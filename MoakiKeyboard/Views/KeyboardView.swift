@@ -233,6 +233,15 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Public State Reset (for external text field changes)
+
+    func resetComposer() {
+        // Reset composer state when text field changes externally
+        // (e.g., when user sends a message and the app clears the field)
+        lastComposingText = ""
+        composer.reset()
+    }
+
     // MARK: - Private Helpers
 
     private func handleComposerAction(_ action: HangulComposer.ComposerAction) {
