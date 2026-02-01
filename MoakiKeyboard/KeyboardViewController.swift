@@ -62,10 +62,13 @@ class KeyboardViewController: UIInputViewController {
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
-        // Reset composer state when text field changes externally
-        // This prevents stale composed characters from appearing when
-        // the user sends a message and the text field is cleared
-        viewModel.resetComposer()
+        // Reset composer state when text field is cleared externally
+        // (e.g., when user sends a message and the app clears the input field)
+        // Only reset if the text field is completely empty
+        if textDocumentProxy.documentContextBeforeInput == nil &&
+           textDocumentProxy.documentContextAfterInput == nil {
+            viewModel.resetComposer()
+        }
     }
 }
 

@@ -20,7 +20,9 @@ struct VowelPattern {
 
         // Y-vowels (triple direction)
         VowelPattern(.ㅛ, .up, .down, .up),               // ↑↓↑
+        VowelPattern(.ㅛ, .up, .downRight, .up),          // ↖↘↖ (정규화 후)
         VowelPattern(.ㅠ, .down, .up, .down),             // ↓↑↓
+        VowelPattern(.ㅠ, .down, .upRight, .down),        // ↙↗↙ (정규화 후)
         VowelPattern(.ㅑ, .right, .left, .right),         // →←→
         VowelPattern(.ㅕ, .left, .right, .left),          // ←→←
 
