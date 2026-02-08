@@ -68,6 +68,19 @@ enum GestureDirection: String, CaseIterable {
         !isCardinal
     }
 
+    /// Check if two directions are exactly opposite (e.g., up↔down, left↔right)
+    func isOpposite(to other: GestureDirection) -> Bool {
+        switch (self, other) {
+        case (.up, .down), (.down, .up),
+             (.left, .right), (.right, .left),
+             (.upLeft, .downRight), (.downRight, .upLeft),
+             (.upRight, .downLeft), (.downLeft, .upRight):
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Check if two directions are adjacent (e.g., up and upRight are adjacent)
     func isAdjacentTo(_ other: GestureDirection) -> Bool {
         let adjacencyMap: [GestureDirection: Set<GestureDirection>] = [

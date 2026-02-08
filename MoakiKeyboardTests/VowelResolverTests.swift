@@ -53,6 +53,22 @@ final class VowelResolverTests: XCTestCase {
         XCTAssertEqual(resolver.resolve(directions: [.left, .right, .left]).vowel, .ㅕ)
     }
 
+    // MARK: - Y-Vowel Diagonal Drift Tests
+
+    func testYVowelDiagonalDrift() {
+        // ㅛ = ↑↓↗ (세 번째 획이 ↗로 빠질 때)
+        XCTAssertEqual(resolver.resolve(directions: [.up, .down, .upRight]).vowel, .ㅛ)
+
+        // ㅛ = ↑↘↗ (중간+세 번째 모두 오른쪽 대각선)
+        XCTAssertEqual(resolver.resolve(directions: [.up, .downRight, .upRight]).vowel, .ㅛ)
+
+        // ㅠ = ↓↑↘ (세 번째 획이 ↘로 빠질 때)
+        XCTAssertEqual(resolver.resolve(directions: [.down, .up, .downRight]).vowel, .ㅠ)
+
+        // ㅠ = ↓↗↘ (중간+세 번째 모두 오른쪽 대각선)
+        XCTAssertEqual(resolver.resolve(directions: [.down, .upRight, .downRight]).vowel, .ㅠ)
+    }
+
     // MARK: - Complex Vowel Tests (Diphthongs)
 
     func testDiphthongs() {

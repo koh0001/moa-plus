@@ -7,11 +7,14 @@ class GestureAnalyzer {
     private var lastDirectionChangePoint: CGPoint?
 
     private let threshold: CGFloat
+    private let reversalThreshold: CGFloat
     private let directionChangeThreshold: CGFloat
 
     init(threshold: CGFloat = KeyboardMetrics.gestureThreshold,
+         reversalThreshold: CGFloat = KeyboardMetrics.reversalThreshold,
          directionChangeThreshold: CGFloat = KeyboardMetrics.directionChangeThreshold) {
         self.threshold = threshold
+        self.reversalThreshold = reversalThreshold
         self.directionChangeThreshold = directionChangeThreshold
     }
 
@@ -45,17 +48,27 @@ class GestureAnalyzer {
             dy: currentPoint.y - referencePoint.y
         )
 
-        guard let newDirection = GestureDirection.from(vector: vector, threshold: threshold) else {
-            return
+        let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
+
+        // Try detecting direction with standard threshold first
+        var newDirection = GestureDirection.from(vector: vector, threshold: threshold)
+
+        // If standard threshold fails, try lower reversal threshold for opposite directions
+        if newDirection == nil, let lastDirection = directions.last, magnitude >= reversalThreshold {
+            if let candidate = GestureDirection.from(vector: vector, threshold: reversalThreshold),
+               candidate.isOpposite(to: lastDirection) {
+                newDirection = candidate
+            }
         }
+
+        guard let newDirection else { return }
 
         // Check if this is a new direction or continuation
         if let lastDirection = directions.last {
             // Only add if direction changed
             if newDirection != lastDirection {
                 // Make sure we've moved enough from the last direction change
-                let distance = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
-                if distance >= directionChangeThreshold {
+                if magnitude >= directionChangeThreshold || (newDirection.isOpposite(to: lastDirection) && magnitude >= reversalThreshold) {
                     directions.append(newDirection)
                     lastDirectionChangePoint = currentPoint
                 }
