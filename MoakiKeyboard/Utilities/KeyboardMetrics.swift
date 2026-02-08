@@ -28,6 +28,7 @@ enum KeyboardMetrics {
 
     // Gesture thresholds
     static let gestureThreshold: CGFloat = 20        // Minimum distance to register direction
+    static let reversalThreshold: CGFloat = 10       // Lower threshold for opposite direction reversals
     static let directionChangeThreshold: CGFloat = 15 // Distance before direction can change
     static let gestureTimeout: TimeInterval = 0.5    // Max time between direction changes
 
