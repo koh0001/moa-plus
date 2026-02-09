@@ -185,11 +185,7 @@ class KeyboardViewModel: ObservableObject {
             handleKoreanModeGesture(row: row, column: column)
         }
 
-        // Reset gesture state
-        activeKey = nil
-        gestureStartPoint = nil
-        gestureDirections = []
-        previewVowel = nil
+        resetGestureState()
     }
 
     private func handleSymbolModeTap(row: Int, column: Int) {
@@ -240,6 +236,16 @@ class KeyboardViewModel: ObservableObject {
         // (e.g., when user sends a message and the app clears the field)
         lastComposingText = ""
         composer.reset()
+    }
+
+    /// Resets gesture tracking state only. Intentionally does NOT reset composer
+    /// or lastComposingText to preserve in-progress Hangul composition.
+    func resetGestureState() {
+        activeKey = nil
+        gestureStartPoint = nil
+        gestureDirections = []
+        previewVowel = nil
+        gestureAnalyzer.reset()
     }
 
     // MARK: - Private Helpers
