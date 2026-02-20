@@ -4,7 +4,7 @@
 
 > 제스처 기반 한글 키보드
 
-<!-- TODO: 키보드 사용 영상 추가 -->
+[시연 영상](https://youtube.com/shorts/6dgNRADQuDA?feature=share)
 
 ## 기능
 
