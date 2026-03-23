@@ -4,6 +4,7 @@
 
 > 제스처 기반 한글 키보드
 
+[앱스토어](https://apps.apple.com/kr/app/moaki-keyboard/id6759444872?l=en-GB)
 [시연 영상](https://youtube.com/shorts/6dgNRADQuDA?feature=share)
 
 ## 기능
