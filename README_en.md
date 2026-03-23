@@ -5,6 +5,7 @@
 > Gesture-based Korean (Hangul) Keyboard
 
 <!-- TODO: Add keyboard demo video -->
+[App Store](https://apps.apple.com/kr/app/moaki-keyboard/id6759444872?l=en-GB)
 
 ## Features
 
