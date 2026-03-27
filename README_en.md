@@ -86,7 +86,7 @@ Select the `MoaPlus` scheme in Xcode → Choose device/simulator → `Cmd + R`
 2. Tap **Moa+** → Enable **Allow Full Access**
 3. Switch to Moa+ using the 🌐 button when typing
 
-> For device installation, see [Build & Install Guide](docs/moakey_ios_custom_docs/10_빌드_및_설치_가이드.md)
+> For device installation, see [Build & Install Guide](docs/moakey_ios_custom_docs/03_빌드_및_설치_가이드.md)
 
 ## Project Structure
 
