@@ -108,6 +108,33 @@ struct AboutView: View {
                 Text("오픈소스 라이선스")
             }
 
+            // Feedback
+            Section {
+                Link(destination: URL(string: "mailto:koh0001@outlook.kr")!) {
+                    HStack {
+                        Label("이메일 문의", systemImage: "envelope")
+                        Spacer()
+                        Text("koh0001@outlook.kr")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Link(destination: URL(string: "https://github.com/koh0001/moa-plus/issues")!) {
+                    HStack {
+                        Label("버그 신고 / 기능 제안", systemImage: "ladybug")
+                        Spacer()
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            } header: {
+                Text("피드백")
+            } footer: {
+                Text("버그, 개선 요청, 아이디어 등 무엇이든 환영합니다.")
+            }
+
             // Links
             Section {
                 Link(destination: URL(string: "https://github.com/koh0001")!) {
