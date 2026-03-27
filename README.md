@@ -1,60 +1,54 @@
-[English](README_en.md)
+# 모아+
 
-# 모아키 (Moaki)
+> 손끝으로 완성하는 한글 — 제스처 기반 iOS 한글 키보드
 
-> 제스처 기반 한글 키보드
+자음 키 위에서 방향을 긋기만 하면 모음이 입력됩니다. 21개 모음을 8방향 제스처 조합으로 빠르게 입력할 수 있는 모아키 방식 키보드입니다.
 
-[앱스토어](https://apps.apple.com/kr/app/moaki-keyboard/id6759444872?l=en-GB)
-[시연 영상](https://youtube.com/shorts/6dgNRADQuDA?feature=share)
+> Based on [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
 
-## 기능
+## 주요 기능
 
-- 자음 키 위 스와이프로 모음 입력 (21종)
-- 쌍자음 포함 4줄 자음 배열
-- 자음 길게 누르면 숫자 입력
-- 숫자/기호 키패드
-- 다크모드, 햅틱 피드백
-- 네트워크 불필요
+- **제스처 모음 입력** — 자음 키 위 8방향 긋기로 21개 모음 입력
+- **롱프레스 보조 입력** — 길게 누르면 숫자/기호, 드래그로 후보 선택
+- **약어 확장** — 자음 몇 개로 긴 문장을 빠르게 입력 (예: ㅇㅎ → 확인했습니다)
+- **커스텀 테마** — 5가지 프리셋 + 커스텀 색상 + 배경 이미지 + 키 투명도
+- **방향별 매핑 커스터마이징** — 대각선 모음 매핑과 인식 각도 범위 조정
+- **열별 제스처 보정** — 끝열 바깥쪽 긋기 정확도 향상
+- **단어 단위 삭제** — 백스페이스 롱프레스 시 단어 단위 빠른 삭제
+- **완전 오프라인** — 네트워크 불필요, 데이터 수집 없음
 
 ## 제스처 가이드
 
-자음 키 위에서 드래그하여 모음을 입력합니다. 왼쪽 대각선(↖, ↙)은 수직 방향으로 정규화됩니다.
+자음 키 위에서 드래그하여 모음을 입력합니다.
 
-### 기본 모음
+### 기본 모음 + 대각선
 
-| 방향 | 모음 |
-|------|------|
-| → | ㅏ |
-| ← | ㅓ |
-| ↑ (또는 ↖) | ㅗ |
-| ↓ (또는 ↙) | ㅜ |
-| ↘ | ㅡ |
-| ↗ | ㅣ |
+| 방향 | 모음 | 방향 | 모음 |
+|------|------|------|------|
+| → | ㅏ | ↗ ↖ | ㅣ |
+| ← | ㅓ | ↘ ↙ | ㅡ |
+| ↑ | ㅗ | | |
+| ↓ | ㅜ | | |
 
-### Y-모음 (왕복 제스처)
+> 대각선 매핑은 설정에서 변경할 수 있습니다.
 
-| 방향 | 모음 |
-|------|------|
-| ↑↓↑ | ㅛ |
-| ↓↑↓ | ㅠ |
-| →←→ | ㅑ |
-| ←→← | ㅕ |
+### Y-모음 (왕복)
+
+| 방향 | 모음 | 방향 | 모음 |
+|------|------|------|------|
+| →←→ | ㅑ | ↑↓↑ | ㅛ |
+| ←→← | ㅕ | ↓↑↓ | ㅠ |
 
 ### 복합 모음
 
-| 방향 | 모음 |
-|------|------|
-| ↑→ | ㅘ |
-| ↑→← | ㅙ |
-| ↓← | ㅝ |
-| ↓←→ | ㅞ |
-| ↑↓ | ㅚ |
-| ↓↑ | ㅟ |
-| →← | ㅐ |
-| →←→← | ㅒ |
-| ←→ | ㅔ |
-| ←→←→ | ㅖ |
-| ↘↖ 또는 ↘↑ | ㅢ |
+| 방향 | 모음 | 방향 | 모음 |
+|------|------|------|------|
+| ↑→ | ㅘ | →← | ㅐ |
+| ↓← | ㅝ | ←→ | ㅔ |
+| ↑↓ | ㅚ | →←→← | ㅒ |
+| ↓↑ | ㅟ | ←→←→ | ㅖ |
+| ↑→← | ㅙ | ↘↖ | ㅢ |
+| ↓→← | ㅞ | | |
 
 ## 키보드 배열
 
@@ -63,59 +57,62 @@
  ^  ㅂ ㅈ ㄷ ㄱ ㅅ  ?
  ;  ㅁ ㄴ ㅇ ㄹ ㅎ  .
  *  ㅋ ㅌ ㅊ ㅍ  ⌫
-[스페이스]  [⏎]  [🌐]
+ 🌐  한/영  ,  [스페이스]  .  ⏎
 ```
 
-자음 길게 누르면 숫자 입력:
-
+롱프레스 숫자/기호:
 ```
-ㅂ→1  ㅈ→2  ㄷ→3  ㄱ→4  ㅅ→5
-ㅁ→6  ㄴ→7  ㅇ→8  ㄹ→9  ㅎ→0
+ㅃ→1  ㅉ→2  ㄸ→3  ㄲ→4  ㅆ→5
+ㅂ→6  ㅈ→7  ㄷ→8  ㄱ→9  ㅅ→0
 ```
 
-## 설치 (TestFlight)
+## 설치
 
-1. iOS 기기에서 [TestFlight](https://apps.apple.com/app/testflight/id899247664)를 설치합니다.
-2. 아래 초대 링크를 클릭하여 모아키를 설치합니다.
-
-> **TestFlight 초대 링크**: [모아키 TestFlight](https://testflight.apple.com/join/zWVF8vqJ)
-
-## 키보드 활성화
-
-1. **설정** → **일반** → **키보드** → **키보드** → **새 키보드 추가** → **Moaki** 선택
-2. 텍스트 입력 시 🌐 버튼으로 모아키로 전환
-
-## 빌드
+### 빌드
 
 ```bash
-git clone https://github.com/vkehfdl1/ios-moaki.git
-cd ios-moaki
-open ios-moaki.xcodeproj
+git clone https://github.com/koh0001/moa-plus.git
+cd moa-plus
+open MoaPlus.xcodeproj
 ```
 
-Xcode에서 `MoakiKeyboard` 스킴을 선택하고 빌드합니다.
+Xcode에서 `MoaPlus` 스킴 선택 → 기기/시뮬레이터 선택 → `Cmd + R`
 
-```bash
-xcodebuild -scheme MoakiKeyboard -destination 'platform=iOS Simulator,name=iPhone 16'
-xcodebuild test -scheme MoakiKeyboardTests -destination 'platform=iOS Simulator,name=iPhone 16'
+### 키보드 활성화
+
+1. **설정** → **일반** → **키보드** → **새 키보드 추가** → **모아+** 선택
+2. **모아+** 탭 → **전체 접근 허용**
+3. 텍스트 입력 시 🌐 버튼으로 모아+ 키보드 전환
+
+> 실기기 설치 시 [빌드 및 설치 가이드](docs/moakey_ios_custom_docs/10_빌드_및_설치_가이드.md) 참조
+
+## 프로젝트 구조
+
+```
+moa-plus/
+├── MoaPlus/                    # 메인 앱 (홈 화면 + 설정 + 튜토리얼)
+├── MoaPlusKeyboard/            # 키보드 익스텐션
+│   ├── Engine/                 # 한글 조합, 제스처 분석, 약어 확장
+│   ├── Models/                 # 자모, 제스처, 테마, 단축어 모델
+│   ├── ViewModels/             # 키보드 뷰모델
+│   ├── Views/                  # 키보드 UI
+│   └── Utilities/              # 설정, 메트릭스, 햅틱
+├── MoaPlusKeyboardTests/       # 유닛 테스트
+└── docs/                       # 개발 문서
 ```
 
-## 구조
-
-```
-ios-moaki/
-├── ios-moaki/              # 메인 앱 (설정 UI)
-├── MoakiKeyboard/          # 키보드 익스텐션
-│   ├── Engine/             # 한글 조합 (HangulComposer, GestureAnalyzer, VowelResolver)
-│   ├── Models/             # 데이터 모델 (HangulJamo, GestureDirection, VowelPattern)
-│   ├── Views/              # SwiftUI 뷰 (KeyboardView, ConsonantGridView 등)
-│   ├── Utilities/          # 유틸리티 (HangulConstants, KeyboardMetrics)
-│   └── KeyboardViewController.swift
-└── MoakiKeyboardTests/     # 유닛 테스트
-```
-
-자세한 아키텍처는 [CLAUDE.md](CLAUDE.md)를 참조하세요.
+아키텍처 상세: [CLAUDE.md](CLAUDE.md)
 
 ## 라이선스
 
 [MIT License](LICENSE)
+
+## 감사의 말
+
+이 프로젝트는 Jeffrey (Dongkyu) Kim님이 만든 [ios-moaki](https://github.com/vkehfdl1/ios-moaki)를 기반으로 합니다.
+오픈소스로 공개해 주신 것에 감사드립니다.
+
+## 크레딧
+
+- 원본 프로젝트: [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
+- 이미지 크롭: [TOCropViewController](https://github.com/TimOliver/TOCropViewController) by Tim Oliver

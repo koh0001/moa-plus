@@ -1,60 +1,56 @@
 [한국어](README.md)
 
-# Moaki
+# Moa+
 
-> Gesture-based Korean (Hangul) Keyboard
+> Korean at your fingertips — Gesture-based iOS Hangul Keyboard
 
-<!-- TODO: Add keyboard demo video -->
-[App Store](https://apps.apple.com/kr/app/moaki-keyboard/id6759444872?l=en-GB)
+Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 8-directional gesture combinations.
+
+> Based on [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
 
 ## Features
 
-- Swipe on consonant keys to input vowels (all 21 vowels)
-- 4-row consonant layout including double consonants
-- Long press consonants to input numbers
-- Number/symbol keypad
-- Dark mode, haptic feedback
-- No network required
+- **Gesture vowel input** — 8-directional swipe on consonant keys for all 21 vowels
+- **Long-press auxiliary input** — Hold for numbers/symbols, drag to select candidates
+- **Abbreviation expansion** — Type a few consonants to expand into full phrases (e.g. ㅇㅎ → 확인했습니다)
+- **Custom themes** — 5 presets + custom colors + background image + key opacity
+- **Direction mapping customization** — Configure diagonal vowel mappings and angle ranges
+- **Per-column gesture correction** — Improve accuracy for edge-column keys
+- **Word-level delete** — Long-press backspace for fast word-by-word deletion
+- **Fully offline** — No network required, no data collection
 
 ## Gesture Guide
 
-Drag on a consonant key to input a vowel. Left diagonals (↖, ↙) are normalized to vertical directions.
+Drag on a consonant key to input a vowel.
 
-### Basic Vowels
+### Basic Vowels + Diagonals
 
-| Direction | Vowel |
-|-----------|-------|
-| → | ㅏ (a) |
-| ← | ㅓ (eo) |
-| ↑ (or ↖) | ㅗ (o) |
-| ↓ (or ↙) | ㅜ (u) |
-| ↘ | ㅡ (eu) |
-| ↗ | ㅣ (i) |
+| Direction | Vowel | Direction | Vowel |
+|-----------|-------|-----------|-------|
+| → | ㅏ (a) | ↗ ↖ | ㅣ (i) |
+| ← | ㅓ (eo) | ↘ ↙ | ㅡ (eu) |
+| ↑ | ㅗ (o) | | |
+| ↓ | ㅜ (u) | | |
 
-### Y-Vowels (Back-and-forth gestures)
+> Diagonal mappings are customizable in settings.
 
-| Direction | Vowel |
-|-----------|-------|
-| ↑↓↑ | ㅛ (yo) |
-| ↓↑↓ | ㅠ (yu) |
-| →←→ | ㅑ (ya) |
-| ←→← | ㅕ (yeo) |
+### Y-Vowels (Back-and-forth)
+
+| Direction | Vowel | Direction | Vowel |
+|-----------|-------|-----------|-------|
+| →←→ | ㅑ (ya) | ↑↓↑ | ㅛ (yo) |
+| ←→← | ㅕ (yeo) | ↓↑↓ | ㅠ (yu) |
 
 ### Compound Vowels
 
-| Direction | Vowel |
-|-----------|-------|
-| ↑→ | ㅘ (wa) |
-| ↑→← | ㅙ (wae) |
-| ↓← | ㅝ (wo) |
-| ↓←→ | ㅞ (we) |
-| ↑↓ | ㅚ (oe) |
-| ↓↑ | ㅟ (wi) |
-| →← | ㅐ (ae) |
-| →←→← | ㅒ (yae) |
-| ←→ | ㅔ (e) |
-| ←→←→ | ㅖ (ye) |
-| ↘↖ or ↘↑ | ㅢ (ui) |
+| Direction | Vowel | Direction | Vowel |
+|-----------|-------|-----------|-------|
+| ↑→ | ㅘ (wa) | →← | ㅐ (ae) |
+| ↓← | ㅝ (wo) | ←→ | ㅔ (e) |
+| ↑↓ | ㅚ (oe) | →←→← | ㅒ (yae) |
+| ↓↑ | ㅟ (wi) | ←→←→ | ㅖ (ye) |
+| ↑→← | ㅙ (wae) | ↘↖ | ㅢ (ui) |
+| ↓→← | ㅞ (we) | | |
 
 ## Keyboard Layout
 
@@ -63,58 +59,61 @@ Drag on a consonant key to input a vowel. Left diagonals (↖, ↙) are normaliz
  ^  ㅂ ㅈ ㄷ ㄱ ㅅ  ?
  ;  ㅁ ㄴ ㅇ ㄹ ㅎ  .
  *  ㅋ ㅌ ㅊ ㅍ  ⌫
-[Space]  [⏎]  [🌐]
+ 🌐  한/영  ,  [Space]  .  ⏎
 ```
 
-Long press consonants for numbers:
-
+Long-press for numbers/symbols:
 ```
-ㅂ→1  ㅈ→2  ㄷ→3  ㄱ→4  ㅅ→5
-ㅁ→6  ㄴ→7  ㅇ→8  ㄹ→9  ㅎ→0
+ㅃ→1  ㅉ→2  ㄸ→3  ㄲ→4  ㅆ→5
+ㅂ→6  ㅈ→7  ㄷ→8  ㄱ→9  ㅅ→0
 ```
 
-## Install (TestFlight)
+## Install
 
-1. Install [TestFlight](https://apps.apple.com/app/testflight/id899247664) on your iOS device.
-2. Tap the invite link below to install Moaki.
-
-> **TestFlight invite link**: [Moaki TestFlight](https://testflight.apple.com/join/zWVF8vqJ)
-
-## Activate the Keyboard
-
-1. **Settings** → **General** → **Keyboard** → **Keyboards** → **Add New Keyboard** → Select **Moaki**
-2. Switch to Moaki using the 🌐 button when typing
-
-## Build
+### Build
 
 ```bash
-git clone https://github.com/vkehfdl1/ios-moaki.git
-cd ios-moaki
-open ios-moaki.xcodeproj
+git clone https://github.com/koh0001/moa-plus.git
+cd moa-plus
+open MoaPlus.xcodeproj
 ```
 
-Select the `MoakiKeyboard` scheme in Xcode and build.
+Select the `MoaPlus` scheme in Xcode → Choose device/simulator → `Cmd + R`
 
-```bash
-xcodebuild -scheme MoakiKeyboard -destination 'platform=iOS Simulator,name=iPhone 16'
-xcodebuild test -scheme MoakiKeyboardTests -destination 'platform=iOS Simulator,name=iPhone 16'
+### Activate the Keyboard
+
+1. **Settings** → **General** → **Keyboard** → **Add New Keyboard** → Select **Moa+**
+2. Tap **Moa+** → Enable **Allow Full Access**
+3. Switch to Moa+ using the 🌐 button when typing
+
+> For device installation, see [Build & Install Guide](docs/moakey_ios_custom_docs/10_빌드_및_설치_가이드.md)
+
+## Project Structure
+
 ```
-
-## Structure
-
-```
-ios-moaki/
-├── ios-moaki/              # Main app (settings UI)
-├── MoakiKeyboard/          # Keyboard extension
-│   ├── Engine/             # Hangul composition (HangulComposer, GestureAnalyzer, VowelResolver)
-│   ├── Models/             # Data models (HangulJamo, GestureDirection, VowelPattern)
-│   ├── Views/              # SwiftUI views (KeyboardView, ConsonantGridView, etc.)
-│   ├── Utilities/          # Utilities (HangulConstants, KeyboardMetrics)
-│   └── KeyboardViewController.swift
-└── MoakiKeyboardTests/     # Unit tests
+moa-plus/
+├── MoaPlus/                    # Main app (home, settings, tutorial)
+├── MoaPlusKeyboard/            # Keyboard extension
+│   ├── Engine/                 # Hangul composition, gesture analysis, abbreviation
+│   ├── Models/                 # Jamo, gesture, theme, shortcut models
+│   ├── ViewModels/             # Keyboard view model
+│   ├── Views/                  # Keyboard UI
+│   └── Utilities/              # Settings, metrics, haptics
+├── MoaPlusKeyboardTests/       # Unit tests
+└── docs/                       # Development docs
 ```
 
 For detailed architecture, see [CLAUDE.md](CLAUDE.md).
+
+## Acknowledgments
+
+This project is based on [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim.
+Thank you for making the project open source.
+
+## Credits
+
+- Original project: [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
+- Image cropping: [TOCropViewController](https://github.com/TimOliver/TOCropViewController) by Tim Oliver
 
 ## License
 
