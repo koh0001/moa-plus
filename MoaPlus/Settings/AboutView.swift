@@ -6,25 +6,12 @@ struct AboutView: View {
             // App header with icon gradient
             Section {
                 VStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.10, green: 0.10, blue: 0.18),
-                                        Color(red: 0.26, green: 0.38, blue: 0.93)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 80, height: 80)
-                            .shadow(color: Color(red: 0.26, green: 0.38, blue: 0.93).opacity(0.3), radius: 8, y: 3)
-
-                        Image(systemName: "keyboard")
-                            .font(.system(size: 32))
-                            .foregroundColor(.white)
-                    }
+                    Image("AppIconImage")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .shadow(color: Color(red: 0.26, green: 0.38, blue: 0.93).opacity(0.3), radius: 8, y: 3)
 
                     Text("모아+")
                         .font(.title2)

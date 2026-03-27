@@ -19,22 +19,12 @@ struct ContentView: View {
 
                     // Hero
                     VStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [deepBlue, accentBlue],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 88, height: 88)
-                                .shadow(color: accentBlue.opacity(0.4), radius: 12, y: 4)
-
-                            Image(systemName: "keyboard")
-                                .font(.system(size: 36))
-                                .foregroundColor(.white)
-                        }
+                        Image("AppIconImage")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 100, height: 100)
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
+                            .shadow(color: accentBlue.opacity(0.4), radius: 12, y: 4)
 
                         Text("모아+")
                             .font(.system(size: 40, weight: .bold))
