@@ -16,12 +16,32 @@ class GestureAnalyzer {
     private let reversalThreshold: CGFloat
     private let directionChangeThreshold: CGFloat
 
+    /// Configurable gesture settings (defaults to standard if not set)
+    var settings: GestureSettings = .default
+
+    /// Column ID for per-column gesture correction (1-5, 0 = no column override)
+    var columnId: Int = 0
+
+    /// Effective swipe threshold considering column overrides
+    var effectiveThreshold: CGFloat {
+        if columnId > 0 {
+            return settings.effectiveSwipeThreshold(forColumn: columnId)
+        }
+        return settings.swipeProfile.swipeLength.threshold
+    }
+
     init(threshold: CGFloat = KeyboardMetrics.gestureThreshold,
          reversalThreshold: CGFloat = KeyboardMetrics.reversalThreshold,
          directionChangeThreshold: CGFloat = KeyboardMetrics.directionChangeThreshold) {
-        self.threshold = threshold
+        self.threshold = threshold  // Note: effectiveThreshold takes precedence at runtime
         self.reversalThreshold = reversalThreshold
         self.directionChangeThreshold = directionChangeThreshold
+    }
+
+    convenience init(settings: GestureSettings, columnId: Int = 0) {
+        self.init()
+        self.settings = settings
+        self.columnId = columnId
     }
 
     func reset() {
@@ -47,8 +67,8 @@ class GestureAnalyzer {
     private func analyzeLatestMovement() {
         guard touchPoints.count >= 2 else { return }
 
-        let referencePoint = lastDirectionChangePoint ?? touchPoints.first!
-        let currentPoint = touchPoints.last!
+        guard let referencePoint = lastDirectionChangePoint ?? touchPoints.first,
+              let currentPoint = touchPoints.last else { return }
 
         let vector = CGVector(
             dx: currentPoint.x - referencePoint.x,
@@ -57,8 +77,8 @@ class GestureAnalyzer {
 
         let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
 
-        // Try detecting direction with standard threshold first
-        var newDirection = GestureDirection.from(vector: vector, threshold: threshold)
+        // Try detecting direction with effective threshold first (respects settings/column overrides)
+        var newDirection = GestureDirection.from(vector: vector, threshold: effectiveThreshold)
 
         // If standard threshold fails, try lower reversal threshold for opposite directions
         if newDirection == nil, let lastDirection = directions.last, magnitude >= reversalThreshold {
@@ -177,6 +197,23 @@ class GestureAnalyzer {
         }
 
         return result
+    }
+
+    /// Get direction with column-specific rotation applied
+    func adjustedDirection(from vector: CGVector) -> GestureDirection? {
+        guard columnId > 0 else {
+            return GestureDirection.from(vector: vector, threshold: effectiveThreshold)
+        }
+        let rotationOffset = settings.effectiveRotationOffset(forColumn: columnId)
+        // Apply rotation to the vector
+        let angleRad = rotationOffset * .pi / 180.0
+        let cosA = cos(angleRad)
+        let sinA = sin(angleRad)
+        let rotatedVector = CGVector(
+            dx: vector.dx * cosA - vector.dy * sinA,
+            dy: vector.dx * sinA + vector.dy * cosA
+        )
+        return GestureDirection.from(vector: rotatedVector, threshold: effectiveThreshold)
     }
 }
 

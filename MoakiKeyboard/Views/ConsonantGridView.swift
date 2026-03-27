@@ -32,12 +32,22 @@ struct KeyGridView: View {
                             centerKeyWidth: centerKeyWidth
                         )
 
+                        let consonantLabel: String = {
+                            if case .consonant(let choseong) = content {
+                                return String(choseong.compatibilityCharacter)
+                            }
+                            return ""
+                        }()
+
                         KeyView(
                             content: content ?? .symbol(""),
                             keySize: CGSize(width: width, height: keyHeight),
                             isPressed: isActive,
                             previewVowel: isActive ? previewVowel : nil,
                             longPressNumber: longPressNumber,
+                            secondaryAction: KeyboardSettings.shared.secondaryAction(forKey: consonantLabel),
+                            showSecondaryHints: KeyboardSettings.shared.showSecondaryHints,
+                            hintSize: KeyboardSettings.shared.hintSize,
                             onLongPress: { number in
                                 onLongPressNumber(number)
                             },

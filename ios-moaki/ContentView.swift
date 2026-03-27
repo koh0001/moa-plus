@@ -94,6 +94,19 @@ struct ContentView: View {
                         )
                     }
 
+                    NavigationLink(destination: SettingsMainView()) {
+                        HStack {
+                            Image(systemName: "gearshape")
+                            Text("모아키 설정")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+
                     Button(action: openSettings) {
                         HStack {
                             Image(systemName: "gear")

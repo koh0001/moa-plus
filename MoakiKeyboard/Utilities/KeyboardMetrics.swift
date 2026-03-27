@@ -6,6 +6,28 @@ enum KeyContent: Equatable {
     case consonant(Choseong)
     case symbol(String)
     case backspace
+    // Moakey bimanual layout key types
+    case vowelPrimitive(VowelPrimitiveType)  // ㆍ, ㅣ, ㅡ
+    case functional(FunctionalKeyType)        // Mode switch, settings, etc.
+    case systemSwitch                         // Globe key (system keyboard switch)
+    case quickPunctuation(String)             // Period, comma, etc.
+}
+
+enum VowelPrimitiveType: String {
+    case dot = "ㆍ"    // Middle dot (아래아)
+    case bar = "ㅣ"    // Vertical bar
+    case dash = "ㅡ"   // Horizontal dash
+
+    var displayLabel: String { rawValue }
+}
+
+enum FunctionalKeyType: String {
+    case modeToggle     // Korean ↔ Symbol toggle
+    case specialChar    // Special character layer entry
+    case settings       // Settings shortcut
+    case space          // Space bar
+    case returnKey      // Return/Enter
+    case languageSwitch // Language switch (short tap = special char, long = system switch)
 }
 
 enum KeyboardMetrics {
@@ -148,5 +170,54 @@ enum KeyboardMetrics {
             return nil
         }
         return longPressNumbers[row][column]
+    }
+
+    // MARK: - Bimanual (Galaxy-style) Layout
+
+    /// Bimanual layout metrics
+    static let bimanualColumnCount = 5
+    static let bimanualRowCount = 4
+    static let vowelColumnWidth: CGFloat = 44.0
+
+    /// Galaxy-style bimanual moakey layout (5 columns × 4 rows of consonants)
+    /// Plus right-side vowel primitives and bottom function row
+    static let bimanualConsonantGrid: [[KeyContent]] = [
+        // Row 1: Double consonants
+        [.consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ)],
+        // Row 2: Basic consonants
+        [.consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ)],
+        // Row 3: Remaining consonants
+        [.consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ)],
+        // Row 4: Bottom consonants
+        [.consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .backspace],
+    ]
+
+    /// Right-side vowel primitive column
+    static let vowelPrimitiveColumn: [KeyContent] = [
+        .vowelPrimitive(.dot),   // ㆍ
+        .vowelPrimitive(.bar),   // ㅣ
+        .vowelPrimitive(.dash),  // ㅡ
+    ]
+
+    /// Bottom function row for bimanual layout
+    static let bimanualFunctionRow: [KeyContent] = [
+        .functional(.languageSwitch),  // Short tap: special chars / Long: system switch
+        .functional(.modeToggle),      // Korean ↔ Symbol (123)
+        .quickPunctuation(","),
+        .functional(.space),
+        .quickPunctuation("."),
+        .functional(.returnKey),
+    ]
+
+    /// Get the column index (1-5) for a consonant key in bimanual layout
+    static func columnIndex(for choseong: Choseong) -> Int {
+        let columnMap: [Choseong: Int] = [
+            .ㅃ: 1, .ㅂ: 1, .ㅁ: 1, .ㅋ: 1,
+            .ㅉ: 2, .ㅈ: 2, .ㄴ: 2, .ㅌ: 2,
+            .ㄸ: 3, .ㄷ: 3, .ㅇ: 3, .ㅊ: 3,
+            .ㄲ: 4, .ㄱ: 4, .ㄹ: 4, .ㅍ: 4,
+            .ㅆ: 5, .ㅅ: 5, .ㅎ: 5,
+        ]
+        return columnMap[choseong] ?? 3
     }
 }

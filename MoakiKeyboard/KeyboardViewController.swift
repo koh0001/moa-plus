@@ -130,7 +130,6 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
     }
 
     func triggerHapticFeedback() {
-        feedbackGenerator?.impactOccurred()
-        feedbackGenerator?.prepare()
+        HapticManager.shared.playTap()
     }
 }

@@ -6,6 +6,9 @@ struct KeyView: View {
     let isPressed: Bool
     let previewVowel: Jungseong?
     let longPressNumber: String?
+    var secondaryAction: SecondaryKeyAction?
+    var showSecondaryHints: Bool = true
+    var hintSize: Int = 1
     let onLongPress: ((String) -> Void)?
     let onBackspacePressStart: (() -> Void)?
     let onBackspacePressEnd: (() -> Void)?
@@ -21,11 +24,22 @@ struct KeyView: View {
         ZStack {
             // Key background
             RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
-                .fill(backgroundColor)
+                .fill(themedBackgroundColor)
                 .shadow(color: .black.opacity(0.2), radius: isPressed ? 0 : 1, y: isPressed ? 0 : 1)
 
             // Key label
             keyLabel
+
+            // Secondary hint label
+            if let hint = secondaryAction?.visibleHint,
+               showSecondaryHints {
+                Text(hint)
+                    .font(.system(size: hintFontSize))
+                    .foregroundColor(Color(.label).opacity(0.5))
+                    .padding(hintEdge, hintEdgePadding)
+                    .padding(.top, 3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: hintAlignment)
+            }
         }
         .frame(width: keySize.width, height: keySize.height)
         .overlay(numberPopupOverlay, alignment: .top)
@@ -75,12 +89,13 @@ struct KeyView: View {
 
     @ViewBuilder
     private var keyLabel: some View {
+        let fontSize = keySize.height * 0.4
         switch content {
         case .consonant(let consonant):
             VStack(spacing: 2) {
                 Text(String(consonant.compatibilityCharacter))
-                    .font(.system(size: keySize.height * 0.4, weight: .medium))
-                    .foregroundColor(textColor)
+                    .font(.system(size: fontSize, weight: .medium))
+                    .foregroundColor(themedTextColor)
 
                 // Show preview vowel when dragging
                 if let vowel = previewVowel {
@@ -92,13 +107,33 @@ struct KeyView: View {
 
         case .symbol(let symbol):
             Text(symbol)
-                .font(.system(size: keySize.height * 0.4, weight: .medium))
-                .foregroundColor(textColor)
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundColor(themedTextColor)
 
         case .backspace:
             Image(systemName: "delete.left")
                 .font(.system(size: keySize.height * 0.35))
-                .foregroundColor(textColor)
+                .foregroundColor(themedTextColor)
+
+        case .vowelPrimitive(let type):
+            Text(type.displayLabel)
+                .font(.system(size: fontSize))
+                .foregroundColor(themedTextColor)
+
+        case .functional(let type):
+            Text(type.rawValue)
+                .font(.system(size: fontSize * 0.7))
+                .foregroundColor(themedTextColor)
+
+        case .systemSwitch:
+            Image(systemName: "globe")
+                .font(.system(size: fontSize * 0.8))
+                .foregroundColor(themedTextColor)
+
+        case .quickPunctuation(let punct):
+            Text(punct)
+                .font(.system(size: fontSize))
+                .foregroundColor(themedTextColor)
         }
     }
 
@@ -119,19 +154,48 @@ struct KeyView: View {
         }
     }
 
-    private var backgroundColor: Color {
-        switch content {
-        case .backspace:
-            return isPressed || isHighlighted ? Color(.systemGray3) : Color(.systemGray5)
-        case .symbol:
-            return isPressed || isHighlighted ? Color(.systemGray3) : Color(.systemGray5)
-        case .consonant:
-            return isPressed || isHighlighted ? Color(.systemGray4) : Color(.secondarySystemBackground)
+    private var hintFontSize: CGFloat {
+        switch hintSize {
+        case 0: return 8
+        case 2: return 12
+        default: return 10
         }
     }
 
-    private var textColor: Color {
-        return .primary
+    private var hintAlignment: Alignment {
+        switch secondaryAction?.hintInsetDirection {
+        case .inwardLeft:
+            return .topLeading
+        default:
+            return .topTrailing
+        }
+    }
+
+    private var hintEdge: Edge.Set {
+        switch secondaryAction?.hintInsetDirection {
+        case .inwardLeft:
+            return .leading
+        default:
+            return .trailing
+        }
+    }
+
+    private var hintEdgePadding: CGFloat { 4 }
+
+    private var themedBackgroundColor: Color {
+        let theme = KeyboardSettings.shared.themeSettings.buttonTheme
+        switch content {
+        case .consonant:
+            return isPressed || isHighlighted ? theme.keyBackgroundColor.opacity(0.7) : theme.keyBackgroundColor
+        case .vowelPrimitive:
+            return isPressed || isHighlighted ? theme.keyBackgroundColor.opacity(0.6) : theme.keyBackgroundColor.opacity(0.85)
+        case .symbol, .functional, .systemSwitch, .quickPunctuation, .backspace:
+            return isPressed || isHighlighted ? theme.functionKeyBackgroundColor.opacity(0.7) : theme.functionKeyBackgroundColor
+        }
+    }
+
+    private var themedTextColor: Color {
+        return KeyboardSettings.shared.themeSettings.buttonTheme.keyTextColor
     }
 
     private var isBackspaceKey: Bool {
