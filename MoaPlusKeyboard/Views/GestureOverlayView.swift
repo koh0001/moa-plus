@@ -35,15 +35,31 @@ struct GestureOverlayView: View {
     }
 
     private func indicatorPosition(start: CGPoint, in size: CGSize) -> CGPoint {
-        // Position the indicator above the touch point
-        var x = start.x
-        var y = start.y - 80
+        let overlayHeight: CGFloat = 80
+        let overlayWidth: CGFloat = 80
 
-        // Keep within bounds
-        x = max(50, min(size.width - 50, x))
-        y = max(40, y)
+        // Vertical: upper half → below, lower half → above
+        let y: CGFloat
+        if start.y < size.height * 0.45 {
+            y = start.y + overlayHeight
+        } else {
+            y = start.y - overlayHeight
+        }
 
-        return CGPoint(x: x, y: y)
+        // Horizontal: left edge → push right, right edge → push left
+        let x: CGFloat
+        if start.x < size.width * 0.25 {
+            x = start.x + overlayWidth
+        } else if start.x > size.width * 0.75 {
+            x = start.x - overlayWidth
+        } else {
+            x = start.x
+        }
+
+        return CGPoint(
+            x: max(50, min(size.width - 50, x)),
+            y: max(40, min(size.height - 40, y))
+        )
     }
 }
 

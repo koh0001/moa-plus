@@ -6,6 +6,16 @@
 
 > Based on [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
 
+## 스크린샷
+
+| 홈 | 키보드 | 설정 | 외형 |
+|:--:|:--:|:--:|:--:|
+| <img src="resources/screenshots/01_home.png" width="180"> | <img src="resources/screenshots/02_keyboard.png" width="180"> | <img src="resources/screenshots/03_settings.png" width="180"> | <img src="resources/screenshots/04_appearance.png" width="180"> |
+
+| 튜토리얼 | 단축어 | 앱 정보 |
+|:--:|:--:|:--:|
+| <img src="resources/screenshots/05_tutorial.png" width="180"> | <img src="resources/screenshots/06_abbreviation.png" width="180"> | <img src="resources/screenshots/07_about.png" width="180"> |
+
 ## 주요 기능
 
 - **제스처 모음 입력** — 자음 키 위 8방향 긋기로 21개 모음 입력

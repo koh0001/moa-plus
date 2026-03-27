@@ -8,6 +8,16 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 
 > Based on [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
 
+## Screenshots
+
+| Home | Keyboard | Settings | Appearance |
+|:--:|:--:|:--:|:--:|
+| <img src="resources/screenshots/01_home.png" width="180"> | <img src="resources/screenshots/02_keyboard.png" width="180"> | <img src="resources/screenshots/03_settings.png" width="180"> | <img src="resources/screenshots/04_appearance.png" width="180"> |
+
+| Tutorial | Abbreviation | About |
+|:--:|:--:|:--:|
+| <img src="resources/screenshots/05_tutorial.png" width="180"> | <img src="resources/screenshots/06_abbreviation.png" width="180"> | <img src="resources/screenshots/07_about.png" width="180"> |
+
 ## Features
 
 - **Gesture vowel input** — 8-directional swipe on consonant keys for all 21 vowels
