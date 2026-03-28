@@ -1,22 +1,64 @@
 import SwiftUI
 import Combine
 
-// ViewModel to handle keyboard logic
-class KeyboardViewModel: ObservableObject {
+// MARK: - Separated State Objects (reduce unnecessary redraws)
+
+/// Gesture-related state — only GestureOverlayView observes this
+class GestureState: ObservableObject {
     @Published var activeKey: (row: Int, column: Int)?
     @Published var previewVowel: Jungseong?
-    @Published var gestureDirections: [GestureDirection] = []
-    @Published var gestureStartPoint: CGPoint?
+    @Published var directions: [GestureDirection] = []
+    @Published var startPoint: CGPoint?
+}
+
+/// Long-press popup state — only popup overlay observes this
+class PopupState: ObservableObject {
+    @Published var text: String?
+    @Published var candidates: [String] = []
+    @Published var selectedIndex: Int = 0
+}
+
+// MARK: - ViewModel
+
+class KeyboardViewModel: ObservableObject {
+    let gestureState = GestureState()
+    let popupState = PopupState()
+
     @Published var isSymbolMode: Bool = false
     @Published var isSpecialCharLayerVisible: Bool = false
     @Published var isAbbreviationCandidateVisible: Bool = false
     @Published var abbreviationCandidate: ShortcutExpansion?
     @Published var abbreviationCandidates: [ShortcutExpansion] = []
 
-    /// Long-press popup state (rendered at KeyboardView level to avoid z-order clipping)
-    @Published var longPressPopupText: String?
-    @Published var longPressPopupCandidates: [String] = []
-    @Published var longPressPopupSelectedIndex: Int = 0
+    // Forwarding properties for backward compatibility
+    var activeKey: (row: Int, column: Int)? {
+        get { gestureState.activeKey }
+        set { gestureState.activeKey = newValue }
+    }
+    var previewVowel: Jungseong? {
+        get { gestureState.previewVowel }
+        set { gestureState.previewVowel = newValue }
+    }
+    var gestureDirections: [GestureDirection] {
+        get { gestureState.directions }
+        set { gestureState.directions = newValue }
+    }
+    var gestureStartPoint: CGPoint? {
+        get { gestureState.startPoint }
+        set { gestureState.startPoint = newValue }
+    }
+    var longPressPopupText: String? {
+        get { popupState.text }
+        set { popupState.text = newValue }
+    }
+    var longPressPopupCandidates: [String] {
+        get { popupState.candidates }
+        set { popupState.candidates = newValue }
+    }
+    var longPressPopupSelectedIndex: Int {
+        get { popupState.selectedIndex }
+        set { popupState.selectedIndex = newValue }
+    }
 
     private let composer = HangulComposer()
     private let gestureAnalyzer = GestureAnalyzer()
@@ -465,7 +507,7 @@ class KeyboardViewModel: ObservableObject {
                 self.backspaceAccelTimer = self.makeTimer(interval: accelDelay, repeats: false) { [weak self] _ in
                     guard let self, self.isBackspacePressing else { return }
                     self.backspaceRepeatTimer?.invalidate()
-                    self.backspaceRepeatTimer = self.makeTimer(interval: 0.12, repeats: true) { [weak self] _ in
+                    self.backspaceRepeatTimer = self.makeTimer(interval: KeyboardMetrics.wordDeleteRepeatInterval, repeats: true) { [weak self] _ in
                         guard let self, self.isBackspacePressing else { return }
                         self.deleteWord()
                     }

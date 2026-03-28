@@ -230,13 +230,16 @@ struct KeyView: View {
 
     private func startLongPressTimer() {
         guard longPressNumber != nil else { return }
+        cancelLongPressTimer()
 
-        longPressTimer = Timer.scheduledTimer(withTimeInterval: KeyboardSettings.shared.longPressDelay, repeats: false) { _ in
+        let timer = Timer(timeInterval: KeyboardSettings.shared.longPressDelay, repeats: false) { _ in
             showNumberPopup = true
             if let number = longPressNumber {
                 onLongPress?(number)
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        longPressTimer = timer
     }
 
     private func cancelLongPressTimer() {

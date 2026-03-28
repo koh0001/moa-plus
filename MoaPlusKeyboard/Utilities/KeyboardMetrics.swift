@@ -51,6 +51,15 @@ enum KeyboardMetrics {
     // Function row
     static let functionRowHeight: CGFloat = 44
 
+    // Keyboard height
+    static let keyboardHeight: CGFloat = 260
+
+    // Audio
+    static let clickSoundID: UInt32 = 1104
+
+    // Backspace timing
+    static let wordDeleteRepeatInterval: TimeInterval = 0.12
+
     // Gesture thresholds
     static let gestureThreshold: CGFloat = 20        // Minimum distance to register direction
     static let reversalThreshold: CGFloat = 10       // Lower threshold for opposite direction reversals

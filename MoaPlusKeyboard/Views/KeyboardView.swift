@@ -4,6 +4,10 @@ import Combine
 struct KeyboardView: View {
     @ObservedObject var viewModel: KeyboardViewModel
     @ObservedObject var settings = KeyboardSettings.shared
+    // Observe sub-states directly to reduce unnecessary redraws
+    @ObservedObject var gestureState: GestureState
+    @ObservedObject var popupState: PopupState
+    private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
     @State private var cachedBgImage: UIImage?
     @State private var cachedBgImageId: String?
 
@@ -102,27 +106,26 @@ struct KeyboardView: View {
                     // Gesture overlay (only shown when enabled and in Korean mode)
                     if settings.showGesturePreview && !viewModel.isSymbolMode {
                         GestureOverlayView(
-                            directions: viewModel.gestureDirections,
-                            startPoint: viewModel.gestureStartPoint,
-                            currentVowel: viewModel.previewVowel
+                            directions: gestureState.directions,
+                            startPoint: gestureState.startPoint,
+                            currentVowel: gestureState.previewVowel
                         )
                     }
 
                     // Long-press popup with candidate bar
-                    if viewModel.longPressPopupText != nil,
-                       let activeRow = viewModel.activeKey?.row,
-                       let activeCol = viewModel.activeKey?.column {
+                    if popupState.text != nil,
+                       let activeRow = gestureState.activeKey?.row,
+                       let activeCol = gestureState.activeKey?.column {
                         let sp = KeyboardMetrics.keySpacing
                         let x = keyXPosition(column: activeCol, row: activeRow, centerKeyWidth: centerKeyWidth, spacing: sp, totalWidth: geometry.size.width)
                         let y = CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
-                        let rawCandidates = viewModel.longPressPopupCandidates
-                        let selectedIdx = viewModel.longPressPopupSelectedIndex
+                        let rawCandidates = popupState.candidates
+                        let selectedIdx = popupState.selectedIndex
                         let isRightEdge = activeCol >= 5
                         // When auto-bracket is on, hide standalone closing brackets
-                        let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
                         let candidates = KeyboardSettings.shared.autoBracketEnabled
-                            ? rawCandidates.filter { !closingBrackets.contains($0) }
+                            ? rawCandidates.filter { !Self.closingBrackets.contains($0) }
                             : rawCandidates
                         // Right-edge: reverse display so leftward drag matches visual order
                         let displayCandidates = isRightEdge ? Array(candidates.reversed()) : candidates
@@ -210,6 +213,7 @@ struct KeyboardView: View {
 }
 
 #Preview {
-    KeyboardView(viewModel: KeyboardViewModel())
+    let vm = KeyboardViewModel()
+    KeyboardView(viewModel: vm, gestureState: vm.gestureState, popupState: vm.popupState)
         .frame(height: 280)
 }

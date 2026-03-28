@@ -24,7 +24,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             toItem: nil,
             attribute: .notAnAttribute,
             multiplier: 1.0,
-            constant: 260
+            constant: KeyboardMetrics.keyboardHeight
         )
         heightConstraint.priority = .required
         rootView.addConstraint(heightConstraint)
@@ -36,13 +36,13 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // Warm up audio session to prevent loud first click
         // Play the actual click sound once at launch to initialize the audio route
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            AudioServicesPlaySystemSound(1104)
+            AudioServicesPlaySystemSound(KeyboardMetrics.clickSoundID)
         }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        heightConstraint?.constant = 260
+        heightConstraint?.constant = KeyboardMetrics.keyboardHeight
         heightConstraint?.isActive = true
         view.setNeedsLayout()
         view.layoutIfNeeded()
@@ -70,7 +70,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     }
 
     private func setupKeyboardView() {
-        let rootView = KeyboardView(viewModel: viewModel).ignoresSafeArea(.all)
+        let rootView = KeyboardView(viewModel: viewModel, gestureState: viewModel.gestureState, popupState: viewModel.popupState).ignoresSafeArea(.all)
         let hostingController = UIHostingController(rootView: rootView)
         hostingController.view.backgroundColor = .clear
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -142,7 +142,7 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
     func triggerHapticFeedback() {
         HapticManager.shared.playTap()
         if KeyboardSettings.shared.clickSoundEnabled {
-            AudioServicesPlaySystemSound(1104)
+            AudioServicesPlaySystemSound(KeyboardMetrics.clickSoundID)
         }
     }
 }
