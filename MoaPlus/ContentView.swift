@@ -118,9 +118,30 @@ struct KeyboardStatusCard: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 stepRow(num: 1, text: "설정 → 일반 → 키보드 → 새 키보드 추가")
-                stepRow(num: 2, text: "목록에서 '모아+' 선택")
+                stepRow(num: 2, text: "목록에서 '모아+' 선택 → 전체 접근 허용")
                 stepRow(num: 3, text: "🌐 버튼으로 키보드 전환")
             }
+
+            // Full access explanation
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("전체 접근이 필요한 이유")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                Text("테마, 배경 이미지, 단축어 등 앱 설정을 키보드에 반영하기 위해 필요합니다. 입력 데이터는 수집하지 않으며 네트워크를 사용하지 않습니다.")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.white.opacity(0.08))
+            )
 
             Button(action: openSettings) {
                 HStack {
