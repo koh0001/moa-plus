@@ -78,10 +78,12 @@ final class AbbreviationEngine {
         for expansion in store.enabledExpansions {
             var node = trieRoot
             for char in expansion.trigger {
-                if node.children[char] == nil {
-                    node.children[char] = TrieNode()
-                }
-                node = node.children[char]!
+                let child = node.children[char] ?? {
+                    let newNode = TrieNode()
+                    node.children[char] = newNode
+                    return newNode
+                }()
+                node = child
             }
             node.expansions.append(expansion)
         }

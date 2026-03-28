@@ -11,6 +11,7 @@ final class HapticManager {
     private lazy var lightImpact = UIImpactFeedbackGenerator(style: .light)
     private lazy var mediumImpact = UIImpactFeedbackGenerator(style: .medium)
     private lazy var selectionFeedback = UISelectionFeedbackGenerator()
+    private lazy var notificationFeedback = UINotificationFeedbackGenerator()
 
     private init() {
         // Prepare generators for lower latency
@@ -45,8 +46,7 @@ final class HapticManager {
     /// Abbreviation expansion confirmed feedback
     func playAbbreviationConfirm() {
         guard settings.hapticEnabled && settings.hapticOnAbbreviationConfirm else { return }
-        let notification = UINotificationFeedbackGenerator()
-        notification.notificationOccurred(.success)
+        notificationFeedback.notificationOccurred(.success)
     }
 
     // MARK: - Private

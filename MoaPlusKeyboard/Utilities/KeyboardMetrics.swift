@@ -217,15 +217,16 @@ enum KeyboardMetrics {
         .functional(.returnKey),
     ]
 
+    private static let columnMap: [Choseong: Int] = [
+        .ㅃ: 1, .ㅂ: 1, .ㅁ: 1, .ㅋ: 1,
+        .ㅉ: 2, .ㅈ: 2, .ㄴ: 2, .ㅌ: 2,
+        .ㄸ: 3, .ㄷ: 3, .ㅇ: 3, .ㅊ: 3,
+        .ㄲ: 4, .ㄱ: 4, .ㄹ: 4, .ㅍ: 4,
+        .ㅆ: 5, .ㅅ: 5, .ㅎ: 5,
+    ]
+
     /// Get the column index (1-5) for a consonant key in bimanual layout
     static func columnIndex(for choseong: Choseong) -> Int {
-        let columnMap: [Choseong: Int] = [
-            .ㅃ: 1, .ㅂ: 1, .ㅁ: 1, .ㅋ: 1,
-            .ㅉ: 2, .ㅈ: 2, .ㄴ: 2, .ㅌ: 2,
-            .ㄸ: 3, .ㄷ: 3, .ㅇ: 3, .ㅊ: 3,
-            .ㄲ: 4, .ㄱ: 4, .ㄹ: 4, .ㅍ: 4,
-            .ㅆ: 5, .ㅅ: 5, .ㅎ: 5,
-        ]
         return columnMap[choseong] ?? 3
     }
 }

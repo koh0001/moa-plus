@@ -3,11 +3,34 @@ import SwiftUI
 struct InputSettingsView: View {
     @ObservedObject private var settings = KeyboardSettings.shared
 
+    // Helper bindings that force full struct reassignment for @Published didSet
+    private func profileBinding<T>(_ keyPath: WritableKeyPath<SwipeProfile, T>) -> Binding<T> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile[keyPath: keyPath] },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile[keyPath: keyPath] = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
+    private func sectorHalfWidthBinding(_ index: Int) -> Binding<Double> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile.sectors[index].halfWidth },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile.sectors[index].halfWidth = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
     var body: some View {
         List {
             // Swipe Angle Section
             Section {
-                Picker("프리셋", selection: $settings.gestureSettings.swipeProfile.mode) {
+                Picker("프리셋", selection: profileBinding(\.mode)) {
                     Text("오른손용").tag(SwipeMode.right)
                     Text("왼손용").tag(SwipeMode.left)
                     Text("양손용").tag(SwipeMode.both)
@@ -22,7 +45,7 @@ struct InputSettingsView: View {
 
             // Swipe Length Section
             Section {
-                Picker("길이", selection: $settings.gestureSettings.swipeProfile.swipeLength) {
+                Picker("길이", selection: profileBinding(\.swipeLength)) {
                     ForEach(SwipeLength.allCases, id: \.self) { length in
                         Text(length.displayName).tag(length)
                     }
@@ -156,7 +179,10 @@ struct ColumnCorrectionDetailView: View {
             get: { override },
             set: { newValue in
                 if let index = settings.gestureSettings.columnOverrides.firstIndex(where: { $0.columnId == columnId }) {
-                    settings.gestureSettings.columnOverrides[index] = newValue
+                    // Force full struct reassignment to trigger @Published didSet
+                    var gs = settings.gestureSettings
+                    gs.columnOverrides[index] = newValue
+                    settings.gestureSettings = gs
                 }
             }
         )
@@ -166,14 +192,31 @@ struct ColumnCorrectionDetailView: View {
         List {
             // Visualization
             Section {
-                GestureAngleVisualization(
-                    rotationOffset: override.rotationOffsetDeg,
-                    verticalIWidthDelta: override.verticalIWidthDelta,
-                    horizontalEuWidthDelta: override.horizontalEuWidthDelta
+                DirectionPieChart(
+                    slices: DirectionPieChart.columnCorrectionSlices(
+                        settings: settings,
+                        rotationOffset: override.rotationOffsetDeg,
+                        iDelta: override.verticalIWidthDelta,
+                        euDelta: override.horizontalEuWidthDelta
+                    ),
+                    rotationLabel: abs(override.rotationOffsetDeg) > 0.1 ? "↻\(String(format: "%.1f", override.rotationOffsetDeg))°" : nil
                 )
                 .frame(height: 200)
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(Color(.systemGroupedBackground))
+                .listRowBackground(Color(.systemBackground))
+
+                // Column keys shown below the chart
+                HStack(spacing: 10) {
+                    ForEach(columnKeys, id: \.self) { key in
+                        Text(key)
+                            .font(.title3)
+                            .frame(width: 36, height: 36)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(8)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
             } header: {
                 Text("방향 인식 영역")
             } footer: {
@@ -221,28 +264,15 @@ struct ColumnCorrectionDetailView: View {
                 }
             }
 
-            // Key list
-            Section {
-                HStack(spacing: 12) {
-                    ForEach(columnKeys, id: \.self) { key in
-                        Text(key)
-                            .font(.title2)
-                            .frame(width: 40, height: 40)
-                            .background(Color(.systemGray5))
-                            .cornerRadius(8)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
-            } header: {
-                Text("이 열의 자음 키")
-            }
 
             Section {
                 Button("이 열만 기본값으로 복원") {
                     if let defaultOverride = ColumnGestureOverride.defaults.first(where: { $0.columnId == columnId }),
                        let index = settings.gestureSettings.columnOverrides.firstIndex(where: { $0.columnId == columnId }) {
-                        settings.gestureSettings.columnOverrides[index] = defaultOverride
+                        // Force full struct reassignment to trigger @Published didSet
+                        var gs = settings.gestureSettings
+                        gs.columnOverrides[index] = defaultOverride
+                        settings.gestureSettings = gs
                     }
                 }
                 .foregroundColor(.red)
@@ -263,125 +293,229 @@ struct ColumnCorrectionDetailView: View {
     }
 }
 
-// MARK: - Gesture Angle Visualization
+// MARK: - Unified Pie Chart Component
 
-struct GestureAngleVisualization: View {
-    let rotationOffset: Double
-    let verticalIWidthDelta: Double
-    let horizontalEuWidthDelta: Double
+/// Unified pie chart for all gesture direction visualizations.
+/// Pass 8 slices as (startDeg, endDeg) in math coords (0°=right, CCW).
+/// The chart handles coordinate conversion internally.
+struct DirectionPieChart: View {
+    let slices: [PieSlice]
+    var rotationLabel: String? = nil
 
-    // Base sector size: 45° each for 8 directions
-    private let baseSector: Double = 45.0
+    struct PieSlice {
+        let mathStart: Double  // degrees, math coords (0°=right, CCW)
+        let mathEnd: Double
+        let label: String
+        let color: Color
+    }
 
-    var body: some View {
-        GeometryReader { geo in
-            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            let radius = min(geo.size.width, geo.size.height) / 2 - 20
+    // Unified color palette
+    static let vowelColors: [String: Color] = [
+        "ㅏ": Color(red: 0.70, green: 0.82, blue: 1.0),   // light blue
+        "ㅓ": Color(red: 1.0,  green: 0.75, blue: 0.75),   // light red/pink
+        "ㅗ": Color(red: 1.0,  green: 0.85, blue: 0.65),   // light orange
+        "ㅜ": Color(red: 0.70, green: 0.92, blue: 0.78),   // light green
+        "ㅣ": Color(red: 0.72, green: 0.92, blue: 0.98),   // light cyan
+        "ㅡ": Color(red: 0.85, green: 0.78, blue: 0.95),   // light purple
+        "✕":  Color(.systemGray4),
+    ]
 
-            ZStack {
-                // Background circle
-                Circle()
-                    .fill(Color(.systemGray6))
-                    .frame(width: radius * 2, height: radius * 2)
-
-                // Direction sectors
-                ForEach(sectors, id: \.label) { sector in
-                    SectorShape(
-                        startAngle: .degrees(sector.startAngle),
-                        endAngle: .degrees(sector.endAngle)
-                    )
-                    .fill(sector.color.opacity(0.3))
-                    .frame(width: radius * 2, height: radius * 2)
-
-                    SectorShape(
-                        startAngle: .degrees(sector.startAngle),
-                        endAngle: .degrees(sector.endAngle)
-                    )
-                    .stroke(sector.color.opacity(0.6), lineWidth: 1)
-                    .frame(width: radius * 2, height: radius * 2)
-                }
-
-                // Direction labels
-                ForEach(sectors, id: \.label) { sector in
-                    let midAngle = (sector.startAngle + sector.endAngle) / 2
-                    let labelRadius = radius * 0.7
-                    let x = center.x + labelRadius * cos(midAngle * .pi / 180)
-                    let y = center.y + labelRadius * sin(midAngle * .pi / 180)
-
-                    Text(sector.label)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(sector.color)
-                        .position(x: x, y: y)
-                }
-
-                // Center dot
-                Circle()
-                    .fill(Color(.label))
-                    .frame(width: 6, height: 6)
-
-                // Rotation offset indicator
-                if abs(rotationOffset) > 0.1 {
-                    let arrowAngle = -90.0 + rotationOffset
-                    let arrowX = center.x + (radius + 12) * cos(arrowAngle * .pi / 180)
-                    let arrowY = center.y + (radius + 12) * sin(arrowAngle * .pi / 180)
-                    Text("↻ \(rotationOffset, specifier: "%.1f")°")
-                        .font(.system(size: 10))
-                        .foregroundColor(.orange)
-                        .position(x: arrowX, y: arrowY)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    static func colorForMapping(_ mapping: DiagonalMapping) -> Color {
+        switch mapping {
+        case .vowelI:  return vowelColors["ㅣ"]!
+        case .vowelEu: return vowelColors["ㅡ"]!
+        case .vowelO:  return vowelColors["ㅗ"]!
+        case .vowelU:  return vowelColors["ㅜ"]!
+        case .vowelA:  return vowelColors["ㅏ"]!
+        case .vowelEo: return vowelColors["ㅓ"]!
+        case .normalizeUp:    return vowelColors["ㅗ"]!.opacity(0.5)
+        case .normalizeDown:  return vowelColors["ㅜ"]!.opacity(0.5)
+        case .normalizeLeft:  return vowelColors["ㅓ"]!.opacity(0.5)
+        case .normalizeRight: return vowelColors["ㅏ"]!.opacity(0.5)
+        case .disabled: return .gray
         }
     }
 
-    // 8 direction sectors with rotation and width adjustments applied
-    private var sectors: [SectorInfo] {
-        let rot = rotationOffset
-        let iDelta = verticalIWidthDelta
-        let euDelta = horizontalEuWidthDelta
+    static func labelForMapping(_ mapping: DiagonalMapping, symbol: String) -> String {
+        switch mapping {
+        case .vowelI:  return "ㅣ"
+        case .vowelEu: return "ㅡ"
+        case .vowelO:  return "ㅗ"
+        case .vowelU:  return "ㅜ"
+        case .vowelA:  return "ㅏ"
+        case .vowelEo: return "ㅓ"
+        case .normalizeUp:    return "\(symbol)→ㅗ"
+        case .normalizeDown:  return "\(symbol)→ㅜ"
+        case .normalizeLeft:  return "\(symbol)→ㅓ"
+        case .normalizeRight: return "\(symbol)→ㅏ"
+        case .disabled: return "✕"
+        }
+    }
 
-        // Angles in screen coordinates (0° = right, clockwise)
-        // Base: each 45° centered on cardinal/diagonal directions
-        return [
-            // → ㅏ (0°)
-            SectorInfo(label: "ㅏ", startAngle: -22.5 + rot, endAngle: 22.5 + rot, color: .blue),
-            // ↘ ㅡ (45°) — widened by euDelta
-            SectorInfo(label: "ㅡ", startAngle: 22.5 + rot - euDelta/2, endAngle: 67.5 + rot + euDelta/2, color: .purple),
-            // ↓ ㅜ (90°)
-            SectorInfo(label: "ㅜ", startAngle: 67.5 + rot, endAngle: 112.5 + rot, color: .green),
-            // ↙ → ↓ 정규화 (135°)
-            SectorInfo(label: "↙↓", startAngle: 112.5 + rot, endAngle: 157.5 + rot, color: .green.opacity(0.5)),
-            // ← ㅓ (180°)
-            SectorInfo(label: "ㅓ", startAngle: 157.5 + rot, endAngle: 202.5 + rot, color: .red),
-            // ↖ → ↑ 정규화 (225°)
-            SectorInfo(label: "↖↑", startAngle: 202.5 + rot, endAngle: 247.5 + rot, color: .orange.opacity(0.5)),
-            // ↑ ㅗ (270°)
-            SectorInfo(label: "ㅗ", startAngle: 247.5 + rot, endAngle: 292.5 + rot, color: .orange),
-            // ↗ ㅣ (315°) — widened by iDelta
-            SectorInfo(label: "ㅣ", startAngle: 292.5 + rot - iDelta/2, endAngle: 337.5 + rot + iDelta/2, color: .cyan),
-        ]
+    var body: some View {
+        GeometryReader { geo in
+            let cx = geo.size.width / 2
+            let cy = geo.size.height / 2
+            let radius = min(geo.size.width, geo.size.height) / 2 - 20
+
+            // Canvas draws pie slices — single pass, no overlap
+            Canvas { context, _ in
+                let center = CGPoint(x: cx, y: cy)
+
+                // Pie slices (no background — sectors fill the entire circle)
+                // Math coords: 0°=right, CCW (90°=up)
+                // Screen coords: 0°=right, CW (90°=down)
+                // To draw a math sector [A, B] on screen:
+                //   screen coords = negate: [-A, -B]
+                //   But SwiftUI addArc goes from start→end in CW direction
+                //   Sector from -B to -A going CW = the small arc
+                for s in slices {
+                    // Convert math angles to screen by drawing with Path manually
+                    // This avoids all clockwise/CCW confusion
+                    let startRad = -s.mathStart * .pi / 180  // negate for screen Y-flip
+                    let endRad = -s.mathEnd * .pi / 180
+
+                    var path = Path()
+                    path.move(to: center)
+                    // Draw arc point by point to guarantee correct direction
+                    let steps = 30
+                    for step in 0...steps {
+                        let t = Double(step) / Double(steps)
+                        let angle = startRad + (endRad - startRad) * t
+                        let px = cx + radius * cos(angle)
+                        let py = cy + radius * sin(angle)
+                        path.addLine(to: CGPoint(x: px, y: py))
+                    }
+                    path.closeSubpath()
+                    context.fill(path, with: .color(s.color))
+                    context.stroke(path, with: .color(s.color.opacity(0.5)), lineWidth: 0.5)
+                }
+
+                // Center dot
+                let dot = CGRect(x: cx - 3, y: cy - 3, width: 6, height: 6)
+                context.fill(Ellipse().path(in: dot), with: .color(Color(.label)))
+            }
+
+            // Labels (SwiftUI Text for crisp rendering)
+            ForEach(0..<slices.count, id: \.self) { i in
+                let s = slices[i]
+                let mid = (s.mathStart + s.mathEnd) / 2
+                let r = radius * 0.65
+                Text(s.label)
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundColor(Color(.label))
+                    .position(
+                        x: cx + r * cos(mid * .pi / 180),
+                        y: cy - r * sin(mid * .pi / 180)
+                    )
+            }
+
+            // Rotation label
+            if let rot = rotationLabel {
+                Text(rot)
+                    .font(.system(size: 9))
+                    .foregroundColor(DirectionPieChart.vowelColors["ㅗ"]!)
+                    .position(x: cx, y: cy - radius - 12)
+            }
+        }
     }
 }
 
-private struct SectorInfo {
-    let label: String
-    let startAngle: Double
-    let endAngle: Double
-    let color: Color
-}
+// MARK: - Pie Chart Builders (convenience)
 
-private struct SectorShape: Shape {
-    let startAngle: Angle
-    let endAngle: Angle
+extension DirectionPieChart {
+    // Shared helper: build base slices from DirectionSector start/end angles
+    // All 3 builders use this to ensure no overlap/gap
+    private static func baseSlices(
+        sectors: [DirectionSector],
+        profile: SwipeProfile,
+        rotationOffset: Double = 0,
+        iDelta: Double = 0,
+        euDelta: Double = 0
+    ) -> [(start: Double, end: Double, mapping: DiagonalMapping, symbol: String)] {
+        let mappings: [DiagonalMapping] = [
+            .vowelA, profile.upRightMapping, .vowelO, profile.upLeftMapping,
+            .vowelEo, profile.downLeftMapping, .vowelU, profile.downRightMapping
+        ]
+        let symbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
 
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        var path = Path()
-        path.move(to: center)
-        path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
-        path.closeSubpath()
-        return path
+        return (0..<min(sectors.count, 8)).map { i in
+            var s = sectors[i]
+            // Apply ㅣ/ㅡ delta to diagonal sectors
+            switch i {
+            case 1, 3: s.halfWidth += iDelta   // ↗, ↖
+            case 5, 7: s.halfWidth += euDelta   // ↙, ↘
+            default: break
+            }
+            return (
+                start: s.startAngle + rotationOffset,
+                end: s.endAngle + rotationOffset,
+                mapping: mappings[i],
+                symbol: symbols[i]
+            )
+        }
+    }
+
+    // Unified color palette for all 8 directions (same order as DirectionSector)
+    // → ㅏ blue, ↗ ㅣ cyan, ↑ ㅗ orange, ↖ ㅣ cyan, ← ㅓ red, ↙ ㅡ purple, ↓ ㅜ green, ↘ ㅡ purple
+    private static let directionColors: [Color] = [
+        vowelColors["ㅏ"]!, vowelColors["ㅣ"]!, vowelColors["ㅗ"]!, vowelColors["ㅣ"]!,
+        vowelColors["ㅓ"]!, vowelColors["ㅡ"]!, vowelColors["ㅜ"]!, vowelColors["ㅡ"]!,
+    ]
+
+    /// Column correction view — shows rotation + ㅣ/ㅡ delta
+    static func columnCorrectionSlices(
+        settings: KeyboardSettings,
+        rotationOffset: Double,
+        iDelta: Double,
+        euDelta: Double
+    ) -> [PieSlice] {
+        let profile = settings.gestureSettings.swipeProfile
+        let bases = baseSlices(sectors: profile.sectors, profile: profile,
+                               rotationOffset: rotationOffset, iDelta: iDelta, euDelta: euDelta)
+        let fixedLabels = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
+
+        return bases.enumerated().map { i, b in
+            PieSlice(
+                mathStart: b.start, mathEnd: b.end,
+                label: fixedLabels[i] ?? labelForMapping(b.mapping, symbol: b.symbol),
+                color: directionColors[i]
+            )
+        }
+    }
+
+    /// Direction mapping overview — no rotation/delta, shows current mappings
+    static func mappingSlices(profile: SwipeProfile) -> [PieSlice] {
+        let bases = baseSlices(sectors: profile.sectors, profile: profile)
+        let fixedLabels = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
+
+        return bases.enumerated().map { i, b in
+            PieSlice(
+                mathStart: b.start, mathEnd: b.end,
+                label: fixedLabels[i] ?? labelForMapping(b.mapping, symbol: b.symbol),
+                color: directionColors[i]
+            )
+        }
+    }
+
+    /// Sector angle editor — shows direction symbols
+    static func sectorAngleSlices(sectors: [DirectionSector], profile: SwipeProfile) -> [PieSlice] {
+        let mappings: [DiagonalMapping] = [
+            .vowelA, profile.upRightMapping, .vowelO, profile.upLeftMapping,
+            .vowelEo, profile.downLeftMapping, .vowelU, profile.downRightMapping
+        ]
+        let symbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
+        let fixedLabels = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
+
+        return (0..<min(sectors.count, 8)).map { i in
+            let label = fixedLabels[i] ?? labelForMapping(mappings[i], symbol: symbols[i])
+            return PieSlice(
+                mathStart: sectors[i].startAngle,
+                mathEnd: sectors[i].endAngle,
+                label: label,
+                color: directionColors[i]
+            )
+        }
     }
 }
 
@@ -390,14 +524,25 @@ private struct SectorShape: Shape {
 struct DirectionMappingView: View {
     @ObservedObject private var settings = KeyboardSettings.shared
 
+    private func profileBinding<T>(_ keyPath: WritableKeyPath<SwipeProfile, T>) -> Binding<T> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile[keyPath: keyPath] },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile[keyPath: keyPath] = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
     var body: some View {
         List {
             // Visual overview
             Section {
-                DirectionMappingDiagram(profile: settings.gestureSettings.swipeProfile)
+                DirectionPieChart(slices: DirectionPieChart.mappingSlices(profile: settings.gestureSettings.swipeProfile))
                     .frame(height: 180)
                     .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color(.systemGroupedBackground))
+                    .listRowBackground(Color(.systemBackground))
             } header: {
                 Text("현재 매핑")
             }
@@ -416,25 +561,25 @@ struct DirectionMappingView: View {
 
             // Diagonal directions (customizable)
             Section {
-                Picker("↖ 왼쪽 위", selection: $settings.gestureSettings.swipeProfile.upLeftMapping) {
+                Picker("↖ 왼쪽 위", selection: profileBinding(\.upLeftMapping)) {
                     ForEach(DiagonalMapping.allCases, id: \.self) { mapping in
                         Text(mapping.displayName).tag(mapping)
                     }
                 }
 
-                Picker("↗ 오른쪽 위", selection: $settings.gestureSettings.swipeProfile.upRightMapping) {
+                Picker("↗ 오른쪽 위", selection: profileBinding(\.upRightMapping)) {
                     ForEach(DiagonalMapping.allCases, id: \.self) { mapping in
                         Text(mapping.displayName).tag(mapping)
                     }
                 }
 
-                Picker("↙ 왼쪽 아래", selection: $settings.gestureSettings.swipeProfile.downLeftMapping) {
+                Picker("↙ 왼쪽 아래", selection: profileBinding(\.downLeftMapping)) {
                     ForEach(DiagonalMapping.allCases, id: \.self) { mapping in
                         Text(mapping.displayName).tag(mapping)
                     }
                 }
 
-                Picker("↘ 오른쪽 아래", selection: $settings.gestureSettings.swipeProfile.downRightMapping) {
+                Picker("↘ 오른쪽 아래", selection: profileBinding(\.downRightMapping)) {
                     ForEach(DiagonalMapping.allCases, id: \.self) { mapping in
                         Text(mapping.displayName).tag(mapping)
                     }
@@ -447,10 +592,12 @@ struct DirectionMappingView: View {
 
             Section {
                 Button("기본값으로 복원") {
-                    settings.gestureSettings.swipeProfile.upLeftMapping = .vowelI
-                    settings.gestureSettings.swipeProfile.upRightMapping = .vowelI
-                    settings.gestureSettings.swipeProfile.downLeftMapping = .vowelEu
-                    settings.gestureSettings.swipeProfile.downRightMapping = .vowelEu
+                    var gs = settings.gestureSettings
+                    gs.swipeProfile.upLeftMapping = .vowelI
+                    gs.swipeProfile.upRightMapping = .vowelI
+                    gs.swipeProfile.downLeftMapping = .vowelEu
+                    gs.swipeProfile.downRightMapping = .vowelEu
+                    settings.gestureSettings = gs
                 }
                 .foregroundColor(.red)
             }
@@ -479,140 +626,7 @@ struct DirectionMappingView: View {
 
 // MARK: - Direction Mapping Diagram
 
-private struct DirectionMappingDiagram: View {
-    let profile: SwipeProfile
-
-    private let colors: [Color] = [.blue, .cyan, .orange, .cyan, .red, .purple, .green, .purple]
-
-    var body: some View {
-        GeometryReader { geo in
-            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            let radius: CGFloat = min(geo.size.width, geo.size.height) / 2 - 24
-
-            ZStack {
-                // Background circle
-                Circle()
-                    .fill(Color(.systemGray6))
-                    .frame(width: radius * 2, height: radius * 2)
-
-                // Concentric guide circles
-                ForEach([0.33, 0.66, 1.0], id: \.self) { ratio in
-                    Circle()
-                        .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-                        .frame(width: radius * 2 * ratio, height: radius * 2 * ratio)
-                }
-
-                // 8 angle divider lines
-                ForEach(0..<8, id: \.self) { i in
-                    let angle = Double(i) * 45.0 + 22.5 // between sectors
-                    let rad = angle * .pi / 180
-                    Path { path in
-                        path.move(to: center)
-                        path.addLine(to: CGPoint(
-                            x: center.x + radius * cos(rad),
-                            y: center.y - radius * sin(rad)
-                        ))
-                    }
-                    .stroke(Color(.separator).opacity(0.25), lineWidth: 0.5)
-                }
-
-                // Colored sector fills
-                ForEach(0..<8, id: \.self) { i in
-                    let startAngle = Double(i) * 45.0 - 22.5
-                    let endAngle = startAngle + 45.0
-                    SectorShape(
-                        startAngle: .degrees(-endAngle),
-                        endAngle: .degrees(-startAngle)
-                    )
-                    .fill(colors[i].opacity(0.15))
-                    .frame(width: radius * 2, height: radius * 2)
-                }
-
-                // Direction labels
-                ForEach(0..<8, id: \.self) { i in
-                    let angle = Double(i) * 45.0
-                    let label = directionLabel(index: i)
-                    let r = radius * 0.72
-                    let rad = angle * .pi / 180
-
-                    Text(label)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(colors[i])
-                        .position(
-                            x: center.x + r * cos(rad),
-                            y: center.y - r * sin(rad)
-                        )
-                }
-
-                // Direction symbols (small, near edge)
-                ForEach(0..<8, id: \.self) { i in
-                    let angle = Double(i) * 45.0
-                    let symbol = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"][i]
-                    let r = radius * 0.42
-                    let rad = angle * .pi / 180
-
-                    Text(symbol)
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(.secondaryLabel))
-                        .position(
-                            x: center.x + r * cos(rad),
-                            y: center.y - r * sin(rad)
-                        )
-                }
-
-                // Center dot
-                Circle()
-                    .fill(Color(.label))
-                    .frame(width: 6, height: 6)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    private func directionLabel(index: Int) -> String {
-        switch index {
-        case 0: return "ㅏ"
-        case 1: return mappingLabel(profile.upRightMapping, fallback: "↗")
-        case 2: return "ㅗ"
-        case 3: return mappingLabel(profile.upLeftMapping, fallback: "↖")
-        case 4: return "ㅓ"
-        case 5: return mappingLabel(profile.downLeftMapping, fallback: "↙")
-        case 6: return "ㅜ"
-        case 7: return mappingLabel(profile.downRightMapping, fallback: "↘")
-        default: return ""
-        }
-    }
-
-    private func mappingLabel(_ mapping: DiagonalMapping, fallback: String) -> String {
-        switch mapping {
-        case .vowelI: return "ㅣ"
-        case .vowelEu: return "ㅡ"
-        case .vowelO: return "ㅗ"
-        case .vowelU: return "ㅜ"
-        case .vowelA: return "ㅏ"
-        case .vowelEo: return "ㅓ"
-        case .normalizeUp: return "→ㅗ"
-        case .normalizeDown: return "→ㅜ"
-        case .normalizeLeft: return "→ㅓ"
-        case .normalizeRight: return "→ㅏ"
-        case .disabled: return "✕"
-        }
-    }
-
-    private func directionColor(index: Int) -> Color {
-        switch index {
-        case 0: return .blue       // →
-        case 1: return .cyan       // ↗
-        case 2: return .orange     // ↑
-        case 3: return .cyan       // ↖
-        case 4: return .red        // ←
-        case 5: return .purple     // ↙
-        case 6: return .green      // ↓
-        case 7: return .purple     // ↘
-        default: return .gray
-        }
-    }
-}
+// DirectionMappingDiagram removed — replaced by DirectionPieChart
 
 // MARK: - Sector Angle View
 
@@ -623,10 +637,10 @@ struct SectorAngleView: View {
         List {
             // Visualization
             Section {
-                SectorAngleDiagram(sectors: settings.gestureSettings.swipeProfile.sectors)
+                DirectionPieChart(slices: DirectionPieChart.sectorAngleSlices(sectors: settings.gestureSettings.swipeProfile.sectors, profile: settings.gestureSettings.swipeProfile))
                     .frame(height: 200)
                     .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color(.systemGroupedBackground))
+                    .listRowBackground(Color(.systemBackground))
             } header: {
                 Text("인식 범위 미리보기")
             }
@@ -645,7 +659,7 @@ struct SectorAngleView: View {
                                 .foregroundColor(.secondary)
                         }
                         Slider(
-                            value: $settings.gestureSettings.swipeProfile.sectors[i].halfWidth,
+                            value: sectorBinding(i),
                             in: 10...40,
                             step: 0.5
                         )
@@ -660,72 +674,30 @@ struct SectorAngleView: View {
 
             Section {
                 Button("기본값으로 복원 (45° 균등)") {
-                    settings.gestureSettings.swipeProfile.sectors = DirectionSector.defaultSectors
+                    var gs = settings.gestureSettings
+                    gs.swipeProfile.sectors = DirectionSector.defaultSectors
+                    settings.gestureSettings = gs
                 }
                 .foregroundColor(.red)
             }
         }
         .navigationTitle("방향별 각도 범위")
     }
+
+    private func sectorBinding(_ index: Int) -> Binding<Double> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile.sectors[index].halfWidth },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile.sectors[index].halfWidth = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
 }
 
 // MARK: - Sector Angle Diagram
 
-private struct SectorAngleDiagram: View {
-    let sectors: [DirectionSector]
+// SectorAngleDiagram removed — replaced by DirectionPieChart
 
-    private let colors: [Color] = [.blue, .cyan, .orange, .cyan, .red, .purple, .green, .purple]
-
-    var body: some View {
-        GeometryReader { geo in
-            let radius = min(geo.size.width, geo.size.height) / 2 - 20
-
-            ZStack {
-                Circle()
-                    .fill(Color(.systemGray6))
-                    .frame(width: radius * 2, height: radius * 2)
-
-                ForEach(0..<sectors.count, id: \.self) { i in
-                    let sector = sectors[i]
-                    // Convert from math angles (0=right, CCW) to screen angles (0=right, CW)
-                    let startScreen = -sector.endAngle
-                    let endScreen = -sector.startAngle
-
-                    SectorShape(
-                        startAngle: .degrees(startScreen),
-                        endAngle: .degrees(endScreen)
-                    )
-                    .fill(colors[i].opacity(0.25))
-                    .frame(width: radius * 2, height: radius * 2)
-
-                    SectorShape(
-                        startAngle: .degrees(startScreen),
-                        endAngle: .degrees(endScreen)
-                    )
-                    .stroke(colors[i].opacity(0.5), lineWidth: 1)
-                    .frame(width: radius * 2, height: radius * 2)
-                }
-
-                // Labels
-                ForEach(0..<sectors.count, id: \.self) { i in
-                    let angle = sectors[i].centerAngle
-                    let r = radius * 0.7
-                    let rad = angle * .pi / 180
-
-                    Text(DirectionSector.directionSymbols[i])
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(colors[i])
-                        .position(
-                            x: geo.size.width / 2 + r * cos(rad),
-                            y: geo.size.height / 2 - r * sin(rad)
-                        )
-                }
-
-                Circle()
-                    .fill(Color(.label))
-                    .frame(width: 6, height: 6)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-}
+// SectorShape removed — DirectionPieChart uses Canvas directly

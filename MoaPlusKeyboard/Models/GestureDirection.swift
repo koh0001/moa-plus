@@ -81,18 +81,19 @@ enum GestureDirection: String, CaseIterable {
         }
     }
 
+    private static let adjacencyMap: [GestureDirection: Set<GestureDirection>] = [
+        .up: [.upLeft, .upRight],
+        .down: [.downLeft, .downRight],
+        .left: [.upLeft, .downLeft],
+        .right: [.upRight, .downRight],
+        .upLeft: [.up, .left],
+        .upRight: [.up, .right],
+        .downLeft: [.down, .left],
+        .downRight: [.down, .right]
+    ]
+
     /// Check if two directions are adjacent (e.g., up and upRight are adjacent)
     func isAdjacentTo(_ other: GestureDirection) -> Bool {
-        let adjacencyMap: [GestureDirection: Set<GestureDirection>] = [
-            .up: [.upLeft, .upRight],
-            .down: [.downLeft, .downRight],
-            .left: [.upLeft, .downLeft],
-            .right: [.upRight, .downRight],
-            .upLeft: [.up, .left],
-            .upRight: [.up, .right],
-            .downLeft: [.down, .left],
-            .downRight: [.down, .right]
-        ]
-        return adjacencyMap[self]?.contains(other) ?? false
+        Self.adjacencyMap[self]?.contains(other) ?? false
     }
 }

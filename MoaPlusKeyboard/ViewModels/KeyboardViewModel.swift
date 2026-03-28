@@ -23,8 +23,13 @@ class KeyboardViewModel: ObservableObject {
     private let vowelResolver = VowelResolver()
     private let abbreviationEngine = AbbreviationEngine()
 
+    private var lastExpansionCount: Int = -1
+
     /// Reload abbreviation engine when settings change
     private func reloadAbbreviationEngine() {
+        let currentCount = KeyboardSettings.shared.shortcutExpansionStore.expansions.count
+        guard currentCount != lastExpansionCount else { return }
+        lastExpansionCount = currentCount
         abbreviationEngine.delegate = self
         abbreviationEngine.loadExpansions(KeyboardSettings.shared.shortcutExpansionStore)
     }
@@ -86,6 +91,8 @@ class KeyboardViewModel: ObservableObject {
         "「": "」", "『": "』", "《": "》", "【": "】", "〔": "〕"
     ]
 
+    private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
+
     func inputSymbol(_ symbol: String) {
         commitCurrent()
         if insertWithAutoBracket(symbol) {
@@ -131,7 +138,10 @@ class KeyboardViewModel: ObservableObject {
            case .consonant(let choseong) = content {
             let keyId = String(choseong.compatibilityCharacter)
             if let action = KeyboardSettings.shared.secondaryAction(forKey: keyId) {
-                longPressPopupCandidates = action.popupOutputs
+                let filtered = KeyboardSettings.shared.autoBracketEnabled
+                    ? action.popupOutputs.filter { !Self.closingBrackets.contains($0) }
+                    : action.popupOutputs
+                longPressPopupCandidates = filtered
                 longPressPopupSelectedIndex = 0
             }
         }

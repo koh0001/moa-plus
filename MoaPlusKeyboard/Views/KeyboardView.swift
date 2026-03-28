@@ -4,15 +4,17 @@ import Combine
 struct KeyboardView: View {
     @ObservedObject var viewModel: KeyboardViewModel
     @ObservedObject var settings = KeyboardSettings.shared
+    @State private var cachedBgImage: UIImage?
+    @State private var cachedBgImageId: String?
 
     private var keyboardBackground: some View {
         Group {
-            if let imageId = KeyboardSettings.shared.themeSettings.backgroundImageId,
-               let image = BackgroundImageManager.shared.loadUserImage(withId: imageId) {
+            if let image = cachedBgImage {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .opacity(KeyboardSettings.shared.themeSettings.backgroundOpacity)
+                    .clipped()
             } else {
                 Color(.systemGray6)
             }
@@ -114,12 +116,17 @@ struct KeyboardView: View {
                         let x = keyXPosition(column: activeCol, row: activeRow, centerKeyWidth: centerKeyWidth, spacing: sp, totalWidth: geometry.size.width)
                         let y = CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
-                        let candidates = viewModel.longPressPopupCandidates
+                        let rawCandidates = viewModel.longPressPopupCandidates
                         let selectedIdx = viewModel.longPressPopupSelectedIndex
                         let isRightEdge = activeCol >= 5
+                        // When auto-bracket is on, hide standalone closing brackets
+                        let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
+                        let candidates = KeyboardSettings.shared.autoBracketEnabled
+                            ? rawCandidates.filter { !closingBrackets.contains($0) }
+                            : rawCandidates
                         // Right-edge: reverse display so leftward drag matches visual order
                         let displayCandidates = isRightEdge ? Array(candidates.reversed()) : candidates
-                        let displaySelectedIdx = isRightEdge ? (candidates.count - 1 - selectedIdx) : selectedIdx
+                        let displaySelectedIdx = isRightEdge ? (candidates.count - 1 - min(selectedIdx, candidates.count - 1)) : min(selectedIdx, candidates.count - 1)
 
                         HStack(spacing: 2) {
                             ForEach(0..<displayCandidates.count, id: \.self) { i in
@@ -161,6 +168,19 @@ struct KeyboardView: View {
                     }
                 }
                 .background(keyboardBackground)
+        }
+        .onAppear { loadBackgroundIfNeeded() }
+        .onChange(of: settings.themeSettings.backgroundImageId) { _ in loadBackgroundIfNeeded() }
+    }
+
+    private func loadBackgroundIfNeeded() {
+        let currentId = settings.themeSettings.backgroundImageId
+        guard currentId != cachedBgImageId else { return }
+        cachedBgImageId = currentId
+        if let id = currentId {
+            cachedBgImage = BackgroundImageManager.shared.loadUserImage(withId: id)
+        } else {
+            cachedBgImage = nil
         }
     }
 

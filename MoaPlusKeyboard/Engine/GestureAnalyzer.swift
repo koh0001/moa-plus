@@ -45,9 +45,9 @@ class GestureAnalyzer {
     }
 
     func reset() {
-        touchPoints.removeAll()
-        directions.removeAll()
-        directionMagnitudes.removeAll()
+        touchPoints.removeAll(keepingCapacity: true)
+        directions.removeAll(keepingCapacity: true)
+        directionMagnitudes.removeAll(keepingCapacity: true)
         lastDirectionChangePoint = nil
     }
 

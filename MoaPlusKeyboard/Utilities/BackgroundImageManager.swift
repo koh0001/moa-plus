@@ -25,6 +25,11 @@ final class BackgroundImageManager {
 
     private init() {}
 
+    private func sanitizedFilename(_ id: String) -> String {
+        id.replacingOccurrences(of: "/", with: "")
+          .replacingOccurrences(of: "..", with: "")
+    }
+
     /// Get the shared container URL for App Group
     private var sharedContainerURL: URL? {
         fileManager.containerURL(forSecurityApplicationGroupIdentifier: "group.com.moaki.keyboard")
@@ -46,7 +51,7 @@ final class BackgroundImageManager {
               let data = image.jpegData(compressionQuality: 0.8) else {
             return false
         }
-        let fileURL = dir.appendingPathComponent("\(id).jpg")
+        let fileURL = dir.appendingPathComponent("\(sanitizedFilename(id)).jpg")
         do {
             try data.write(to: fileURL)
             return true
@@ -58,14 +63,14 @@ final class BackgroundImageManager {
     /// Load a user image by ID
     func loadUserImage(withId id: String) -> UIImage? {
         guard let dir = backgroundImagesDirectory else { return nil }
-        let fileURL = dir.appendingPathComponent("\(id).jpg")
+        let fileURL = dir.appendingPathComponent("\(sanitizedFilename(id)).jpg")
         return UIImage(contentsOfFile: fileURL.path)
     }
 
     /// Delete a user image
     func deleteUserImage(withId id: String) {
         guard let dir = backgroundImagesDirectory else { return }
-        let fileURL = dir.appendingPathComponent("\(id).jpg")
+        let fileURL = dir.appendingPathComponent("\(sanitizedFilename(id)).jpg")
         try? fileManager.removeItem(at: fileURL)
     }
 

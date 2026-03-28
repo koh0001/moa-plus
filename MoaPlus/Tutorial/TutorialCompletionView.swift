@@ -4,6 +4,7 @@ struct TutorialCompletionView: View {
     let onRestart: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var freeText: String = ""
+    @State private var showTypingPractice: Bool = false
     @FocusState private var isFocused: Bool
 
     private let accentBlue = Color(red: 0.26, green: 0.38, blue: 0.93)
@@ -61,6 +62,24 @@ struct TutorialCompletionView: View {
             )
             .padding(.horizontal, 16)
 
+            // Typing practice CTA
+            NavigationLink(destination: TypingPracticeListView()) {
+                HStack {
+                    Image(systemName: "keyboard")
+                    Text("자판 연습으로 실력 키우기")
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(accentBlue)
+                )
+            }
+            .padding(.horizontal, 16)
+
             HStack(spacing: 12) {
                 Button(action: onRestart) {
                     HStack {
@@ -89,7 +108,7 @@ struct TutorialCompletionView: View {
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(accentBlue)
+                                .stroke(.white.opacity(0.3), lineWidth: 1.5)
                         )
                 }
             }

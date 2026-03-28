@@ -16,8 +16,9 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         super.viewDidLoad()
 
         // 키보드 높이 설정 (iOS 키보드 익스텐션은 명시적 높이 필요)
+        guard let rootView = self.view else { return }
         let heightConstraint = NSLayoutConstraint(
-            item: view!,
+            item: rootView,
             attribute: .height,
             relatedBy: .equal,
             toItem: nil,
@@ -26,12 +27,17 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             constant: 260
         )
         heightConstraint.priority = .required
-        view.addConstraint(heightConstraint)
+        rootView.addConstraint(heightConstraint)
         self.heightConstraint = heightConstraint
 
         viewModel.delegate = self
         setupKeyboardView()
         setupHapticFeedback()
+        // Warm up audio session to prevent loud first click
+        // Play the actual click sound once at launch to initialize the audio route
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            AudioServicesPlaySystemSound(1104)
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {

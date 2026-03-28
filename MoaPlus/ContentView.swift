@@ -57,6 +57,22 @@ struct ContentView: View {
                                 )
                         }
 
+                        NavigationLink(destination: TypingPracticeListView()) {
+                            Label("자판 연습", systemImage: "keyboard")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 15)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(.white.opacity(0.18))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(.white.opacity(0.25), lineWidth: 1)
+                                        )
+                                )
+                        }
+
                         NavigationLink(destination: SettingsMainView()) {
                             Label("모아키 설정", systemImage: "slider.horizontal.3")
                                 .font(.headline)
