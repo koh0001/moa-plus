@@ -35,14 +35,26 @@ struct KeyView: View {
             keyLabel
 
             // Secondary hint label
-            if let hint = secondaryAction?.visibleHint,
-               showSecondaryHints {
-                Text(hint)
-                    .font(.system(size: hintFontSize))
-                    .foregroundColor(Color(.label).opacity(0.5))
-                    .padding(hintEdge, hintEdgePadding)
-                    .padding(.top, 3)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: hintAlignment)
+            if let action = secondaryAction, showSecondaryHints {
+                if KeyboardSettings.shared.showDetailedHints {
+                    // Detailed: show all popup candidates
+                    Text(action.popupOutputs.joined(separator: " "))
+                        .font(.system(size: max(hintFontSize - 2, 6)))
+                        .foregroundColor(Color(.label).opacity(0.4))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .padding(.horizontal, 3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 2)
+                } else {
+                    // Simple: show only primary hint
+                    Text(action.visibleHint)
+                        .font(.system(size: hintFontSize))
+                        .foregroundColor(Color(.label).opacity(0.5))
+                        .padding(hintEdge, hintEdgePadding)
+                        .padding(.top, 3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: hintAlignment)
+                }
             }
         }
         .frame(width: keySize.width, height: keySize.height)

@@ -16,11 +16,15 @@ struct SecondaryInputSettingsView: View {
                         Text("크게").tag(2)
                     }
                     .pickerStyle(.segmented)
+
+                    Toggle("전체 후보 표시", isOn: $settings.showDetailedHints)
                 }
             } header: {
                 Text("보조 힌트 표시")
             } footer: {
-                Text("각 자음 키에 숫자/기호 힌트를 작게 표시합니다.")
+                Text(settings.showDetailedHints
+                    ? "각 키에 롱프레스 후보 문자가 모두 표시됩니다."
+                    : "각 자음 키에 대표 숫자/기호 힌트를 작게 표시합니다.")
             }
 
             Section {
@@ -35,6 +39,14 @@ struct SecondaryInputSettingsView: View {
                 Text("롱프레스 속도")
             } footer: {
                 Text("짧을수록 빠르게 보조 입력이 활성화됩니다. 기본값: 0.5초")
+            }
+
+            Section {
+                Toggle("괄호 자동 닫기", isOn: $settings.autoBracketEnabled)
+            } header: {
+                Text("괄호")
+            } footer: {
+                Text("( [ { 등 여는 괄호 입력 시 닫는 괄호를 자동 삽입하고 커서를 가운데에 놓습니다.")
             }
 
             Section {

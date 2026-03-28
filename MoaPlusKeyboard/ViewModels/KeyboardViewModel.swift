@@ -81,9 +81,18 @@ class KeyboardViewModel: ObservableObject {
         triggerHapticFeedback()
     }
 
+    private static let bracketPairs: [String: String] = [
+        "(": ")", "[": "]", "{": "}", "<": ">",
+        "「": "」", "『": "』", "《": "》", "【": "】", "〔": "〕"
+    ]
+
     func inputSymbol(_ symbol: String) {
         commitCurrent()
-        delegate?.insertText(symbol)
+        if insertWithAutoBracket(symbol) {
+            // Bracket pair inserted with cursor positioned
+        } else {
+            delegate?.insertText(symbol)
+        }
         if symbol.count == 1, let char = symbol.first {
             abbreviationEngine.processCharacter(char)
         }
@@ -92,8 +101,25 @@ class KeyboardViewModel: ObservableObject {
 
     func inputNumber(_ number: String) {
         commitCurrent()
-        delegate?.insertText(number)
+        if insertWithAutoBracket(number) {
+            // Bracket pair inserted
+        } else {
+            delegate?.insertText(number)
+        }
         triggerHapticFeedback()
+    }
+
+    /// Insert opening bracket + closing bracket, then move cursor back between them.
+    /// Returns true if auto-bracket was applied.
+    private func insertWithAutoBracket(_ text: String) -> Bool {
+        guard KeyboardSettings.shared.autoBracketEnabled,
+              let closing = Self.bracketPairs[text] else { return false }
+        delegate?.insertText(text + closing)
+        // Move cursor back 1 position (between the brackets)
+        if let vc = delegate as? KeyboardViewController {
+            vc.textDocumentProxy.adjustTextPosition(byCharacterOffset: -1)
+        }
+        return true
     }
 
     func inputLongPressNumber(_ number: String) {
@@ -114,11 +140,19 @@ class KeyboardViewModel: ObservableObject {
         // Don't input yet - wait for drag selection or release
     }
 
+    /// Whether the active key is on the right edge (column 5 or 6) — drag direction is reversed
+    private var isRightEdgeKey: Bool {
+        guard let col = activeKey?.column else { return false }
+        return col >= 5
+    }
+
     /// Called when user drags over popup candidates
     func updatePopupSelection(translationX: CGFloat) {
         guard !longPressPopupCandidates.isEmpty else { return }
         let cellWidth: CGFloat = 40
-        let index = Int(translationX / cellWidth)
+        // Right-edge keys: left drag = next candidate (negate translationX)
+        let effectiveX = isRightEdgeKey ? -translationX : translationX
+        let index = Int(effectiveX / cellWidth)
         let clamped = max(0, min(index, longPressPopupCandidates.count - 1))
         if clamped != longPressPopupSelectedIndex {
             longPressPopupSelectedIndex = clamped

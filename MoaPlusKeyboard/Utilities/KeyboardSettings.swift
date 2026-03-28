@@ -20,6 +20,8 @@ final class KeyboardSettings: ObservableObject {
         static let sideKeyWidthRatio = "sideKeyWidthRatio"
         static let longPressDelay = "longPressDelay"
         static let clickSoundEnabled = "clickSoundEnabled"
+        static let showDetailedHints = "showDetailedHints"
+        static let autoBracketEnabled = "autoBracketEnabled"
         static let wordDeleteEnabled = "wordDeleteEnabled"
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
@@ -68,6 +70,16 @@ final class KeyboardSettings: ObservableObject {
     /// Hint size: 0 = small, 1 = normal, 2 = large
     @Published var hintSize: Int = 1 {
         didSet { guard !isLoading else { return }; defaults.set(hintSize, forKey: Keys.hintSize) }
+    }
+
+    /// Auto-close brackets: (), {}, []
+    @Published var autoBracketEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; defaults.set(autoBracketEnabled, forKey: Keys.autoBracketEnabled) }
+    }
+
+    /// Show all popup candidates on key (detailed hint mode)
+    @Published var showDetailedHints: Bool = false {
+        didSet { guard !isLoading else { return }; defaults.set(showDetailedHints, forKey: Keys.showDetailedHints) }
     }
 
     /// Click sound - stored independently (not inside ThemeSettings) for reliable decoding
@@ -140,6 +152,8 @@ final class KeyboardSettings: ObservableObject {
         sideKeyWidthRatio = defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.35
         longPressDelay = defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5
         clickSoundEnabled = defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false
+        showDetailedHints = defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false
+        autoBracketEnabled = defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true
         wordDeleteEnabled = defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true
         backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
         wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5

@@ -116,16 +116,25 @@ struct KeyboardView: View {
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
                         let candidates = viewModel.longPressPopupCandidates
                         let selectedIdx = viewModel.longPressPopupSelectedIndex
+                        let isRightEdge = activeCol >= 5
+                        // Right-edge: reverse display so leftward drag matches visual order
+                        let displayCandidates = isRightEdge ? Array(candidates.reversed()) : candidates
+                        let displaySelectedIdx = isRightEdge ? (candidates.count - 1 - selectedIdx) : selectedIdx
 
                         HStack(spacing: 2) {
-                            ForEach(0..<candidates.count, id: \.self) { i in
-                                Text(candidates[i])
-                                    .font(.system(size: 18, weight: i == selectedIdx ? .bold : .regular))
-                                    .foregroundColor(i == selectedIdx ? .white : .primary)
-                                    .frame(width: 36, height: 36)
+                            ForEach(0..<displayCandidates.count, id: \.self) { i in
+                                let text = displayCandidates[i]
+                                // Show bracket pair if auto-bracket enabled
+                                let label = KeyboardSettings.shared.autoBracketEnabled
+                                    ? (bracketPairLabel(text) ?? text)
+                                    : text
+                                Text(label)
+                                    .font(.system(size: label.count > 1 ? 14 : 18, weight: i == displaySelectedIdx ? .bold : .regular))
+                                    .foregroundColor(i == displaySelectedIdx ? .white : .primary)
+                                    .frame(width: label.count > 1 ? 44 : 36, height: 36)
                                     .background(
                                         RoundedRectangle(cornerRadius: 6)
-                                            .fill(i == selectedIdx ? Color.accentColor : Color(.systemBackground))
+                                            .fill(i == displaySelectedIdx ? Color.accentColor : Color(.systemBackground))
                                     )
                             }
                         }
@@ -135,7 +144,19 @@ struct KeyboardView: View {
                                 .fill(Color(.systemBackground))
                                 .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
                         )
-                        .position(x: min(max(x, 80), geometry.size.width - 80), y: popupY)
+                        .position(x: {
+                            let cellSize: CGFloat = 36
+                            let popupHalfWidth = CGFloat(candidates.count) * (cellSize + 2) / 2 + 8
+                            // Right-edge keys: anchor popup to the left of key
+                            if activeCol >= 5 {
+                                return min(x, geometry.size.width - popupHalfWidth - 4)
+                            }
+                            // Left-edge keys: anchor popup to the right
+                            if activeCol == 0 {
+                                return max(x, popupHalfWidth + 4)
+                            }
+                            return min(max(x, popupHalfWidth + 4), geometry.size.width - popupHalfWidth - 4)
+                        }(), y: popupY)
                         .allowsHitTesting(false)
                     }
                 }
@@ -156,6 +177,15 @@ struct KeyboardView: View {
             x += w + spacing
         }
         return totalWidth / 2 // fallback: center
+    }
+
+    /// Returns "( )" style label if the character is an opening bracket, nil otherwise
+    private func bracketPairLabel(_ text: String) -> String? {
+        let pairs: [String: String] = [
+            "(": "( )", "[": "[ ]", "{": "{ }", "<": "< >",
+            "「": "「」", "『": "『』", "《": "《》", "【": "【】", "〔": "〔〕"
+        ]
+        return pairs[text]
     }
 }
 
