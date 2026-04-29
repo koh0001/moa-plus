@@ -17,13 +17,19 @@ enum Choseong: Int, CaseIterable {
     }
 }
 
-// MARK: - Jungseong (중성) - 21 vowels
+// MARK: - Jungseong (중성) - 21 modern vowels + 1 archaic (ㆍ for 천지인)
 enum Jungseong: Int, CaseIterable {
     case ㅏ = 0, ㅐ, ㅑ, ㅒ, ㅓ, ㅔ, ㅕ, ㅖ, ㅗ, ㅘ
     case ㅙ, ㅚ, ㅛ, ㅜ, ㅝ, ㅞ, ㅟ, ㅠ, ㅡ, ㅢ
     case ㅣ
+    /// Archaic 아래아 (Hangul Letter Araea, U+318D). Used as a transient
+    /// 천지인 (cheonjiin) primitive — never forms a modern syllable. Callers
+    /// must avoid composing into Hangul Syllables block with this value.
+    case ㆍ
 
     var character: Character {
+        // ㆍ has no Hangul Jamo (U+1161+) counterpart; fall back to compat.
+        if self == .ㆍ { return "ㆍ" }
         let baseCode: UInt32 = 0x1161
         return Character(UnicodeScalar(baseCode + UInt32(rawValue))!)
     }
@@ -31,7 +37,7 @@ enum Jungseong: Int, CaseIterable {
     var compatibilityCharacter: Character {
         let chars: [Character] = ["ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ",
                                    "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ",
-                                   "ㅣ"]
+                                   "ㅣ", "ㆍ"]
         return chars[rawValue]
     }
 }

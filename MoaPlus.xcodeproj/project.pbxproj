@@ -68,13 +68,21 @@
 		3ADB3B4B2F761E2900822C03 /* Exceptions for "MoaPlusKeyboard" folder in "MoaPlus" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Engine/GestureAnalyzer.swift,
+				Engine/VowelResolver.swift,
 				Models/ColumnGestureOverride.swift,
+				Models/GestureDirection.swift,
+				Models/HangulJamo.swift,
+				Models/KeyboardMode.swift,
 				Models/SecondaryKeyAction.swift,
 				Models/ShortcutExpansion.swift,
 				Models/SwipeProfile.swift,
 				Models/ThemeSettings.swift,
+				Models/VowelPattern.swift,
 				Utilities/BackgroundImageManager.swift,
 				Utilities/GestureSettings.swift,
+				Utilities/HangulConstants.swift,
+				Utilities/KeyboardMetrics.swift,
 				Utilities/KeyboardSettings.swift,
 				Views/SpecialCharacterLayerView.swift,
 			);
@@ -85,16 +93,22 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		00A43CE62F2A2F8C005FF0AB /* MoaPlus */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = MoaPlus;
 			sourceTree = "<group>";
 		};
 		00A43CF62F2A2F8E005FF0AB /* MoaPlusTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = MoaPlusTests;
 			sourceTree = "<group>";
 		};
 		00A43D002F2A2F8E005FF0AB /* MoaPlusUITests  */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "MoaPlusUITests ";
 			sourceTree = "<group>";
 		};
@@ -211,8 +225,6 @@
 				00A43CF62F2A2F8E005FF0AB /* MoaPlusTests */,
 			);
 			name = MoaPlusTests;
-			packageProductDependencies = (
-			);
 			productName = "ios-moakiTests";
 			productReference = 00A43CF32F2A2F8E005FF0AB /* MoaPlusTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -234,8 +246,6 @@
 				00A43D002F2A2F8E005FF0AB /* MoaPlusUITests  */,
 			);
 			name = MoaPlusUITests;
-			packageProductDependencies = (
-			);
 			productName = "ios-moakiUITests";
 			productReference = 00A43CFD2F2A2F8E005FF0AB /* MoaPlusUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -256,8 +266,6 @@
 				00A43D152F2A349E005FF0AB /* MoaPlusKeyboard */,
 			);
 			name = MoaPlusKeyboard;
-			packageProductDependencies = (
-			);
 			productName = MoakiKeyboard;
 			productReference = 00A43D142F2A349E005FF0AB /* MoaPlusKeyboard.appex */;
 			productType = "com.apple.product-type.app-extension";

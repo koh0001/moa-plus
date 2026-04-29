@@ -59,6 +59,18 @@ struct SecondaryKeyAction: Codable, Equatable, Identifiable {
         SecondaryKeyAction(keyId: "ㅌ", visibleHint: "@", primaryLongPressOutput: "@", popupOutputs: ["@", "#"]),
         SecondaryKeyAction(keyId: "ㅊ", visibleHint: "₩", primaryLongPressOutput: "₩", popupOutputs: ["₩", "$", "€"]),
         SecondaryKeyAction(keyId: "ㅍ", visibleHint: "…", primaryLongPressOutput: "…", popupOutputs: ["…", "·", "•"]),
+
+        // English number row (PR G17) — long-tap produces shift+number special characters
+        SecondaryKeyAction(keyId: "1", visibleHint: "!", primaryLongPressOutput: "!", popupOutputs: ["!"]),
+        SecondaryKeyAction(keyId: "2", visibleHint: "@", primaryLongPressOutput: "@", popupOutputs: ["@"]),
+        SecondaryKeyAction(keyId: "3", visibleHint: "#", primaryLongPressOutput: "#", popupOutputs: ["#"]),
+        SecondaryKeyAction(keyId: "4", visibleHint: "$", primaryLongPressOutput: "$", popupOutputs: ["$"]),
+        SecondaryKeyAction(keyId: "5", visibleHint: "%", primaryLongPressOutput: "%", popupOutputs: ["%"]),
+        SecondaryKeyAction(keyId: "6", visibleHint: "^", primaryLongPressOutput: "^", popupOutputs: ["^"]),
+        SecondaryKeyAction(keyId: "7", visibleHint: "&", primaryLongPressOutput: "&", popupOutputs: ["&"]),
+        SecondaryKeyAction(keyId: "8", visibleHint: "*", primaryLongPressOutput: "*", popupOutputs: ["*"]),
+        SecondaryKeyAction(keyId: "9", visibleHint: "(", primaryLongPressOutput: "(", popupOutputs: ["("]),
+        SecondaryKeyAction(keyId: "0", visibleHint: ")", primaryLongPressOutput: ")", popupOutputs: [")"]),
     ]
 
     /// Find the secondary action for a given key

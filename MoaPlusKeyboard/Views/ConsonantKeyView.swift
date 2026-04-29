@@ -9,8 +9,11 @@ struct KeyView: View {
     var secondaryAction: SecondaryKeyAction?
     var showSecondaryHints: Bool = true
     var hintSize: Int = 1
+    var isGestureActive: Bool = false
     var row: Int = 1  // Row index (0 = top row, popup goes down)
     var column: Int = 3  // Column index (0 and 6 = side keys)
+    var shiftState: ShiftState = .off
+    var mode: KeyboardMode = .korean
     let onLongPress: ((String) -> Void)?
     let onBackspacePressStart: (() -> Void)?
     let onBackspacePressEnd: (() -> Void)?
@@ -40,20 +43,22 @@ struct KeyView: View {
                     // Detailed: show all popup candidates
                     Text(action.popupOutputs.joined(separator: " "))
                         .font(.system(size: max(hintFontSize - 2, 6)))
-                        .foregroundColor(Color(.label).opacity(0.4))
+                        .foregroundColor(themedTextColor.opacity(0.55))
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                         .padding(.horizontal, 3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, 2)
+                        .opacity(isGestureActive ? 0 : 1)
                 } else {
                     // Simple: show only primary hint
                     Text(action.visibleHint)
                         .font(.system(size: hintFontSize))
-                        .foregroundColor(Color(.label).opacity(0.5))
+                        .foregroundColor(themedTextColor.opacity(0.6))
                         .padding(hintEdge, hintEdgePadding)
                         .padding(.top, 3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: hintAlignment)
+                        .opacity(isGestureActive ? 0 : 1)
                 }
             }
         }
@@ -130,12 +135,15 @@ struct KeyView: View {
                 if let vowel = previewVowel {
                     Text(String(vowel.compatibilityCharacter))
                         .font(.system(size: keySize.height * 0.25))
-                        .foregroundColor(.blue)
+                        .foregroundColor(themedTextColor)
+                        .opacity(0.9)
                 }
             }
 
-        case .symbol(let symbol):
-            Text(symbol)
+        case .symbol(let s):
+            let displayText = (mode == .english && s.first?.isLetter == true && shiftState != .off)
+                ? s.uppercased() : s
+            Text(displayText)
                 .font(.system(size: fontSize, weight: .medium))
                 .foregroundColor(themedTextColor)
 
@@ -145,14 +153,64 @@ struct KeyView: View {
                 .foregroundColor(themedTextColor)
 
         case .vowelPrimitive(let type):
-            Text(type.displayLabel)
-                .font(.system(size: fontSize))
-                .foregroundColor(themedTextColor)
+            switch type {
+            case .bar:
+                if let vowel = previewVowel {
+                    Text(String(vowel.compatibilityCharacter))
+                        .font(.system(size: fontSize, weight: .medium))
+                        .foregroundColor(themedTextColor)
+                } else {
+                    VStack(spacing: 1) {
+                        Text("ㅕ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                        HStack(spacing: 2) {
+                            Text("ㅓ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                            Text("ㅣ").font(.system(size: fontSize, weight: .medium)).foregroundColor(themedTextColor)
+                            Text("ㅏ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                        }
+                        Text("ㅑ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                    }
+                    .opacity(isGestureActive ? 0 : 1)
+                }
+            case .dash:
+                if let vowel = previewVowel {
+                    Text(String(vowel.compatibilityCharacter))
+                        .font(.system(size: fontSize, weight: .medium))
+                        .foregroundColor(themedTextColor)
+                } else {
+                    VStack(spacing: 1) {
+                        Text("ㅗ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                        HStack(spacing: 2) {
+                            Text("ㅛ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                            Text("ㅡ").font(.system(size: fontSize, weight: .medium)).foregroundColor(themedTextColor)
+                            Text("ㅠ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                        }
+                        Text("ㅜ").font(.system(size: 9)).foregroundColor(themedTextColor.opacity(0.5))
+                    }
+                    .opacity(isGestureActive ? 0 : 1)
+                }
+            case .dot:
+                Text(type.displayLabel)
+                    .font(.system(size: fontSize))
+                    .foregroundColor(themedTextColor)
+            }
 
         case .functional(let type):
-            Text(type.rawValue)
-                .font(.system(size: fontSize * 0.7))
-                .foregroundColor(themedTextColor)
+            if type == .shift {
+                let iconName: String = {
+                    switch shiftState {
+                    case .off:    return "shift"
+                    case .on:     return "shift.fill"
+                    case .locked: return "capslock.fill"
+                    }
+                }()
+                Image(systemName: iconName)
+                    .font(.system(size: keySize.height * 0.35, weight: .medium))
+                    .foregroundColor(shiftState != .off ? Color.accentColor : themedTextColor)
+            } else {
+                Text(type.rawValue)
+                    .font(.system(size: fontSize * 0.7))
+                    .foregroundColor(themedTextColor)
+            }
 
         case .systemSwitch:
             Image(systemName: "globe")
@@ -206,8 +264,15 @@ struct KeyView: View {
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
         case .vowelPrimitive:
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.6) : ts.resolvedKeyBackground.opacity(0.85)
-        case .symbol, .quickPunctuation:
-            // Center symbols (numbers/chars) use key color, side symbols use function key color
+        case .symbol(let s), .quickPunctuation(let s):
+            // English mode: letter keys use normal key color; digit keys use function key color
+            if mode == .english {
+                if s.first?.isNumber == true {
+                    return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
+                }
+                return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
+            }
+            // Korean / symbol mode: center keys use key color, side keys use function key color
             if isSideKey {
                 return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
             }

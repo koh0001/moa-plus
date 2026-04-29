@@ -1,6 +1,14 @@
 import SwiftUI
 import Combine
 
+// MARK: - Shift State
+
+enum ShiftState: Equatable {
+    case off
+    case on        // single shot — auto-disables after one letter
+    case locked    // caps lock — stays on until tapped again
+}
+
 // MARK: - Separated State Objects (reduce unnecessary redraws)
 
 /// Gesture-related state — only GestureOverlayView observes this
@@ -24,8 +32,19 @@ class KeyboardViewModel: ObservableObject {
     let gestureState = GestureState()
     let popupState = PopupState()
 
-    @Published var isSymbolMode: Bool = false
+    @Published var keyboardMode: KeyboardMode = .korean
     @Published var isSpecialCharLayerVisible: Bool = false
+    @Published var shiftState: ShiftState = .off
+
+    private var lastShiftTapTimestamp: Date?
+    private static let doubleTapInterval: TimeInterval = 0.3
+
+    /// Backward-compat shim. Reads from keyboardMode; writes are ignored
+    /// (use toggleSymbolMode() or assign to keyboardMode directly).
+    var isSymbolMode: Bool {
+        get { keyboardMode.isSymbol }
+        set { _ = newValue /* legacy, ignored */ }
+    }
     @Published var isAbbreviationCandidateVisible: Bool = false
     @Published var abbreviationCandidate: ShortcutExpansion?
     @Published var abbreviationCandidates: [ShortcutExpansion] = []
@@ -107,11 +126,57 @@ class KeyboardViewModel: ObservableObject {
 
     // MARK: - Mode Toggle
 
-    func toggleMode() {
+    func toggleSymbolMode() {
         stopBackspaceRepeat()
         commitCurrent()
-        isSymbolMode.toggle()
+        keyboardMode = keyboardMode.toggleSymbol()
         triggerHapticFeedback()
+    }
+
+    func toggleLetterMode() {
+        stopBackspaceRepeat()
+        commitCurrent()
+        keyboardMode = keyboardMode.toggleLetter()
+        // Abbreviation engine applies in both Korean and English; reset the
+        // buffer so half-typed triggers don't leak across modes.
+        abbreviationEngine.resetBuffer()
+        shiftState = .off  // reset shift when switching language mode
+        triggerHapticFeedback()
+    }
+
+    func toggleShift() {
+        let now = Date()
+        let isDoubleTap: Bool = {
+            guard let last = lastShiftTapTimestamp else { return false }
+            return now.timeIntervalSince(last) < Self.doubleTapInterval
+        }()
+        lastShiftTapTimestamp = now
+
+        if isDoubleTap {
+            shiftState = .locked
+        } else {
+            switch shiftState {
+            case .off:    shiftState = .on
+            case .on:     shiftState = .off
+            case .locked: shiftState = .off
+            }
+        }
+        triggerHapticFeedback()
+    }
+
+    /// Apply shift to a letter symbol. Auto-releases .on to .off after consuming one letter.
+    private func shiftedSymbolIfNeeded(_ symbol: String) -> String {
+        guard keyboardMode == .english else { return symbol }
+        switch shiftState {
+        case .off:
+            return symbol
+        case .on:
+            let result = symbol.uppercased()
+            shiftState = .off
+            return result
+        case .locked:
+            return symbol.uppercased()
+        }
     }
 
     // MARK: - Input Methods
@@ -128,6 +193,20 @@ class KeyboardViewModel: ObservableObject {
         triggerHapticFeedback()
     }
 
+    /// Input a vowel primitive (천지인 ㅣ/ㅡ/ㆍ).
+    /// All three feed the Hangul composer as `Jungseong` values; ㆍ is held
+    /// as a transient pending vowel that combines with subsequent input
+    /// (ㆍ + ㅣ = ㅓ, ㅣ + ㆍ = ㅏ, …). See HangulComposer.combineVowels.
+    func inputVowelPrimitive(_ primitive: VowelPrimitiveType) {
+        let vowel: Jungseong
+        switch primitive {
+        case .bar:  vowel = .ㅣ
+        case .dash: vowel = .ㅡ
+        case .dot:  vowel = .ㆍ
+        }
+        inputVowel(vowel)
+    }
+
     private static let bracketPairs: [String: String] = [
         "(": ")", "[": "]", "{": "}", "<": ">",
         "「": "」", "『": "』", "《": "》", "【": "】", "〔": "〕"
@@ -136,13 +215,14 @@ class KeyboardViewModel: ObservableObject {
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
 
     func inputSymbol(_ symbol: String) {
+        let resolved = shiftedSymbolIfNeeded(symbol)
         commitCurrent()
-        if insertWithAutoBracket(symbol) {
+        if insertWithAutoBracket(resolved) {
             // Bracket pair inserted with cursor positioned
         } else {
-            delegate?.insertText(symbol)
+            delegate?.insertText(resolved)
         }
-        if symbol.count == 1, let char = symbol.first {
+        if resolved.count == 1, let char = resolved.first {
             abbreviationEngine.processCharacter(char)
         }
         triggerHapticFeedback()
@@ -175,11 +255,21 @@ class KeyboardViewModel: ObservableObject {
         didHandleLongPressNumberInCurrentGesture = true
 
         // Load popup candidates from secondary action
-        if let activeRow = activeKey?.row, let activeCol = activeKey?.column,
-           let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, isSymbolMode: false),
-           case .consonant(let choseong) = content {
-            let keyId = String(choseong.compatibilityCharacter)
-            if let action = KeyboardSettings.shared.secondaryAction(forKey: keyId) {
+        if let activeRow = activeKey?.row, let activeCol = activeKey?.column {
+            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode)
+
+            let keyId: String? = {
+                switch content {
+                case .consonant(let choseong):
+                    return String(choseong.compatibilityCharacter)
+                case .symbol(let s) where keyboardMode == .english && s.first?.isNumber == true:
+                    return s
+                default:
+                    return nil
+                }
+            }()
+
+            if let keyId, let action = KeyboardSettings.shared.secondaryAction(forKey: keyId) {
                 let filtered = KeyboardSettings.shared.autoBracketEnabled
                     ? action.popupOutputs.filter { !Self.closingBrackets.contains($0) }
                     : action.popupOutputs
@@ -227,6 +317,11 @@ class KeyboardViewModel: ObservableObject {
         longPressPopupText = nil
         longPressPopupCandidates = []
         longPressPopupSelectedIndex = 0
+        // Reset gesture visual state so hints restore immediately after popup ends
+        activeKey = nil
+        previewVowel = nil
+        gestureDirections = []
+        gestureStartPoint = nil
     }
 
     func deleteBackward() {
@@ -269,6 +364,19 @@ class KeyboardViewModel: ObservableObject {
         stopBackspaceRepeat()
         commitCurrent()
         delegate?.switchToNextKeyboard()
+    }
+
+    /// Move cursor by character offset.
+    /// Treats the currently composing character as committed (frozen at old cursor position),
+    /// resets composer + abbreviation buffer, then asks delegate to adjust proxy cursor.
+    func moveCursor(by offset: Int) {
+        guard offset != 0 else { return }
+        // Freeze any in-progress composition at its current screen position.
+        // commitCurrent() clears internal state without touching the proxy.
+        commitCurrent()
+        // Cursor moves invalidate abbreviation context — reset trie matching state.
+        abbreviationEngine.resetBuffer()
+        delegate?.moveCursor(by: offset)
     }
 
     func toggleSpecialCharLayer() {
@@ -316,6 +424,15 @@ class KeyboardViewModel: ObservableObject {
         gestureStartPoint = point
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        // Set columnId before reset() so per-column correction applies from the first touch point.
+        // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
+        if keyboardMode == .korean,
+           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean),
+           case .consonant(let consonant) = content {
+            gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
+        } else {
+            gestureAnalyzer.columnId = 0
+        }
         gestureAnalyzer.reset()
         gestureAnalyzer.addPoint(point)
         gestureDirections = []
@@ -327,8 +444,22 @@ class KeyboardViewModel: ObservableObject {
         let directions = gestureAnalyzer.getDirections()
         gestureDirections = directions
 
-        // Update preview vowel (only meaningful for consonant keys)
-        previewVowel = vowelResolver.peekVowel(directions: directions)
+        // Update preview vowel based on active key type so preview matches actual output.
+        // Vowel primitive keys (ㅣ, ㅡ) use the same resolver as input commit;
+        // consonant keys use the 8-direction VowelResolver pattern trie.
+        if let key = activeKey,
+           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode) {
+            switch content {
+            case .vowelPrimitive(let primitive):
+                previewVowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
+            case .consonant:
+                previewVowel = vowelResolver.peekVowel(directions: directions)
+            default:
+                previewVowel = nil
+            }
+        } else {
+            previewVowel = vowelResolver.peekVowel(directions: directions)
+        }
     }
 
     func gestureEnded(row: Int, column: Int) {
@@ -338,10 +469,12 @@ class KeyboardViewModel: ObservableObject {
             return
         }
 
-        // In symbol mode, gesture handling is simpler - just tap
-        if isSymbolMode {
+        switch keyboardMode {
+        case .symbolFromKorean, .symbolFromEnglish:
             handleSymbolModeTap(row: row, column: column)
-        } else {
+        case .english:
+            handleEnglishModeTap(row: row, column: column)
+        case .korean:
             handleKoreanModeGesture(row: row, column: column)
         }
 
@@ -349,7 +482,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func handleSymbolModeTap(row: Int, column: Int) {
-        guard let content = KeyboardMetrics.keyContent(at: row, column: column, isSymbolMode: true) else { return }
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode) else { return }
 
         switch content {
         case .symbol(let symbol):
@@ -361,14 +494,31 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
+    private func handleEnglishModeTap(row: Int, column: Int) {
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .english) else { return }
+
+        switch content {
+        case .symbol(let symbol):
+            inputSymbol(symbol)
+        case .backspace:
+            deleteBackward()
+        case .functional(let kind):
+            switch kind {
+            case .shift: toggleShift()
+            default: break
+            }
+        default:
+            break
+        }
+    }
+
     private func handleKoreanModeGesture(row: Int, column: Int) {
         let directions = gestureAnalyzer.finalizeGesture()
 
-        guard let content = KeyboardMetrics.keyContent(at: row, column: column, isSymbolMode: false) else { return }
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean) else { return }
 
         switch content {
         case .consonant(let consonant):
-            gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
             if directions.isEmpty {
                 // No gesture - treat as tap
                 inputConsonant(consonant)
@@ -387,6 +537,17 @@ class KeyboardViewModel: ObservableObject {
 
         case .backspace:
             deleteBackward()
+
+        case .vowelPrimitive(let primitive):
+            if directions.isEmpty {
+                inputVowelPrimitive(primitive)
+            } else {
+                if let vowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions) {
+                    inputVowel(vowel)
+                } else {
+                    inputVowelPrimitive(primitive)
+                }
+            }
 
         default:
             break
@@ -419,6 +580,114 @@ class KeyboardViewModel: ObservableObject {
     }
 
     // MARK: - Private Helpers
+
+    /// Map a drag direction on a vowel primitive key to a Jungseong.
+    /// Diagonal directions are normalised to the nearest cardinal before lookup.
+    /// First stroke produces the base vowel (PR G6); subsequent strokes fold
+    /// into compound vowels (PR G14 — ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅔ ㅐ ㅖ ㅒ).
+    /// Returns nil if the primitive has no mapping (e.g. .dot).
+    func resolveVowelFromPrimitiveDrag(primitive: VowelPrimitiveType, directions: [GestureDirection]) -> Jungseong? {
+        guard let first = directions.first else { return nil }
+
+        // First stroke: base vowel
+        let cardinal1 = normalizedCardinal(first)
+        guard var current = baseVowelFor(primitive: primitive, direction: cardinal1) else {
+            return nil
+        }
+
+        // Additional strokes: fold into compound vowels.
+        // applySecondaryStroke == nil → keep prior vowel (ignore noise).
+        for direction in directions.dropFirst() {
+            let cardinal = normalizedCardinal(direction)
+            if let combined = applySecondaryStroke(current, primitive: primitive, direction: cardinal) {
+                current = combined
+            }
+        }
+        return current
+    }
+
+    private func normalizedCardinal(_ direction: GestureDirection) -> GestureDirection {
+        switch direction {
+        case .upLeft, .upRight:     return .up
+        case .downLeft, .downRight: return .down
+        default:                    return direction
+        }
+    }
+
+    private func baseVowelFor(primitive: VowelPrimitiveType, direction: GestureDirection) -> Jungseong? {
+        switch primitive {
+        case .bar:   // ㅣ key: ←ㅓ →ㅏ ↑ㅕ ↓ㅑ
+            switch direction {
+            case .left:  return .ㅓ
+            case .right: return .ㅏ
+            case .up:    return .ㅕ
+            case .down:  return .ㅑ
+            default:     return nil
+            }
+        case .dash:  // ㅡ key: ↑ㅗ ↓ㅜ ←ㅛ →ㅠ
+            switch direction {
+            case .up:    return .ㅗ
+            case .down:  return .ㅜ
+            case .left:  return .ㅛ
+            case .right: return .ㅠ
+            default:     return nil
+            }
+        case .dot:   // ㆍ key: no drag mapping
+            return nil
+        }
+    }
+
+    /// Fold an additional stroke into the running vowel.
+    /// Returns nil if the stroke doesn't produce a known compound — caller
+    /// then keeps the previous vowel intact.
+    private func applySecondaryStroke(_ current: Jungseong, primitive: VowelPrimitiveType, direction: GestureDirection) -> Jungseong? {
+        switch primitive {
+        case .dash:
+            switch (current, direction) {
+            // ㅗ → ㅘ (→) / ㅚ (←,↓ 역방향)
+            case (.ㅗ, .right): return .ㅘ
+            case (.ㅗ, .left):  return .ㅚ
+            case (.ㅗ, .down):  return .ㅚ
+            // ㅘ → ㅙ (어느 방향이든 추가 stroke로 ㅣ 합성)
+            case (.ㅘ, .left):  return .ㅙ
+            case (.ㅘ, .right): return .ㅙ
+            case (.ㅘ, .up):    return .ㅙ
+            case (.ㅘ, .down):  return .ㅙ
+            // ㅜ → ㅝ (←) / ㅟ (→,↑ 역방향)
+            case (.ㅜ, .left):  return .ㅝ
+            case (.ㅜ, .right): return .ㅟ
+            case (.ㅜ, .up):    return .ㅟ
+            // ㅝ → ㅞ (어느 방향이든 추가 stroke로 ㅣ 합성)
+            case (.ㅝ, .left):  return .ㅞ
+            case (.ㅝ, .right): return .ㅞ
+            case (.ㅝ, .up):    return .ㅞ
+            case (.ㅝ, .down):  return .ㅞ
+            default: return nil
+            }
+        case .bar:
+            switch (current, direction) {
+            // ㅓ → ㅔ (→ 또는 수직 perpendicular stroke로 ㅣ 추가)
+            case (.ㅓ, .right): return .ㅔ
+            case (.ㅓ, .up):    return .ㅔ
+            case (.ㅓ, .down):  return .ㅔ
+            // ㅏ → ㅐ (← 또는 수직 perpendicular stroke로 ㅣ 추가)
+            case (.ㅏ, .left):  return .ㅐ
+            case (.ㅏ, .up):    return .ㅐ
+            case (.ㅏ, .down):  return .ㅐ
+            // ㅕ → ㅖ (수평 ←/→ 또는 ↓ 역방향)
+            case (.ㅕ, .right): return .ㅖ
+            case (.ㅕ, .left):  return .ㅖ
+            case (.ㅕ, .down):  return .ㅖ
+            // ㅑ → ㅒ (수평 ←/→ 또는 ↑ 역방향)
+            case (.ㅑ, .right): return .ㅒ
+            case (.ㅑ, .left):  return .ㅒ
+            case (.ㅑ, .up):    return .ㅒ
+            default: return nil
+            }
+        case .dot:
+            return nil
+        }
+    }
 
     private func handleComposerAction(_ action: HangulComposer.ComposerAction) {
         switch action {
@@ -459,7 +728,10 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func updateComposingText() {
-        let composing = composer.currentComposingCharacter.map { String($0) } ?? ""
+        // composingDisplay returns the full multi-character string for
+        // dotPending states (e.g. "ㅇㆍㆍ"). Single-character states still
+        // return one Character's worth of text.
+        let composing = composer.composingDisplay
         let previous = lastComposingText
         lastComposingText = composing
         delegate?.updateComposingText(from: previous, to: composing)
@@ -562,6 +834,7 @@ protocol KeyboardViewModelDelegate: AnyObject {
     func updateComposingText(from previous: String, to current: String)
     func switchToNextKeyboard()
     func triggerHapticFeedback()
+    func moveCursor(by offset: Int)
 }
 
 // MARK: - AbbreviationEngineDelegate

@@ -14,8 +14,14 @@ enum HangulConstants {
     static let jungseongOffset: UInt32 = jongseongCount           // 28
     static let choseongOffset: UInt32 = jungseongCount * jongseongCount  // 588
 
-    // Compose a complete Hangul syllable
+    // Compose a complete Hangul syllable.
+    // ㆍ (archaic 아래아) is not part of the modern Hangul Syllables block;
+    // callers should never reach this with .ㆍ — if they do we fall back to the
+    // bare jungseong glyph rather than crashing on an invalid scalar.
     static func composeSyllable(choseong: Choseong, jungseong: Jungseong, jongseong: Jongseong = .none) -> Character {
+        if jungseong == .ㆍ {
+            return jungseong.compatibilityCharacter
+        }
         let code = syllableBase
             + UInt32(choseong.rawValue) * choseongOffset
             + UInt32(jungseong.rawValue) * jungseongOffset

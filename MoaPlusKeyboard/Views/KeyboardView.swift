@@ -27,7 +27,11 @@ struct KeyboardView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: geometry.size.width)
+            let centerKeyWidth = KeyboardMetrics.centerKeyWidth(
+                for: geometry.size.width,
+                columnCount: viewModel.keyboardMode == .english ? 10 : 7,
+                mode: viewModel.keyboardMode
+            )
             let keyHeight = KeyboardMetrics.keyHeight(for: geometry.size.height)
 
                 ZStack {
@@ -48,9 +52,11 @@ struct KeyboardView: View {
                             centerKeyWidth: centerKeyWidth,
                             keyHeight: keyHeight,
                             totalWidth: geometry.size.width,
-                            isSymbolMode: viewModel.isSymbolMode,
+                            mode: viewModel.keyboardMode,
                             activeKey: viewModel.activeKey,
                             previewVowel: viewModel.previewVowel,
+                            isGestureActive: gestureState.activeKey != nil,
+                            shiftState: viewModel.shiftState,
                             onConsonantTap: { consonant in
                                 viewModel.inputConsonant(consonant)
                             },
@@ -86,25 +92,31 @@ struct KeyboardView: View {
                         // Function row
                         FunctionRowView(
                             totalWidth: geometry.size.width,
-                            isSymbolMode: viewModel.isSymbolMode,
-                            onToggleModePressed: {
-                                viewModel.toggleMode()
+                            mode: viewModel.keyboardMode,
+                            onToggleSymbolPressed: {
+                                viewModel.toggleSymbolMode()
                             },
-                            onCommaPressed: {
-                                viewModel.inputSymbol(",")
+                            onToggleLetterPressed: {
+                                viewModel.toggleLetterMode()
                             },
                             onSpacePressed: {
                                 viewModel.inputSpace()
                             },
+                            onPunctuation: { symbol in
+                                viewModel.inputSymbol(symbol)
+                            },
                             onReturnPressed: {
                                 viewModel.inputReturn()
+                            },
+                            onCursorMoveDelta: { offset in
+                                viewModel.moveCursor(by: offset)
                             }
                         )
                     }
                     .padding(KeyboardMetrics.keySpacing)
 
                     // Gesture overlay (only shown when enabled and in Korean mode)
-                    if settings.showGesturePreview && !viewModel.isSymbolMode {
+                    if settings.showGesturePreview && viewModel.keyboardMode == .korean {
                         GestureOverlayView(
                             directions: gestureState.directions,
                             startPoint: gestureState.startPoint,
@@ -187,13 +199,25 @@ struct KeyboardView: View {
         }
     }
 
-    /// Calculate the X center of a key based on column/row
+    /// Calculate the X center of a key based on column/row, with grid centered horizontally
     private func keyXPosition(column: Int, row: Int, centerKeyWidth: CGFloat, spacing: CGFloat, totalWidth: CGFloat) -> CGFloat {
-        var x = spacing // left padding
+        let mode = viewModel.keyboardMode
+        let columnCount = KeyboardMetrics.columnCount(for: row, mode: mode)
 
-        let columnCount = KeyboardMetrics.columnCount(for: row, isSymbolMode: viewModel.isSymbolMode)
+        // Calculate total grid width for centering
+        var totalGridWidth: CGFloat = 0
         for col in 0..<columnCount {
-            let w = KeyboardMetrics.keyWidth(for: col, row: row, centerKeyWidth: centerKeyWidth)
+            totalGridWidth += KeyboardMetrics.keyWidth(for: col, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
+            if col < columnCount - 1 {
+                totalGridWidth += spacing
+            }
+        }
+
+        let leftMargin = max(spacing, (totalWidth - totalGridWidth) / 2)
+
+        var x = leftMargin
+        for col in 0..<columnCount {
+            let w = KeyboardMetrics.keyWidth(for: col, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
             if col == column {
                 return x + w / 2
             }

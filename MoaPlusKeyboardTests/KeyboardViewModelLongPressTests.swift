@@ -79,4 +79,6 @@ private final class SpyKeyboardDelegate: KeyboardViewModelDelegate {
     func triggerHapticFeedback() {
         hapticCount += 1
     }
+
+    func moveCursor(by offset: Int) {}
 }

@@ -2,17 +2,32 @@ import SwiftUI
 
 struct FunctionRowView: View {
     let totalWidth: CGFloat
-    let isSymbolMode: Bool
-    let onToggleModePressed: () -> Void
-    let onCommaPressed: () -> Void
+    let mode: KeyboardMode
+    let onToggleSymbolPressed: () -> Void
+    let onToggleLetterPressed: () -> Void
     let onSpacePressed: () -> Void
+    let onPunctuation: (String) -> Void
     let onReturnPressed: () -> Void
+    var onCursorMoveDelta: ((Int) -> Void)? = nil
     var onLanguageSwitchPressed: (() -> Void)? = nil
-    var onPeriodPressed: (() -> Void)? = nil
     var useBimanualLayout: Bool = false
 
     private let spacing: CGFloat = KeyboardMetrics.keySpacing
     private let height: CGFloat = KeyboardMetrics.functionRowHeight
+
+    /// Label for the 한글-or-ABC / !#1 toggle.
+    /// In symbol mode, shows the target letter mode (한글/ABC) the user will return to.
+    private var symbolToggleLabel: String {
+        if mode.isSymbol {
+            return mode.letterMode == .korean ? "한글" : "ABC"
+        }
+        return "!#1"
+    }
+
+    /// Label for the 한/영 toggle (shows the *target* letter mode).
+    private var letterToggleLabel: String {
+        mode.letterMode == .korean ? "ABC" : "한"
+    }
 
     var body: some View {
         if useBimanualLayout {
@@ -23,41 +38,45 @@ struct FunctionRowView: View {
     }
 
     // MARK: - Default layout
+    // [123/한글] [한/영] [   space   ] [긋기 .] [return]
 
     private var defaultLayoutBody: some View {
         HStack(spacing: spacing) {
-            // 123/한글 toggle button (replaces globe)
+            // Symbol toggle (123/한글)
             FunctionKeyView(
                 content: AnyView(
-                    Text(isSymbolMode ? "한글" : "123")
+                    Text(symbolToggleLabel)
                         .font(.system(size: 16, weight: .medium))
                 ),
-                width: toggleWidth,
+                width: symbolToggleWidth,
                 height: height,
-                action: onToggleModePressed
+                action: onToggleSymbolPressed
             )
 
-            // Comma key (left of space)
+            // Letter toggle (한/영)
             FunctionKeyView(
                 content: AnyView(
-                    Text(",")
-                        .font(.system(size: 20))
+                    Text(letterToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
                 ),
-                width: commaWidth,
+                width: letterToggleWidth,
                 height: height,
-                action: onCommaPressed
+                action: onToggleLetterPressed
             )
 
             // Space bar
-            FunctionKeyView(
-                content: AnyView(
-                    Text("space")
-                        .font(.system(size: 16))
-                        .foregroundColor(KeyboardSettings.shared.themeSettings.resolvedKeyText.opacity(0.6))
-                ),
+            SpaceKeyView(
                 width: spaceWidth,
                 height: height,
-                action: onSpacePressed
+                onTap: onSpacePressed,
+                onCursorMove: onCursorMoveDelta ?? { _ in }
+            )
+
+            // Swipe punctuation key (tap = ".", up = ",", left = "?", right = "!", down = ".")
+            PunctuationSwipeKey(
+                width: punctuationWidth,
+                height: height,
+                onPunctuation: onPunctuation
             )
 
             // Return button
@@ -74,7 +93,7 @@ struct FunctionRowView: View {
     }
 
     // MARK: - Bimanual layout
-    // Layout: [🌐] [한글/123] [,] [   space   ] [.] [return]
+    // Layout: [🌐] [한글/123] [한/영] [   space   ] [긋기 .] [return]
 
     private var bimanualLayoutBody: some View {
         HStack(spacing: spacing) {
@@ -92,46 +111,38 @@ struct FunctionRowView: View {
             // Mode toggle (한글/123)
             FunctionKeyView(
                 content: AnyView(
-                    Text(isSymbolMode ? "한글" : "123")
+                    Text(symbolToggleLabel)
                         .font(.system(size: 16, weight: .medium))
                 ),
                 width: bimanualToggleWidth,
                 height: height,
-                action: onToggleModePressed
+                action: onToggleSymbolPressed
             )
 
-            // Comma
+            // Letter toggle (한/영)
             FunctionKeyView(
                 content: AnyView(
-                    Text(",")
-                        .font(.system(size: 20))
+                    Text(letterToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
                 ),
                 width: bimanualPunctuationWidth,
                 height: height,
-                action: onCommaPressed
+                action: onToggleLetterPressed
             )
 
             // Space bar (takes remaining width)
-            FunctionKeyView(
-                content: AnyView(
-                    Text("space")
-                        .font(.system(size: 16))
-                        .foregroundColor(KeyboardSettings.shared.themeSettings.resolvedKeyText.opacity(0.6))
-                ),
+            SpaceKeyView(
                 width: bimanualSpaceWidth,
                 height: height,
-                action: onSpacePressed
+                onTap: onSpacePressed,
+                onCursorMove: onCursorMoveDelta ?? { _ in }
             )
 
-            // Period
-            FunctionKeyView(
-                content: AnyView(
-                    Text(".")
-                        .font(.system(size: 20))
-                ),
+            // Swipe punctuation
+            PunctuationSwipeKey(
                 width: bimanualPunctuationWidth,
                 height: height,
-                action: onPeriodPressed ?? {}
+                onPunctuation: onPunctuation
             )
 
             // Return key
@@ -157,19 +168,24 @@ struct FunctionRowView: View {
     }
 
     private var availableWidthWithoutReturn: CGFloat {
-        totalWidth - returnWidth - spacing * 5  // 5 gaps for 4 buttons + edges
+        // 5 internal gaps for 5 buttons (4 widgets + return) plus 2 outer paddings
+        totalWidth - returnWidth - spacing * 5
     }
 
-    private var toggleWidth: CGFloat {
-        availableWidthWithoutReturn * 0.30
+    private var symbolToggleWidth: CGFloat {
+        availableWidthWithoutReturn * 0.20
     }
 
-    private var commaWidth: CGFloat {
-        availableWidthWithoutReturn * 0.14
+    private var letterToggleWidth: CGFloat {
+        availableWidthWithoutReturn * 0.16
+    }
+
+    private var punctuationWidth: CGFloat {
+        availableWidthWithoutReturn * 0.16
     }
 
     private var spaceWidth: CGFloat {
-        availableWidthWithoutReturn * 0.56
+        availableWidthWithoutReturn * 0.48
     }
 
     // MARK: - Bimanual layout widths
@@ -194,6 +210,127 @@ struct FunctionRowView: View {
         let gapCount: CGFloat = 7  // 6 keys = 5 gaps, plus 2 outer edges omitted (HStack handles)
         let fixedWidths = bimanualGlobeWidth + bimanualToggleWidth + bimanualPunctuationWidth * 2 + returnWidth
         return totalWidth - fixedWidths - spacing * (gapCount - 2)
+    }
+}
+
+// MARK: - Punctuation swipe key
+
+/// Tap = ".", swipe up = ",", swipe left = "?", swipe right = "!", swipe down = ".".
+struct PunctuationSwipeKey: View {
+    let width: CGFloat
+    let height: CGFloat
+    let onPunctuation: (String) -> Void
+
+    @State private var isPressed = false
+    @State private var didDrag = false
+
+    private static let dragThreshold: CGFloat = 12
+
+    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(",").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            HStack(spacing: 4) {
+                Text("?").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+                Text(".").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
+                Text("!").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            }
+            Text(".").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+        }
+        .frame(width: width, height: height)
+        .background(
+            RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
+                .fill(isPressed ? bg.opacity(0.7) : bg)
+        )
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if !isPressed { isPressed = true }
+                    if !didDrag {
+                        let dx = value.translation.width
+                        let dy = value.translation.height
+                        if abs(dx) >= Self.dragThreshold || abs(dy) >= Self.dragThreshold {
+                            didDrag = true
+                            let symbol: String
+                            if abs(dx) > abs(dy) {
+                                symbol = dx > 0 ? "!" : "?"
+                            } else {
+                                symbol = dy > 0 ? "." : ","
+                            }
+                            onPunctuation(symbol)
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                    if !didDrag {
+                        onPunctuation(".")
+                    }
+                    didDrag = false
+                }
+        )
+    }
+}
+
+struct SpaceKeyView: View {
+    let width: CGFloat
+    let height: CGFloat
+    let onTap: () -> Void
+    let onCursorMove: (Int) -> Void
+
+    @State private var isPressed = false
+    @State private var didDrag = false
+    @State private var lastReportedOffset: CGFloat = 0
+
+    private static let dragThreshold: CGFloat = 8
+    private static let pixelsPerStep: CGFloat = 12
+
+    private var themeBackgroundColor: Color {
+        KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground
+    }
+    private var themeTextColor: Color {
+        KeyboardSettings.shared.themeSettings.resolvedKeyText
+    }
+
+    var body: some View {
+        Text("space")
+            .font(.system(size: 16))
+            .foregroundColor(themeTextColor.opacity(0.6))
+            .frame(width: width, height: height)
+            .background(
+                RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
+                    .fill(isPressed ? themeBackgroundColor.opacity(0.7) : themeBackgroundColor)
+            )
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !isPressed { isPressed = true }
+                        let dx = value.translation.width
+                        if !didDrag && abs(dx) >= Self.dragThreshold {
+                            didDrag = true
+                            lastReportedOffset = 0
+                        }
+                        if didDrag && KeyboardSettings.shared.cursorMoveBySpaceDragEnabled {
+                            let totalSteps = Int(dx / Self.pixelsPerStep)
+                            let lastSteps = Int(lastReportedOffset / Self.pixelsPerStep)
+                            let delta = totalSteps - lastSteps
+                            if delta != 0 {
+                                onCursorMove(delta)
+                                lastReportedOffset = dx
+                            }
+                        }
+                    }
+                    .onEnded { _ in
+                        isPressed = false
+                        if !didDrag {
+                            onTap()
+                        }
+                        didDrag = false
+                        lastReportedOffset = 0
+                    }
+            )
     }
 }
 
@@ -242,10 +379,11 @@ struct FunctionKeyView: View {
             .font(.headline)
         FunctionRowView(
             totalWidth: 350,
-            isSymbolMode: false,
-            onToggleModePressed: { print("Toggle") },
-            onCommaPressed: { print("Comma") },
+            mode: .korean,
+            onToggleSymbolPressed: { print("Symbol") },
+            onToggleLetterPressed: { print("Letter") },
             onSpacePressed: { print("Space") },
+            onPunctuation: { print("Punct: \($0)") },
             onReturnPressed: { print("Return") }
         )
 
@@ -253,25 +391,24 @@ struct FunctionKeyView: View {
             .font(.headline)
         FunctionRowView(
             totalWidth: 350,
-            isSymbolMode: true,
-            onToggleModePressed: { print("Toggle") },
-            onCommaPressed: { print("Comma") },
+            mode: .symbolFromKorean,
+            onToggleSymbolPressed: { print("Symbol") },
+            onToggleLetterPressed: { print("Letter") },
             onSpacePressed: { print("Space") },
+            onPunctuation: { print("Punct: \($0)") },
             onReturnPressed: { print("Return") }
         )
 
-        Text("Korean Mode (bimanual)")
+        Text("English Mode (default)")
             .font(.headline)
         FunctionRowView(
             totalWidth: 350,
-            isSymbolMode: false,
-            onToggleModePressed: { print("Toggle") },
-            onCommaPressed: { print("Comma") },
+            mode: .english,
+            onToggleSymbolPressed: { print("Symbol") },
+            onToggleLetterPressed: { print("Letter") },
             onSpacePressed: { print("Space") },
-            onReturnPressed: { print("Return") },
-            onLanguageSwitchPressed: { print("Globe") },
-            onPeriodPressed: { print("Period") },
-            useBimanualLayout: true
+            onPunctuation: { print("Punct: \($0)") },
+            onReturnPressed: { print("Return") }
         )
     }
     .padding()

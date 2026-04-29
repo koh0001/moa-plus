@@ -25,6 +25,7 @@ final class KeyboardSettings: ObservableObject {
         static let wordDeleteEnabled = "wordDeleteEnabled"
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
+        static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
     }
 
     /// Shared UserDefaults (App Group) with fallback to standard
@@ -89,8 +90,8 @@ final class KeyboardSettings: ObservableObject {
 
     // MARK: - Layout Settings
 
-    /// Side key width ratio (0.2 ~ 0.5, default 0.35)
-    @Published var sideKeyWidthRatio: Double = 0.35 {
+    /// Side key width ratio (0.2 ~ 1.0, default 0.7 for square keys)
+    @Published var sideKeyWidthRatio: Double = 0.7 {
         didSet { guard !isLoading else { return }; defaults.set(sideKeyWidthRatio, forKey: Keys.sideKeyWidthRatio) }
     }
 
@@ -114,6 +115,11 @@ final class KeyboardSettings: ObservableObject {
     /// Seconds before switching to word delete (0.8~3.0)
     @Published var wordDeleteDelay: Double = 1.5 {
         didSet { guard !isLoading else { return }; defaults.set(wordDeleteDelay, forKey: Keys.wordDeleteDelay) }
+    }
+
+    /// Space-bar drag moves the cursor (default ON)
+    @Published var cursorMoveBySpaceDragEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; defaults.set(cursorMoveBySpaceDragEnabled, forKey: Keys.cursorMoveBySpaceDragEnabled) }
     }
 
     /// Computed repeat interval from speed setting
@@ -149,7 +155,7 @@ final class KeyboardSettings: ObservableObject {
         showGesturePreview = defaults.bool(forKey: Keys.showGesturePreview)
         showSecondaryHints = defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true
         hintSize = defaults.object(forKey: Keys.hintSize) as? Int ?? 1
-        sideKeyWidthRatio = defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.35
+        sideKeyWidthRatio = defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7
         longPressDelay = defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5
         clickSoundEnabled = defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false
         showDetailedHints = defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false
@@ -157,6 +163,7 @@ final class KeyboardSettings: ObservableObject {
         wordDeleteEnabled = defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true
         backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
         wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5
+        cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
     }
 
     private func save<T: Encodable>(_ value: T, forKey key: String) {

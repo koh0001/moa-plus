@@ -145,4 +145,8 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
             AudioServicesPlaySystemSound(KeyboardMetrics.clickSoundID)
         }
     }
+
+    func moveCursor(by offset: Int) {
+        textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
+    }
 }
