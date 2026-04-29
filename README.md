@@ -10,13 +10,17 @@
 
 ## 스크린샷
 
-| 홈 | 키보드 | 설정 | 외형 |
-|:--:|:--:|:--:|:--:|
-| <img src="resources/screenshots/01_home.png" width="180"> | <img src="resources/screenshots/02_keyboard.png" width="180"> | <img src="resources/screenshots/03_settings.png" width="180"> | <img src="resources/screenshots/04_appearance.png" width="180"> |
+### v1.2 — 키보드와 외형 미리보기
 
-| 튜토리얼 | 단축어 | 앱 정보 |
+| 한글 키보드 | 영문 키보드 | 외형 미리보기 |
 |:--:|:--:|:--:|
-| <img src="resources/screenshots/05_tutorial.png" width="180"> | <img src="resources/screenshots/06_abbreviation.png" width="180"> | <img src="resources/screenshots/07_about.png" width="180"> |
+| <img src="resources/screenshots/new-01_ko.PNG" width="180"> | <img src="resources/screenshots/new-02_en.PNG" width="180"> | <img src="resources/screenshots/new-03_skin.PNG" width="180"> |
+
+### 메인 앱
+
+| 홈 | 설정 | 튜토리얼 | 단축어 | 앱 정보 |
+|:--:|:--:|:--:|:--:|:--:|
+| <img src="resources/screenshots/01_home.png" width="160"> | <img src="resources/screenshots/03_settings.png" width="160"> | <img src="resources/screenshots/05_tutorial.png" width="160"> | <img src="resources/screenshots/06_abbreviation.png" width="160"> | <img src="resources/screenshots/07_about.png" width="160"> |
 
 ## 주요 기능
 

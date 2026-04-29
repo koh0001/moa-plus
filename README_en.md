@@ -12,13 +12,17 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 
 ## Screenshots
 
-| Home | Keyboard | Settings | Appearance |
-|:--:|:--:|:--:|:--:|
-| <img src="resources/screenshots/01_home.png" width="180"> | <img src="resources/screenshots/02_keyboard.png" width="180"> | <img src="resources/screenshots/03_settings.png" width="180"> | <img src="resources/screenshots/04_appearance.png" width="180"> |
+### v1.2 — Keyboard and Appearance preview
 
-| Tutorial | Abbreviation | About |
+| Korean keyboard | English keyboard | Appearance preview |
 |:--:|:--:|:--:|
-| <img src="resources/screenshots/05_tutorial.png" width="180"> | <img src="resources/screenshots/06_abbreviation.png" width="180"> | <img src="resources/screenshots/07_about.png" width="180"> |
+| <img src="resources/screenshots/new-01_ko.PNG" width="180"> | <img src="resources/screenshots/new-02_en.PNG" width="180"> | <img src="resources/screenshots/new-03_skin.PNG" width="180"> |
+
+### Host app
+
+| Home | Settings | Tutorial | Abbreviation | About |
+|:--:|:--:|:--:|:--:|:--:|
+| <img src="resources/screenshots/01_home.png" width="160"> | <img src="resources/screenshots/03_settings.png" width="160"> | <img src="resources/screenshots/05_tutorial.png" width="160"> | <img src="resources/screenshots/06_abbreviation.png" width="160"> | <img src="resources/screenshots/07_about.png" width="160"> |
 
 ## Features
 
