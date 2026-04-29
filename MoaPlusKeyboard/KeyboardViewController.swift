@@ -42,6 +42,11 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // The keyboard extension lives in a separate process from the main
+        // app, so @Published mutations there don't notify our singleton.
+        // Reload from App Group UserDefaults on every appearance to pick up
+        // theme/gesture/etc. changes the user just made in the host app.
+        KeyboardSettings.shared.loadAll()
         heightConstraint?.constant = KeyboardMetrics.keyboardHeight
         heightConstraint?.isActive = true
         view.setNeedsLayout()

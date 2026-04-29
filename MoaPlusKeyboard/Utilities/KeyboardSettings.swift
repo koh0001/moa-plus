@@ -145,7 +145,7 @@ final class KeyboardSettings: ObservableObject {
 
     // MARK: - Persistence
 
-    private func loadAll() {
+    func loadAll() {
         isLoading = true
         defer { isLoading = false }
         gestureSettings = load(GestureSettings.self, forKey: Keys.gestureSettings) ?? .default
