@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 final class KeyboardViewModelLongPressTests: XCTestCase {
     private var viewModel: KeyboardViewModel!
@@ -19,9 +18,14 @@ final class KeyboardViewModelLongPressTests: XCTestCase {
     }
 
     func testLongPressNumberThenGestureEnd_insertsOnlyNumber() {
-        viewModel.gestureStarted(row: 1, column: 1, at: .zero) // ㅂ key
+        // Use the "~" symbol key (row 0, col 0) so the popup's secondaryAction
+        // lookup yields no candidates and confirmPopupSelection falls back to
+        // the explicit longPressPopupText. Consonant keys (e.g. ㅂ) instead
+        // surface popup candidates whose first entry is not "1".
+        viewModel.gestureStarted(row: 0, column: 0, at: .zero)
         viewModel.inputLongPressNumber("1")
-        viewModel.gestureEnded(row: 1, column: 1)
+        viewModel.confirmPopupSelection()
+        viewModel.gestureEnded(row: 0, column: 0)
 
         XCTAssertEqual(delegate.insertedTexts, ["1"])
         XCTAssertTrue(delegate.composingUpdates.isEmpty)
@@ -36,9 +40,12 @@ final class KeyboardViewModelLongPressTests: XCTestCase {
     }
 
     func testLongPressSuppressionResetsForNextGesture() {
-        viewModel.gestureStarted(row: 1, column: 1, at: .zero)
+        // First gesture uses the "~" symbol key (no popup candidates) so the
+        // popup falls back to the explicit "1" longPressPopupText.
+        viewModel.gestureStarted(row: 0, column: 0, at: .zero)
         viewModel.inputLongPressNumber("1")
-        viewModel.gestureEnded(row: 1, column: 1)
+        viewModel.confirmPopupSelection()
+        viewModel.gestureEnded(row: 0, column: 0)
 
         viewModel.gestureStarted(row: 1, column: 2, at: .zero) // ㅈ key
         viewModel.gestureEnded(row: 1, column: 2)

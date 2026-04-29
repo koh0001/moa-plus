@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 final class KeyboardViewModelCursorTests: XCTestCase {
     private var viewModel: KeyboardViewModel!

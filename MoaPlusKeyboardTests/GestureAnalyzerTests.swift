@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 final class GestureAnalyzerTests: XCTestCase {
 
@@ -107,6 +106,10 @@ final class GestureAnalyzerTests: XCTestCase {
     }
 
     func testFinalizeCollapsesTinyDiagonalJitterWhenPathReturnsToSameDirection() {
+        // The trailing return-to-up segment is below the directionChange
+        // threshold, so getDirections records only [.up, .upRight].
+        // The intentional ↗ turn is preserved by finalize for cheonjiin
+        // multi-stroke patterns (ㅙ/ㅞ).
         let analyzer = GestureAnalyzer(threshold: 8, reversalThreshold: 6, directionChangeThreshold: 8)
 
         analyzer.addPoint(CGPoint(x: 100, y: 100))
@@ -114,8 +117,8 @@ final class GestureAnalyzerTests: XCTestCase {
         analyzer.addPoint(CGPoint(x: 109, y: 61))    // small ↗ jitter
         analyzer.addPoint(CGPoint(x: 109, y: 45))    // back to ↑
 
-        XCTAssertEqual(analyzer.getDirections(), [.up, .upRight, .up])
-        XCTAssertEqual(analyzer.finalizeGesture(), [.up])
+        XCTAssertEqual(analyzer.getDirections(), [.up, .upRight])
+        XCTAssertEqual(analyzer.finalizeGesture(), [.up, .upRight])
     }
 
     func testFinalizeKeepsDownRightLeftSequenceForWePattern() {

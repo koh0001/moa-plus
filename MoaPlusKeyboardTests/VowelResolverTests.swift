@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 final class VowelResolverTests: XCTestCase {
 
@@ -30,11 +29,11 @@ final class VowelResolverTests: XCTestCase {
         // ㅓ = ←
         XCTAssertEqual(resolver.resolve(directions: [.left]).vowel, .ㅓ)
 
-        // ㅜ = ↙ (normalizes to ↓)
-        XCTAssertEqual(resolver.resolve(directions: [.downLeft]).vowel, .ㅜ)
+        // ㅡ = ↙ (new default diagonal mapping per CLAUDE.md: ↙↘ = ㅡ, ↖↗ = ㅣ)
+        XCTAssertEqual(resolver.resolve(directions: [.downLeft]).vowel, .ㅡ)
 
-        // ㅗ = ↖ (normalizes to ↑)
-        XCTAssertEqual(resolver.resolve(directions: [.upLeft]).vowel, .ㅗ)
+        // ㅣ = ↖ (new default diagonal mapping)
+        XCTAssertEqual(resolver.resolve(directions: [.upLeft]).vowel, .ㅣ)
     }
 
     // MARK: - Y-Vowel Tests (Triple Direction)

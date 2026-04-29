@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 final class HangulComposerTests: XCTestCase {
 
@@ -197,38 +196,20 @@ final class HangulComposerTests: XCTestCase {
     // MARK: - Complex Input Sequences
 
     func testHelloWorld() {
-        // 안녕하세요
-        let inputs: [(Choseong?, Jungseong?)] = [
-            (.ㅇ, .ㅏ), (nil, nil), // 아 + ㄴ (next)
-            (.ㄴ, nil), // attached as jongseong
-            (nil, .ㅕ), // splits to 안 + 녀
-            (.ㅇ, nil), // 녕
-            (nil, nil), // commit
-            (.ㅎ, .ㅏ), // 하
-            (.ㅅ, nil), // 세 (next syllable start)
-            (nil, .ㅔ), // 세
-            (.ㅇ, nil), // jongseong? no, starts new: 세 + ㅇ
-            (nil, .ㅛ), // 셍? no - 세요
-        ]
-
-        // Simplified test
+        // 안녕하세요 — standard 두벌식 IME requires the second ㄴ to commit
+        // "안" before starting the "녀" syllable.
         _ = composer.inputChoseong(.ㅇ)
         _ = composer.inputJungseong(.ㅏ)
+        _ = composer.inputChoseong(.ㄴ)
         _ = composer.inputChoseong(.ㄴ)
         _ = composer.inputJungseong(.ㅕ)
         _ = composer.inputChoseong(.ㅇ)
 
-        composer.commitCurrent()
-
         _ = composer.inputChoseong(.ㅎ)
         _ = composer.inputJungseong(.ㅏ)
 
-        composer.commitCurrent()
-
         _ = composer.inputChoseong(.ㅅ)
         _ = composer.inputJungseong(.ㅔ)
-
-        composer.commitCurrent()
 
         _ = composer.inputChoseong(.ㅇ)
         _ = composer.inputJungseong(.ㅛ)
@@ -239,37 +220,26 @@ final class HangulComposerTests: XCTestCase {
     }
 
     func testThankYou() {
-        // 감사합니다
+        // 감사합니다 — keys: ㄱㅏㅁ ㅅㅏ ㅎㅏㅂ ㄴㅣ ㄷㅏ
         _ = composer.inputChoseong(.ㄱ)
         _ = composer.inputJungseong(.ㅏ)
         _ = composer.inputChoseong(.ㅁ)
-        _ = composer.inputJungseong(.ㅏ)
 
-        XCTAssertEqual(composer.composedText, "가")
-
-        _ = composer.inputChoseong(.ㅅ)
-        _ = composer.inputJungseong(.ㅏ)
-
+        _ = composer.inputChoseong(.ㅅ) // ㅁ+ㅅ no combine → commit "감"
         XCTAssertEqual(composer.composedText, "감")
 
-        _ = composer.inputChoseong(.ㅎ)
         _ = composer.inputJungseong(.ㅏ)
-
+        _ = composer.inputChoseong(.ㅎ) // ㅎ as jongseong
+        _ = composer.inputJungseong(.ㅏ) // splits → commit "사"
         XCTAssertEqual(composer.composedText, "감사")
 
-        _ = composer.inputChoseong(.ㅂ)
-        _ = composer.inputJungseong(.ㅣ)
-
-        XCTAssertEqual(composer.composedText, "감사하")
-
-        _ = composer.inputChoseong(.ㄴ)
-        _ = composer.inputJungseong(.ㅏ)
-
+        _ = composer.inputChoseong(.ㅂ) // ㅂ as jongseong
+        _ = composer.inputChoseong(.ㄴ) // ㅂ+ㄴ no combine → commit "합"
         XCTAssertEqual(composer.composedText, "감사합")
 
-        _ = composer.inputChoseong(.ㄷ)
-        _ = composer.inputJungseong(.ㅏ)
-
+        _ = composer.inputJungseong(.ㅣ)
+        _ = composer.inputChoseong(.ㄷ) // ㄷ as jongseong
+        _ = composer.inputJungseong(.ㅏ) // splits → commit "니"
         composer.commitCurrent()
 
         XCTAssertEqual(composer.composedText, "감사합니다")

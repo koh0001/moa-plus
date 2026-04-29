@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 /// Tests for `KeyboardViewModel.resolveVowelFromPrimitiveDrag` (PR G6, G11, G14).
 /// Covers single-stroke base vowels and multi-stroke compound vowels on the

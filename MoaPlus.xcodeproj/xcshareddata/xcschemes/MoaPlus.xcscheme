@@ -29,6 +29,30 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "3A2FCBAD2FA210D9006847D0"
+               BuildableName = "MoaPlusKeyboardTests.xctest"
+               BlueprintName = "MoaPlusKeyboardTests"
+               ReferencedContainer = "container:MoaPlus.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "00A43CFC2F2A2F8E005FF0AB"
+               BuildableName = "MoaPlusUITests.xctest"
+               BlueprintName = "MoaPlusUITests"
+               ReferencedContainer = "container:MoaPlus.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

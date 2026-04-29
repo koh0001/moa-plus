@@ -1,5 +1,4 @@
 import XCTest
-@testable import MoaPlusKeyboard
 
 final class KeyboardViewModelShiftTests: XCTestCase {
     private var vm: KeyboardViewModel!
@@ -36,7 +35,10 @@ final class KeyboardViewModelShiftTests: XCTestCase {
     func test_shift_on_then_off_by_tap() {
         vm.toggleShift()  // off → on
         XCTAssertEqual(vm.shiftState, .on)
-        vm.toggleShift()  // on → off (single tap, >0.3s apart not needed for off path)
+        // Wait past doubleTapInterval (0.3s) so the next tap is treated as a
+        // single tap (.on → .off) rather than a caps-lock double-tap.
+        Thread.sleep(forTimeInterval: 0.31)
+        vm.toggleShift()
         XCTAssertEqual(vm.shiftState, .off)
     }
 
