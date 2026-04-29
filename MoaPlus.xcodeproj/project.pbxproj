@@ -110,8 +110,11 @@
 		3ADB3B4B2F761E2900822C03 /* Exceptions for "MoaPlusKeyboard" folder in "MoaPlus" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Engine/AbbreviationEngine.swift,
 				Engine/GestureAnalyzer.swift,
+				Engine/HangulComposer.swift,
 				Engine/VowelResolver.swift,
+				KeyboardViewController.swift,
 				Models/ColumnGestureOverride.swift,
 				Models/GestureDirection.swift,
 				Models/HangulJamo.swift,
@@ -124,8 +127,16 @@
 				Utilities/BackgroundImageManager.swift,
 				Utilities/GestureSettings.swift,
 				Utilities/HangulConstants.swift,
+				Utilities/HapticManager.swift,
 				Utilities/KeyboardMetrics.swift,
 				Utilities/KeyboardSettings.swift,
+				ViewModels/KeyboardViewModel.swift,
+				Views/AbbreviationCandidateView.swift,
+				Views/ConsonantGridView.swift,
+				Views/ConsonantKeyView.swift,
+				Views/FunctionRowView.swift,
+				Views/GestureOverlayView.swift,
+				Views/KeyboardView.swift,
 				Views/SpecialCharacterLayerView.swift,
 			);
 			target = 00A43CE32F2A2F8C005FF0AB /* MoaPlus */;

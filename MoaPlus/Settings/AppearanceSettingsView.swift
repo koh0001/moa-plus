@@ -102,13 +102,11 @@ struct AppearanceSettingsView: View {
 
             // Background Image
             Section {
-                // Keyboard preview with background
-                KeyboardPreviewCard(
-                    backgroundImage: backgroundPreview,
-                    opacity: settings.themeSettings.backgroundOpacity,
-                    themeSettings: settings.themeSettings
-                )
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                // Keyboard preview — renders the real production KeyboardView
+                // so theme / background / opacity changes match exactly what
+                // the user sees when typing.
+                KeyboardPreviewView()
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
                 // Image picker
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
