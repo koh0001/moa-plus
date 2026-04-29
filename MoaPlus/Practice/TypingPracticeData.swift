@@ -12,12 +12,18 @@ enum PracticeCategory: String, CaseIterable {
     case poem = "시"
     case proverb = "속담"
     case sentence = "문장"
+    case vowel = "천지인 모음"
+    case english = "영문 입력"
+    case cursor = "커서·기능"
 
     var icon: String {
         switch self {
         case .poem: return "book"
         case .proverb: return "quote.bubble"
         case .sentence: return "text.alignleft"
+        case .vowel: return "character.korean"
+        case .english: return "a.square"
+        case .cursor: return "cursorarrow.motionlines"
         }
     }
 }
@@ -298,6 +304,194 @@ enum TypingPracticeContent {
                 "키스의 고유 조건은 입술끼리 만나야 한다",
                 "꽃이 피는 봄이 오면 나들이를 갑니다",
                 "짧은 글에도 긴 생각이 담길 수 있습니다",
+            ]
+        ),
+
+        // MARK: - 천지인 모음 입력 (PR G3/G5/G6/G14)
+
+        TypingPracticeItem(
+            id: 21,
+            title: "단일 획 모음 — ㅣ 키",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "ㅣ",
+                "ㅓ",
+                "ㅏ",
+                "ㅕ",
+                "ㅑ",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 22,
+            title: "단일 획 모음 — ㅡ 키",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "ㅡ",
+                "ㅗ",
+                "ㅜ",
+                "ㅛ",
+                "ㅠ",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 23,
+            title: "복합 제스처 모음 — ㅡ 키",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "ㅘ",
+                "ㅙ",
+                "ㅚ",
+                "ㅝ",
+                "ㅞ",
+                "ㅟ",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 24,
+            title: "복합 제스처 모음 — ㅣ 키",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "ㅔ",
+                "ㅐ",
+                "ㅖ",
+                "ㅒ",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 25,
+            title: "천지인 누적 입력",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "ㅓ",
+                "ㅏ",
+                "ㅗ",
+                "ㅜ",
+                "ㅕ",
+                "ㅛ",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 26,
+            title: "천지인 낱말 연습",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "아이",
+                "우유",
+                "여우",
+                "오이",
+                "의자",
+            ]
+        ),
+
+        // MARK: - 영문 입력 (PR E3 / F / G2 / G17)
+
+        TypingPracticeItem(
+            id: 27,
+            title: "영문 소문자",
+            author: "모아+ 연습",
+            category: .english,
+            lines: [
+                "hello",
+                "world",
+                "swift",
+                "keyboard",
+                "practice",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 28,
+            title: "영문 대문자 (Shift)",
+            author: "모아+ 연습",
+            category: .english,
+            lines: [
+                "Hello",
+                "World",
+                "Swift",
+                "CAPS",
+                "MoaPlus",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 29,
+            title: "숫자 입력",
+            author: "모아+ 연습",
+            category: .english,
+            lines: [
+                "1234567890",
+                "010-1234-5678",
+                "2025년 4월",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 30,
+            title: "숫자 롱탭 특수문자 (PR G17)",
+            author: "모아+ 연습",
+            category: .english,
+            lines: [
+                "!",
+                "@",
+                "#",
+                "$",
+                "%",
+                "^",
+                "&",
+                "*",
+                "(",
+                ")",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 31,
+            title: "영문 + 특수문자 혼합",
+            author: "모아+ 연습",
+            category: .english,
+            lines: [
+                "Hello, World!",
+                "user@example.com",
+                "Price: $9.99",
+                "Swift 5.9 #release",
+            ]
+        ),
+
+        // MARK: - 커서 이동 및 기능키 (PR D)
+
+        TypingPracticeItem(
+            id: 32,
+            title: "커서 이동 연습 (Space 드래그)",
+            author: "모아+ 연습",
+            category: .cursor,
+            lines: [
+                "안녕",
+                "반갑습니다",
+                "모아+",
+                "커서 이동",
+            ]
+        ),
+
+        TypingPracticeItem(
+            id: 33,
+            title: "한/영 전환 연습",
+            author: "모아+ 연습",
+            category: .cursor,
+            lines: [
+                "안녕 hello",
+                "모아+ keyboard",
+                "한국어 Korean",
             ]
         ),
     ]

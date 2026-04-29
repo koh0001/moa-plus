@@ -29,5 +29,8 @@ Pods/
 # oh-my-claudecode local state
 .omc/
 
+# Claude Code local state
+.claude/
+
 # Rendered/generated docs
 docs/moakey_ios_custom_docs/rendered/
