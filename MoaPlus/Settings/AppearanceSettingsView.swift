@@ -305,24 +305,29 @@ struct KeyboardPreviewCard: View {
                 let rowH = (h - pad * 2 - sp * 4) / 5  // 4 key rows + 1 func row
 
                 VStack(spacing: sp) {
-                    keyRow(["~"], ["ㅃ","ㅉ","ㄸ","ㄲ","ㅆ"], ["!"], sw: sw, ckw: ckw, sp: sp, h: rowH)
-                    keyRow(["^"], ["ㅂ","ㅈ","ㄷ","ㄱ","ㅅ"], ["?"], sw: sw, ckw: ckw, sp: sp, h: rowH)
-                    keyRow([";"], ["ㅁ","ㄴ","ㅇ","ㄹ","ㅎ"], ["."], sw: sw, ckw: ckw, sp: sp, h: rowH)
-                    // Row 3
+                    keyRow(["~"], ["ㅃ","ㅉ","ㄸ","ㄲ","ㅆ"], ["#"], sw: sw, ckw: ckw, sp: sp, h: rowH)
+                    // Row 1: backspace moved into col 6
+                    HStack(spacing: sp) {
+                        sideCell("^", w: sw, h: rowH)
+                        ForEach(["ㅂ","ㅈ","ㄷ","ㄱ","ㅅ"], id: \.self) { keyCell($0, w: ckw, h: rowH) }
+                        funcCell("⌫", w: sw, h: rowH)
+                    }
+                    // Row 2: ㅣ vowel primitive in col 6
+                    keyRow([";"], ["ㅁ","ㄴ","ㅇ","ㄹ","ㅎ"], ["ㅣ"], sw: sw, ckw: ckw, sp: sp, h: rowH)
+                    // Row 3: ㅡ at col 5, ㆍ at col 6 (천지인 vowel primitives)
                     HStack(spacing: sp) {
                         sideCell("*", w: sw, h: rowH)
-                        ForEach(["ㅋ","ㅌ","ㅊ","ㅍ"], id: \.self) { keyCell($0, w: ckw, h: rowH) }
-                        funcCell("⌫", w: bsw, h: rowH)
+                        ForEach(["ㅋ","ㅌ","ㅊ","ㅍ","ㅡ"], id: \.self) { keyCell($0, w: ckw, h: rowH) }
+                        sideCell("ㆍ", w: sw, h: rowH)
                     }
-                    // Function row
+                    // Function row: [123] [한/영] [space (drag cursor)] [punct] [⏎]
                     HStack(spacing: sp) {
-                        let funcW = innerW - sp * 5
-                        funcCell("🌐", w: funcW * 0.08, h: rowH)
-                        funcCell("한", w: funcW * 0.12, h: rowH)
-                        funcCell(",", w: funcW * 0.08, h: rowH)
-                        funcCell("", w: funcW * 0.44, h: rowH)
-                        funcCell(".", w: funcW * 0.08, h: rowH)
-                        funcCell("⏎", w: funcW * 0.12, h: rowH)
+                        let funcW = innerW - sp * 4
+                        funcCell("123", w: funcW * 0.12, h: rowH)
+                        funcCell("한/영", w: funcW * 0.14, h: rowH)
+                        funcCell("", w: funcW * 0.50, h: rowH)
+                        funcCell("·", w: funcW * 0.10, h: rowH)
+                        funcCell("⏎", w: funcW * 0.14, h: rowH)
                     }
                 }
                 .padding(pad)
