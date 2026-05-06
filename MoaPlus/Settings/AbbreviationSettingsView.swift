@@ -17,6 +17,12 @@ struct AbbreviationSettingsView: View {
     var body: some View {
         List {
             Section {
+                Toggle("단축어 사용", isOn: $settings.abbreviationEnabled)
+            } footer: {
+                Text("끄면 등록된 단축어가 더 이상 자동 확장되지 않습니다. 등록된 항목은 그대로 유지되어 다시 켜면 즉시 작동합니다.")
+            }
+
+            Section {
                 if filteredExpansions.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "text.badge.plus")

@@ -39,12 +39,10 @@ class KeyboardViewModel: ObservableObject {
     private var lastShiftTapTimestamp: Date?
     private static let doubleTapInterval: TimeInterval = 0.3
 
-    /// Backward-compat shim. Reads from keyboardMode; writes are ignored
-    /// (use toggleSymbolMode() or assign to keyboardMode directly).
-    var isSymbolMode: Bool {
-        get { keyboardMode.isSymbol }
-        set { _ = newValue /* legacy, ignored */ }
-    }
+    /// Read-only convenience for callers that only ask "are we in a
+    /// symbol layer right now?". Mode is mutated through `toggleSymbolMode()`
+    /// or by assigning `keyboardMode` directly.
+    var isSymbolMode: Bool { keyboardMode.isSymbol }
     @Published var isAbbreviationCandidateVisible: Bool = false
     @Published var abbreviationCandidate: ShortcutExpansion?
     @Published var abbreviationCandidates: [ShortcutExpansion] = []
@@ -86,12 +84,17 @@ class KeyboardViewModel: ObservableObject {
 
     private var lastExpansionCount: Int = -1
 
-    /// Reload abbreviation engine when settings change
+    /// Reload abbreviation engine when settings change.
+    /// Always syncs the master toggle so the user can flip the global
+    /// switch without re-entering the keyboard. The trigger trie is only
+    /// rebuilt when the expansion count actually changed.
     private func reloadAbbreviationEngine() {
+        abbreviationEngine.delegate = self
+        abbreviationEngine.isEnabled = KeyboardSettings.shared.abbreviationEnabled
+
         let currentCount = KeyboardSettings.shared.shortcutExpansionStore.expansions.count
         guard currentCount != lastExpansionCount else { return }
         lastExpansionCount = currentCount
-        abbreviationEngine.delegate = self
         abbreviationEngine.loadExpansions(KeyboardSettings.shared.shortcutExpansionStore)
     }
 
@@ -99,21 +102,31 @@ class KeyboardViewModel: ObservableObject {
     private var lastComposingText: String = ""
 
     private let backspaceRepeatInitialDelay: TimeInterval
-    private let backspaceRepeatInterval: TimeInterval
     private var isBackspacePressing = false
     private var backspaceInitialDelayTimer: Timer?
     private var backspaceRepeatTimer: Timer?
     private var backspaceAccelTimer: Timer?
     private var backspaceDeleteCount: Int = 0
     private var didHandleLongPressNumberInCurrentGesture = false
+    /// Set when long-press on the English shift key has already toggled
+    /// caps lock; the trailing tap (fired when the finger lifts) must be
+    /// suppressed, otherwise it would call `toggleShift()` and immediately
+    /// undo the lock.
+    private var didHandleShiftLongPressInCurrentGesture = false
 
     weak var delegate: KeyboardViewModelDelegate?
 
-    init(backspaceRepeatInitialDelay: TimeInterval = 0.4, backspaceRepeatInterval: TimeInterval = 0.08) {
+    init(backspaceRepeatInitialDelay: TimeInterval = 0.4) {
         self.backspaceRepeatInitialDelay = backspaceRepeatInitialDelay
-        self.backspaceRepeatInterval = backspaceRepeatInterval
-        HapticManager.shared.updateSettings(KeyboardSettings.shared.themeSettings)
         reloadAbbreviationEngine()
+    }
+
+    /// Push the live center-key width into the gesture analyzer so the
+    /// proportional swipe thresholds adapt to the current device. The
+    /// view layer owns the geometry; this method is the only seam.
+    func setCenterKeyWidth(_ width: CGFloat) {
+        guard width > 0 else { return }
+        gestureAnalyzer.keyWidth = width
     }
 
     deinit {
@@ -161,6 +174,19 @@ class KeyboardViewModel: ObservableObject {
             case .locked: shiftState = .off
             }
         }
+        triggerHapticFeedback()
+    }
+
+    /// Set caps-lock unconditionally. Wired to long-press on the shift
+    /// key — matches the platform-standard expectation that holding
+    /// shift toggles the lock without needing a precise double-tap.
+    /// Marks the gesture as long-press-handled so the tap fired when the
+    /// finger lifts doesn't toggle the state right back off.
+    func lockShift() {
+        guard keyboardMode == .english else { return }
+        shiftState = (shiftState == .locked) ? .off : .locked
+        lastShiftTapTimestamp = nil
+        didHandleShiftLongPressInCurrentGesture = true
         triggerHapticFeedback()
     }
 
@@ -420,6 +446,7 @@ class KeyboardViewModel: ObservableObject {
 
     func gestureStarted(row: Int, column: Int, at point: CGPoint) {
         didHandleLongPressNumberInCurrentGesture = false
+        didHandleShiftLongPressInCurrentGesture = false
         activeKey = (row, column)
         gestureStartPoint = point
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
@@ -465,6 +492,11 @@ class KeyboardViewModel: ObservableObject {
     func gestureEnded(row: Int, column: Int) {
         if didHandleLongPressNumberInCurrentGesture {
             didHandleLongPressNumberInCurrentGesture = false
+            resetGestureState()
+            return
+        }
+        if didHandleShiftLongPressInCurrentGesture {
+            didHandleShiftLongPressInCurrentGesture = false
             resetGestureState()
             return
         }
@@ -569,6 +601,7 @@ class KeyboardViewModel: ObservableObject {
     func resetGestureState() {
         stopBackspaceRepeat()
         didHandleLongPressNumberInCurrentGesture = false
+        didHandleShiftLongPressInCurrentGesture = false
         dismissPopup()
         activeKey = nil
         gestureStartPoint = nil
@@ -790,11 +823,10 @@ class KeyboardViewModel: ObservableObject {
 
     /// Delete one word (characters until previous space or line break)
     private func deleteWord() {
-        guard let vc = delegate as? KeyboardViewController else {
-            // Fallback: just delete a few characters
-            for _ in 0..<5 { delegate?.deleteBackward() }
-            return
-        }
+        // The runtime delegate is always `KeyboardViewController`; this
+        // cast only fails in a unit-test stub. Tests don't exercise word
+        // delete, so silently no-op rather than guess at character counts.
+        guard let vc = delegate as? KeyboardViewController else { return }
         let before = vc.textDocumentProxy.documentContextBeforeInput ?? ""
         if before.isEmpty { return }
 
@@ -841,6 +873,18 @@ protocol KeyboardViewModelDelegate: AnyObject {
 
 extension KeyboardViewModel: AbbreviationEngineDelegate {
     func abbreviationEngine(_ engine: AbbreviationEngine, shouldReplace trigger: String, with replacement: String, delimiter: Character) {
+        // Suggestion-mode candidates are confirmed *after* the user typed
+        // the delimiter, which by then was already inserted into the proxy
+        // (`inputSpace`/`inputReturn` only suppresses insertion when the
+        // engine immediately replaces — `.onDelimiter` mode). Strip that
+        // trailing delimiter first so the deletion arithmetic matches both
+        // confirmation paths. `.onDelimiter` confirmations skipped the
+        // insertText, so this branch is a no-op there.
+        if let vc = delegate as? KeyboardViewController,
+           let before = vc.textDocumentProxy.documentContextBeforeInput,
+           before.hasSuffix(trigger + String(delimiter)) {
+            delegate?.deleteBackward()
+        }
         // Delete trigger text from screen.
         // Each character was individually committed by the Hangul composer,
         // so we delete one-by-one. However, the last character may have been
@@ -852,18 +896,19 @@ extension KeyboardViewModel: AbbreviationEngineDelegate {
             delegate?.deleteBackward()
             remaining -= 1
         }
-        // Verify: if trigger text is still partially on screen, delete more
-        if let vc = delegate as? KeyboardViewController {
-            let before = vc.textDocumentProxy.documentContextBeforeInput ?? ""
-            // Check if any trigger suffix remains
-            for suffix in (1...trigger.count).reversed() {
-                let triggerSuffix = String(trigger.prefix(suffix))
-                if before.hasSuffix(triggerSuffix) {
-                    for _ in 0..<suffix {
-                        delegate?.deleteBackward()
-                    }
-                    break
-                }
+        // Composer state can leave the last character of the trigger uncommitted
+        // when the engine fires; in that case the first `trigger.count` deletes
+        // remove `trigger.count - 1` real characters and one composing char that
+        // was already going to be replaced. If the *entire* trigger is still
+        // visible after the first pass, do a second `trigger.count` pass — but
+        // never more than that, and never on a partial suffix. Deleting partial
+        // suffixes risked eating user-typed characters that happened to share a
+        // prefix with the trigger.
+        if let vc = delegate as? KeyboardViewController,
+           let before = vc.textDocumentProxy.documentContextBeforeInput,
+           before.hasSuffix(trigger) {
+            for _ in 0..<trigger.count {
+                delegate?.deleteBackward()
             }
         }
         // Insert the replacement + delimiter

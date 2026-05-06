@@ -20,9 +20,6 @@ final class HapticManager {
         selectionFeedback.prepare()
     }
 
-    /// No-op: settings are now read directly from KeyboardSettings.shared each time
-    func updateSettings(_ settings: ThemeSettings) {}
-
     // MARK: - Event-based Haptics
 
     /// Key tap feedback

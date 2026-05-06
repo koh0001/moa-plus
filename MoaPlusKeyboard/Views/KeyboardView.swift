@@ -72,6 +72,9 @@ struct KeyboardView: View {
                             onLongPressNumber: { number in
                                 viewModel.inputLongPressNumber(number)
                             },
+                            onShiftLongPress: {
+                                viewModel.lockShift()
+                            },
                             onGestureStart: { row, column, point in
                                 viewModel.gestureStarted(row: row, column: column, at: point)
                             },
@@ -183,6 +186,10 @@ struct KeyboardView: View {
                     }
                 }
                 .background(keyboardBackground)
+                .onAppear { viewModel.setCenterKeyWidth(centerKeyWidth) }
+                .onChange(of: centerKeyWidth) { newValue in
+                    viewModel.setCenterKeyWidth(newValue)
+                }
         }
         .onAppear { loadBackgroundIfNeeded() }
         .onChange(of: settings.themeSettings.backgroundImageId) { _ in loadBackgroundIfNeeded() }

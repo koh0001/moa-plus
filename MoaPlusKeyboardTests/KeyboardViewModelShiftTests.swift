@@ -71,6 +71,52 @@ final class KeyboardViewModelShiftTests: XCTestCase {
         // shiftState unchanged since shiftedSymbolIfNeeded returns early for non-english
         XCTAssertEqual(vm.shiftState, .on)
     }
+
+    // MARK: - Caps lock long-press regression
+
+    /// Holding the shift key fires `lockShift()` while the finger is still
+    /// down. When the finger lifts, `gestureEnded` runs and previously
+    /// called `toggleShift()` which immediately undid the lock — so the
+    /// user could only sustain caps lock by keeping the finger pressed.
+    /// Regression test: after `lockShift()` followed by `gestureEnded` on
+    /// the shift key, the state must remain `.locked`.
+    func test_capsLockLongPress_survivesGestureEnd() {
+        // shift key is at row 3, col 0 in english layout (functional .shift)
+        // The exact coordinates don't matter for this test as long as the
+        // gesture lifecycle is exercised correctly.
+        vm.gestureStarted(row: 3, column: 0, at: .zero)
+        vm.lockShift()
+        XCTAssertEqual(vm.shiftState, .locked, "long-press toggles caps lock on")
+
+        vm.gestureEnded(row: 3, column: 0)
+        XCTAssertEqual(
+            vm.shiftState,
+            .locked,
+            "caps lock must remain on after the finger lifts; the trailing tap should be suppressed by didHandleShiftLongPressInCurrentGesture"
+        )
+    }
+
+    /// A second long-press toggles caps lock back off.
+    func test_capsLockLongPress_secondHoldTurnsOff() {
+        vm.shiftState = .locked
+
+        vm.gestureStarted(row: 3, column: 0, at: .zero)
+        vm.lockShift()
+        XCTAssertEqual(vm.shiftState, .off, "second long-press releases caps lock")
+        vm.gestureEnded(row: 3, column: 0)
+        XCTAssertEqual(vm.shiftState, .off, "released state survives gesture end")
+    }
+
+    /// A normal tap on shift (no long-press) still toggles state via
+    /// `gestureEnded` — the suppression flag must only fire when
+    /// `lockShift()` actually ran.
+    func test_normalShiftTap_stillToggles() {
+        vm.gestureStarted(row: 3, column: 0, at: .zero)
+        // No lockShift() call — simulating a quick tap that doesn't reach
+        // the long-press threshold.
+        vm.gestureEnded(row: 3, column: 0)
+        XCTAssertEqual(vm.shiftState, .on, "quick tap toggles to .on")
+    }
 }
 
 private final class MockShiftDelegate: KeyboardViewModelDelegate {

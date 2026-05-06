@@ -11,37 +11,82 @@ enum GestureDirection: String, CaseIterable {
     case downLeft  // ↙
     case downRight // ↘
 
+    /// Sector index → GestureDirection mapping used by data-driven judgment.
+    /// Order matches `DirectionSector.defaultSectors` and
+    /// `GestureTestModel.sectorIndex` (0:→ 1:↗ 2:↑ 3:↖ 4:← 5:↙ 6:↓ 7:↘).
+    private static let sectorOrder: [GestureDirection] = [
+        .right, .upRight, .up, .upLeft, .left, .downLeft, .down, .downRight
+    ]
+
+    /// Diagonals are checked first so that user-driven widening of a
+    /// diagonal (e.g. `verticalIWidthDelta` enlarging ↗) actually eats
+    /// into the adjacent cardinal — matching the visual sector model
+    /// used by `GestureTestView`.
+    private static let diagonalSectorIndices = [1, 3, 5, 7]
+    private static let cardinalSectorIndices = [0, 2, 4, 6]
+
+    /// Convenience for callers without per-column settings (e.g. unit
+    /// tests). Uses the default 8 × 45° sectors and no rotation.
     static func from(vector: CGVector, threshold: CGFloat = 20) -> GestureDirection? {
+        from(vector: vector,
+             sectors: DirectionSector.defaultSectors,
+             rotationOffset: 0,
+             threshold: threshold)
+    }
+
+    /// Data-driven judgment that respects user-configurable sector widths
+    /// (per-column `verticalIWidthDelta` / `horizontalEuWidthDelta` are
+    /// expected to be folded into the supplied `sectors` by the caller)
+    /// and per-column `rotationOffset` (degrees, math convention: positive
+    /// rotates sectors counter-clockwise).
+    ///
+    /// The caller passes already-customised sectors so this function stays
+    /// pure — no global settings lookups happen here.
+    ///
+    /// Boundary handling: a sector includes its endpoints. Diagonal-first
+    /// priority resolves any overlap that user widening creates. If the
+    /// sector ring leaves a gap (only possible with negative deltas
+    /// shrinking everything), the function returns nil rather than
+    /// guessing — gaps are a misconfiguration the caller should surface.
+    static func from(vector: CGVector,
+                     sectors: [DirectionSector],
+                     rotationOffset: Double,
+                     threshold: CGFloat) -> GestureDirection? {
         let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
         guard magnitude >= threshold else { return nil }
 
-        let angle = atan2(-vector.dy, vector.dx) // Negative dy because iOS y-axis is inverted
-        let degrees = angle * 180 / .pi
+        // iOS y-axis is inverted; convert to math convention where
+        // 0° = right and 90° = up.
+        let angle = atan2(-vector.dy, vector.dx) * 180 / .pi
+        let normalized = positiveModulo(angle, 360)
 
-        // Normalize to 0-360
-        let normalizedDegrees = degrees < 0 ? degrees + 360 : degrees
+        // Subtract rotationOffset so a positive offset rotates the sector
+        // ring CCW — equivalent to rotating the incoming vector CW.
+        let relative = positiveModulo(normalized - rotationOffset, 360)
 
-        // 8 directions with adjusted sectors (wider right-diagonals for ㅣ, ㅡ)
-        switch normalizedDegrees {
-        case 330...360, 0..<30:
-            return .right
-        case 30..<80:
-            return .upRight
-        case 80..<120:
-            return .up
-        case 120..<150:
-            return .upLeft
-        case 150..<210:
-            return .left
-        case 210..<240:
-            return .downLeft
-        case 240..<280:
-            return .down
-        case 280..<330:
-            return .downRight
-        default:
-            return .right
+        for index in diagonalSectorIndices + cardinalSectorIndices
+        where index < sectors.count && index < sectorOrder.count {
+            let sector = sectors[index]
+            let delta = abs(signedAngularDistance(from: sector.centerAngle, to: relative))
+            if delta <= sector.halfWidth {
+                return sectorOrder[index]
+            }
         }
+        return nil
+    }
+
+    private static func positiveModulo(_ value: Double, _ modulus: Double) -> Double {
+        let r = value.truncatingRemainder(dividingBy: modulus)
+        return r < 0 ? r + modulus : r
+    }
+
+    /// Smallest signed angular distance from `a` to `b` (degrees), result
+    /// in (-180, 180].
+    private static func signedAngularDistance(from a: Double, to b: Double) -> Double {
+        let diff = (b - a).truncatingRemainder(dividingBy: 360)
+        if diff > 180 { return diff - 360 }
+        if diff <= -180 { return diff + 360 }
+        return diff
     }
 
     var symbol: String {

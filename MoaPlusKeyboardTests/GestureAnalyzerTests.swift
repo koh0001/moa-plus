@@ -105,20 +105,42 @@ final class GestureAnalyzerTests: XCTestCase {
         XCTAssertEqual(analyzer.finalizeGesture(), [.down, .downRight, .left])
     }
 
-    func testFinalizeCollapsesTinyDiagonalJitterWhenPathReturnsToSameDirection() {
-        // The trailing return-to-up segment is below the directionChange
-        // threshold, so getDirections records only [.up, .upRight].
-        // The intentional ↗ turn is preserved by finalize for cheonjiin
-        // multi-stroke patterns (ㅙ/ㅞ).
+    func testTinyDiagonalJitterInVerticalStrokeIsAbsorbed() {
+        // A small ↗ wobble inside an otherwise vertical stroke must be
+        // treated as motor noise — not as the start of a compound vowel.
+        // This mirrors the user-facing "고도조소 → 과솨롸와" report:
+        // intent is ㅗ, finger drift drags the stroke a few degrees off
+        // vertical, the analyzer must keep the gesture as a single ↑.
+        // Larger, intentional ↗ turns are still recognised — see
+        // `testPronouncedDiagonalTurnIsPreserved`.
         let analyzer = GestureAnalyzer(threshold: 8, reversalThreshold: 6, directionChangeThreshold: 8)
 
         analyzer.addPoint(CGPoint(x: 100, y: 100))
-        analyzer.addPoint(CGPoint(x: 100, y: 70))    // ↑
-        analyzer.addPoint(CGPoint(x: 109, y: 61))    // small ↗ jitter
+        analyzer.addPoint(CGPoint(x: 100, y: 70))    // ↑ 30px
+        analyzer.addPoint(CGPoint(x: 109, y: 61))    // ~9px diagonal wobble (≈45°)
         analyzer.addPoint(CGPoint(x: 109, y: 45))    // back to ↑
 
-        XCTAssertEqual(analyzer.getDirections(), [.up, .upRight])
-        XCTAssertEqual(analyzer.finalizeGesture(), [.up, .upRight])
+        XCTAssertEqual(
+            analyzer.finalizeGesture(),
+            [.up],
+            "정수직 stroke 안의 작은 ↗ 흔들림은 ↑로 흡수되어야 한다 (ㅗ→ㅘ 오인식 방지)"
+        )
+    }
+
+    func testPronouncedDiagonalTurnIsPreserved() {
+        // When the second stroke is unambiguously diagonal (clearly past
+        // the ↑ sector), the analyzer must record both segments so
+        // compound vowels like ㅢ (↘↑) or downstream resolvers can fold
+        // them correctly.
+        let analyzer = GestureAnalyzer(threshold: 8, reversalThreshold: 6, directionChangeThreshold: 8)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 70))    // ↑ 30px
+        analyzer.addPoint(CGPoint(x: 140, y: 30))    // clear ↗ ~45° (40px right, 40px up)
+
+        XCTAssertEqual(analyzer.finalizeGesture().first, .up)
+        XCTAssertGreaterThanOrEqual(analyzer.finalizeGesture().count, 2,
+                                    "명확한 ↗ 턴은 두 stroke 로 보존되어야 한다")
     }
 
     func testFinalizeKeepsDownRightLeftSequenceForWePattern() {
@@ -130,6 +152,98 @@ final class GestureAnalyzerTests: XCTestCase {
         analyzer.addPoint(CGPoint(x: 98, y: 152))    // ←
 
         XCTAssertEqual(analyzer.finalizeGesture(), [.down, .downRight, .left])
+    }
+
+    // MARK: - Vertical Stroke Stability (ㅗ → ㅘ 오인식 방지)
+
+    /// 정수직 ↑ 끝부분이 약 10–15° 휘어 감기는 자연스러운 손 움직임은
+    /// 단일 [.up] 으로 유지되어야 한다 ("고도조소" 입력 시 ↗ 가 추가로 잡혀
+    /// `[.up, .upRight]` → ㅘ 로 폴드되는 현상을 막는 회귀 테스트).
+    func testNearVerticalCurveWithMildEndDriftStaysAsUp() {
+        let analyzer = GestureAnalyzer(threshold: 30, reversalThreshold: 10, directionChangeThreshold: 15)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 70))   // up 30px → ↑ 등록
+        analyzer.addPoint(CGPoint(x: 100, y: 30))   // 계속 ↑ (lastChangePoint=(100,70) 유지)
+        analyzer.addPoint(CGPoint(x: 110, y: 22))   // 끝 휨: vec from (100,70)=(10,-48), angle≈78°
+
+        let final = analyzer.finalizeGesture()
+        XCTAssertEqual(
+            final,
+            [.up],
+            "정수직 위 + 끝부분 ~12° 휨은 단일 ↑ stroke 로 유지되어야 함 (ㅗ → ㅘ 오인식 방지)"
+        )
+    }
+
+    /// 의도적 ㅘ 입력(↑ 후 명확히 →)은 여전히 [.up, .upRight] 또는 [.up, .right]
+    /// 으로 두 stroke 잡혀야 한다.
+    func testIntentionalRightTurnStillProducesTwoStrokes() {
+        let analyzer = GestureAnalyzer(threshold: 30, reversalThreshold: 10, directionChangeThreshold: 15)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 60))   // up 40 → ↑
+        analyzer.addPoint(CGPoint(x: 145, y: 55))   // 명확한 우향 turn (45px right, 5px up)
+
+        let final = analyzer.finalizeGesture()
+        XCTAssertEqual(final.first, .up, "첫 stroke 는 ↑")
+        XCTAssertGreaterThanOrEqual(final.count, 2, "의도적 우향 turn 은 두 stroke 로 인식")
+        XCTAssertTrue(
+            final.last == .right || final.last == .upRight,
+            "두 번째 stroke 는 → 또는 ↗ (둘 다 normalize 후 ㅘ 매칭)"
+        )
+    }
+
+    // MARK: - Edge Column Diagonal Recognition (5열 ↗→ㅣ, 1열 ↖→ㅣ)
+
+    /// 5열에서 ↗ stroke (대각선 오른쪽위) 를 ㅣ 로 의도한 swipe 가 ↑ 로 빠져
+    /// `[.up, .upRight]` → ㅘ 가 되는 회귀를 막는 테스트.
+    /// 새 default override (col 5: rotation -3°, iDelta 5°) 로 ~69° 까지의
+    /// ↗ swipe 가 단일 ↗ stroke 로 보존되어야 한다.
+    /// 75°+ 의 매우 가파른 ↗ 는 여전히 ↑ 로 분류된다 — 그 영역까지 ↗ 를
+    /// 넓히면 ↗(ㅏ) 영역 침범이 생기므로 사용자가 굿기 테스트 슬라이더로
+    /// 추가 튜닝하도록 둔다.
+    func testColumn5SteepDiagonalStaysAsUpRight() {
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 5)
+
+        // 시작점에서 (24, -60) 방향으로 swipe.
+        // angle = atan2(60, 24) ≈ 68.2°. magnitude ≈ 64.6, threshold(default normal)=20.
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 124, y: 40))
+
+        XCTAssertEqual(
+            analyzer.finalizeGesture(),
+            [.upRight],
+            "5열의 ~68° ↗ swipe 는 단일 ↗ stroke 로 분류되어 ㅣ 매칭 (ㅘ 오인식 방지)"
+        )
+    }
+
+    /// 1열에서 ↖ stroke 를 ㅣ 로 의도한 swipe 의 대칭 케이스.
+    func testColumn1SteepDiagonalStaysAsUpLeft() {
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 1)
+
+        // (-24, -60) → angle ≈ 180 - 68 = 111.8°.
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 76, y: 40))
+
+        XCTAssertEqual(
+            analyzer.finalizeGesture(),
+            [.upLeft],
+            "1열의 ~112° ↖ swipe 는 단일 ↖ stroke 로 분류되어 ㅣ 매칭"
+        )
+    }
+
+    /// 5열에서도 정수직 ↑ 는 여전히 ↑ 로 분류되어 ㅗ 매칭 가능해야 한다.
+    func testColumn5VerticalStaysAsUp() {
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 5)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 40))   // 정확한 ↑
+
+        XCTAssertEqual(
+            analyzer.finalizeGesture(),
+            [.up],
+            "5열의 정수직 ↑ 는 여전히 ↑ 로 분류 (ㅗ 매칭)"
+        )
     }
 
     // MARK: - isOpposite Tests

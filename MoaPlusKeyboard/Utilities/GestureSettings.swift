@@ -6,19 +6,33 @@ struct GestureSettings: Codable, Equatable {
     var swipeProfile: SwipeProfile = .bothHands
     var columnOverrides: [ColumnGestureOverride] = ColumnGestureOverride.defaults
 
-    /// Edge-specific outward distance multipliers
-    var leftEdgeOutwardDistanceMultiplier: Double = 0.85
-    var rightEdgeOutwardDistanceMultiplier: Double = 0.85
+    /// Distance (in points) the finger must move from the previous
+    /// direction-change point before a *non-opposite* direction switch
+    /// is recorded. Larger values reject end-of-swipe lateral drift
+    /// (the ㅗ → ㅘ misclassification reported in PR G15).
+    /// Opposite reversals (e.g. ↑ → ↓ for ㅚ) keep using the lower
+    /// `KeyboardMetrics.reversalThreshold` so multi-stroke vowels stay
+    /// fluid.
+    var directionChangeThreshold: CGFloat = KeyboardMetrics.directionChangeThreshold
 
-    /// Long-press configuration
-    var longPressDelayMs: Int = 500
-    var movementToleranceForLongPress: CGFloat = 10.0
-
-    /// Get effective swipe threshold for a specific column
-    func effectiveSwipeThreshold(forColumn columnId: Int) -> CGFloat {
-        let baseThreshold = swipeProfile.swipeLength.threshold
+    /// Get effective swipe threshold for a specific column. `keyWidth`
+    /// must be the live center-key width measured by the view layer so
+    /// the same swipeLength preset behaves consistently across iPhone
+    /// SE through Pro Max (and iPad).
+    func effectiveSwipeThreshold(forColumn columnId: Int, keyWidth: CGFloat) -> CGFloat {
+        let baseThreshold = swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
         let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
         return baseThreshold * CGFloat(override.outwardDistanceMultiplier)
+    }
+
+    /// Effective direction-change threshold for a specific column. The
+    /// global `directionChangeThreshold` is the base; columns can apply
+    /// a non-zero `directionChangeThresholdDelta` to be stricter or
+    /// looser about second-stroke registration.
+    func effectiveDirectionChangeThreshold(forColumn columnId: Int) -> CGFloat {
+        let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
+        let adjusted = directionChangeThreshold + CGFloat(override.directionChangeThresholdDelta)
+        return max(0, adjusted)
     }
 
     /// Get effective rotation offset for a specific column

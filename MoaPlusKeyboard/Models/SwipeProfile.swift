@@ -15,13 +15,29 @@ enum SwipeLength: String, Codable, CaseIterable {
     case normal
     case long
 
-    /// Minimum swipe distance in points
-    var threshold: CGFloat {
+    /// Fraction of the current center-key width that the finger must
+    /// travel before a swipe direction is recorded. Calibrated so that
+    /// on a 50pt center-key (≈ iPhone 17 Pro Korean layout) the values
+    /// reproduce the legacy absolute thresholds 12 / 20 / 30 pt; on a
+    /// smaller iPhone SE (~38pt center key) the thresholds shrink
+    /// proportionally, and on iPhone Pro Max (~60pt) they grow.
+    private var keyWidthRatio: CGFloat {
         switch self {
-        case .short:  return 12.0
-        case .normal: return 20.0
-        case .long:   return 30.0
+        case .short:  return 0.24
+        case .normal: return 0.40
+        case .long:   return 0.60
         }
+    }
+
+    /// Effective swipe threshold for the current device's keyboard
+    /// geometry. Pass the live center-key width — the GestureAnalyzer
+    /// already owns this value via `keyWidth`.
+    func threshold(keyWidth: CGFloat) -> CGFloat {
+        // Guard against zero / negative widths from view layout that
+        // hasn't run yet. Falls back to the legacy 50pt-equivalent so
+        // unit tests and pre-layout invocations stay deterministic.
+        let width = keyWidth > 0 ? keyWidth : 50
+        return width * keyWidthRatio
     }
 
     var displayName: String {

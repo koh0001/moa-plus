@@ -43,7 +43,7 @@ https://github.com/koh0001/moa-plus/issues
 
 ### 영문 QWERTY 키보드
 - 한영 키로 한글과 영문을 즉시 전환
-- Shift 더블탭으로 Caps Lock
+- Shift 더블탭 또는 길게 누르기로 Caps Lock
 - 숫자 키 길게 누르면 ! @ # $ % 등 특수문자 입력
 
 ### 편집 도우미
@@ -95,7 +95,7 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
 ### English QWERTY Keyboard
 - Switch instantly between Korean and English with the language key
-- Double-tap Shift for Caps Lock
+- Double-tap or long-press Shift for Caps Lock
 - Long-press number keys for ! @ # $ % and more
 
 ### Editing Helpers
@@ -130,6 +130,23 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 ---
 
 ## 새로운 기능 (업데이트 노트)
+
+### v1.3
+
+[새로운 기능]
+- 영문 Shift 키 길게 누르기로 Caps Lock 토글
+- 단축어 전체 ON/OFF 스위치. 등록 데이터는 유지하면서 자동 확장만 일시 정지
+- 단축어 후보 바에서 같은 글자로 시작하는 여러 단축어 골라 쓰기
+- 컬럼별 ‘방향 전환 거리 보정’ 슬라이더로 끝 휨 오인식(예: ㅗ→ㅘ) 사용자 튜닝
+- 굿기 거리 임계값이 디바이스 키 폭에 비례 — iPhone SE부터 Pro Max까지 손맛 일관
+
+[개선]
+- 5열·1열에서 가파른 ↗·↖ 긋기를 ㅣ로 더 안정적으로 인식
+- 호스트 앱에서 변경한 테마·약어·햅틱이 키보드에 즉시 반영 (Darwin notification 기반 동기화)
+- 메모리 안정성 강화: 익스텐션 메모리 누수 차단으로 장시간 사용 후에도 한도 안전
+- 단축어 후보 선택 시 첫 글자가 남는 문제 수정
+- 스페이스 드래그 OFF 시 짧은 횡 swipe도 공백으로 정상 입력
+- 8단계였던 튜토리얼이 9단계로 확장: 보조 입력(스페이스 드래그/단축어 활용) + 영문 모드 안내 추가
 
 ### v1.2
 

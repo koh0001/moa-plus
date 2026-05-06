@@ -14,6 +14,7 @@ struct KeyGridView: View {
     let onBackspacePressStart: () -> Void
     let onBackspacePressEnd: () -> Void
     let onLongPressNumber: (String) -> Void
+    var onShiftLongPress: (() -> Void)? = nil
     let onGestureStart: (Int, Int, CGPoint) -> Void
     let onGestureMove: (CGPoint) -> Void
     let onGestureEnd: (Int, Int) -> Void
@@ -124,7 +125,8 @@ struct KeyGridView: View {
                             },
                             onPopupRelease: {
                                 onPopupRelease?()
-                            }
+                            },
+                            onShiftLongPress: onShiftLongPress
                         )
                     }
                 }

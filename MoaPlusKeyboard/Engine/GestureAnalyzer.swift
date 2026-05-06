@@ -22,20 +22,74 @@ class GestureAnalyzer {
     /// Column ID for per-column gesture correction (1-5, 0 = no column override)
     var columnId: Int = 0
 
-    /// Effective swipe threshold considering column overrides
+    /// Live center-key width, set by the view layer once geometry is
+    /// known. Drives the proportional swipe threshold so the same
+    /// "보통" / "길게" preset feels right on every iPhone size.
+    /// Default 50 reproduces the legacy absolute thresholds for
+    /// pre-layout calls and unit tests.
+    var keyWidth: CGFloat = 50
+
+    /// Effective swipe threshold considering column overrides + the
+    /// device's center-key width.
     var effectiveThreshold: CGFloat {
         if columnId > 0 {
-            return settings.effectiveSwipeThreshold(forColumn: columnId)
+            return settings.effectiveSwipeThreshold(forColumn: columnId, keyWidth: keyWidth)
         }
-        return settings.swipeProfile.swipeLength.threshold
+        return settings.swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
     }
 
+    /// Effective direction-change threshold considering column overrides.
+    /// If the analyzer was constructed with a custom `directionChangeThreshold`
+    /// (legacy/test path) we honour that value; otherwise we read it from
+    /// settings so user customisation in the UI flows through to actual
+    /// judgment.
+    var effectiveDirectionChangeThreshold: CGFloat {
+        if hasCustomDirectionChangeThreshold {
+            return directionChangeThreshold
+        }
+        if columnId > 0 {
+            return settings.effectiveDirectionChangeThreshold(forColumn: columnId)
+        }
+        return settings.directionChangeThreshold
+    }
+
+    /// Sector ring with per-column rotation+delta adjustments folded in,
+    /// ready to hand to `GestureDirection.from`.
+    private var effectiveSectors: [DirectionSector] {
+        var sectors = settings.swipeProfile.sectors
+        guard columnId > 0 else { return sectors }
+        let iDelta = settings.verticalIWidthDelta(forColumn: columnId)
+        let euDelta = settings.horizontalEuWidthDelta(forColumn: columnId)
+        // ↗ (1) and ↖ (3) widen with the ㅣ delta; ↙ (5) and ↘ (7) widen
+        // with the ㅡ delta. Cardinals stay at their base widths and are
+        // shrunk implicitly by the diagonal-first priority in
+        // `GestureDirection.from`.
+        for index in [1, 3] where index < sectors.count {
+            sectors[index].halfWidth += iDelta
+        }
+        for index in [5, 7] where index < sectors.count {
+            sectors[index].halfWidth += euDelta
+        }
+        return sectors
+    }
+
+    private var effectiveRotationOffset: Double {
+        guard columnId > 0 else { return 0 }
+        return settings.effectiveRotationOffset(forColumn: columnId)
+    }
+
+    private let hasCustomDirectionChangeThreshold: Bool
+
+    /// Designated initialiser. Tests usually pin all three thresholds for
+    /// deterministic behaviour; the runtime keyboard creates the analyzer
+    /// without arguments and lets it read every threshold from `settings`.
     init(threshold: CGFloat = KeyboardMetrics.gestureThreshold,
          reversalThreshold: CGFloat = KeyboardMetrics.reversalThreshold,
-         directionChangeThreshold: CGFloat = KeyboardMetrics.directionChangeThreshold) {
+         directionChangeThreshold: CGFloat? = nil) {
         self.threshold = threshold  // Note: effectiveThreshold takes precedence at runtime
         self.reversalThreshold = reversalThreshold
-        self.directionChangeThreshold = directionChangeThreshold
+        self.directionChangeThreshold = directionChangeThreshold ?? KeyboardMetrics.directionChangeThreshold
+        self.hasCustomDirectionChangeThreshold = directionChangeThreshold != nil
     }
 
     convenience init(settings: GestureSettings, columnId: Int = 0) {
@@ -77,12 +131,26 @@ class GestureAnalyzer {
 
         let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
 
-        // Try detecting direction with effective threshold first (respects settings/column overrides)
-        var newDirection = GestureDirection.from(vector: vector, threshold: effectiveThreshold)
+        let sectors = effectiveSectors
+        let rotation = effectiveRotationOffset
+
+        // Try detecting direction with effective threshold first (respects
+        // settings/column overrides, including rotation and ㅣ/ㅡ width deltas).
+        var newDirection = GestureDirection.from(
+            vector: vector,
+            sectors: sectors,
+            rotationOffset: rotation,
+            threshold: effectiveThreshold
+        )
 
         // If standard threshold fails, try lower reversal threshold for opposite directions
         if newDirection == nil, let lastDirection = directions.last, magnitude >= reversalThreshold {
-            if let candidate = GestureDirection.from(vector: vector, threshold: reversalThreshold),
+            if let candidate = GestureDirection.from(
+                vector: vector,
+                sectors: sectors,
+                rotationOffset: rotation,
+                threshold: reversalThreshold
+            ),
                candidate.isOpposite(to: lastDirection) {
                 newDirection = candidate
             }
@@ -90,12 +158,14 @@ class GestureAnalyzer {
 
         guard let newDirection else { return }
 
+        let changeThreshold = effectiveDirectionChangeThreshold
+
         // Check if this is a new direction or continuation
         if let lastDirection = directions.last {
             // Only add if direction changed
             if newDirection != lastDirection {
                 // Make sure we've moved enough from the last direction change
-                if magnitude >= directionChangeThreshold || (newDirection.isOpposite(to: lastDirection) && magnitude >= reversalThreshold) {
+                if magnitude >= changeThreshold || (newDirection.isOpposite(to: lastDirection) && magnitude >= reversalThreshold) {
                     directions.append(newDirection)
                     directionMagnitudes.append(magnitude)
                     lastDirectionChangePoint = currentPoint
@@ -199,22 +269,6 @@ class GestureAnalyzer {
         return result
     }
 
-    /// Get direction with column-specific rotation applied
-    func adjustedDirection(from vector: CGVector) -> GestureDirection? {
-        guard columnId > 0 else {
-            return GestureDirection.from(vector: vector, threshold: effectiveThreshold)
-        }
-        let rotationOffset = settings.effectiveRotationOffset(forColumn: columnId)
-        // Apply rotation to the vector
-        let angleRad = rotationOffset * .pi / 180.0
-        let cosA = cos(angleRad)
-        let sinA = sin(angleRad)
-        let rotatedVector = CGVector(
-            dx: vector.dx * cosA - vector.dy * sinA,
-            dy: vector.dx * sinA + vector.dy * cosA
-        )
-        return GestureDirection.from(vector: rotatedVector, threshold: effectiveThreshold)
-    }
 }
 
 // Extension to help with gesture visualization

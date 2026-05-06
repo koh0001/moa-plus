@@ -53,6 +53,23 @@ final class AbbreviationEngine {
     /// Tracks whether the last action was an expansion (for backspace restore)
     private(set) var canRestoreLastExpansion: Bool = false
 
+    /// Master switch. When `false`, `processCharacter` and `processBackspace`
+    /// short-circuit so the engine has no observable effect on input — but
+    /// the loaded trigger trie stays intact, so flipping back to `true`
+    /// resumes work without a reload.
+    var isEnabled: Bool = true {
+        didSet {
+            if !isEnabled {
+                buffer.removeAll(keepingCapacity: true)
+                isShowingCandidate = false
+                pendingCandidate = nil
+                pendingCandidates = []
+                canRestoreLastExpansion = false
+                lastExpansion = nil
+            }
+        }
+    }
+
     // MARK: - Trie for fast trigger lookup
 
     private class TrieNode {
@@ -94,6 +111,8 @@ final class AbbreviationEngine {
     /// Process a character input
     /// Call this for each confirmed character (after Hangul composition is complete)
     func processCharacter(_ char: Character) {
+        guard isEnabled else { return }
+
         // Any new input invalidates backspace restoration
         canRestoreLastExpansion = false
         lastExpansion = nil
@@ -130,6 +149,8 @@ final class AbbreviationEngine {
     /// Returns true if backspace was handled (restoration occurred)
     @discardableResult
     func processBackspace() -> Bool {
+        guard isEnabled else { return false }
+
         // Check if we should restore the original trigger
         if canRestoreLastExpansion, let last = lastExpansion {
             delegate?.abbreviationEngine(self, shouldRestore: last.trigger, removing: last.replacement)

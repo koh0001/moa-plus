@@ -22,6 +22,10 @@ struct KeyView: View {
     let onGestureEnd: () -> Void
     var onPopupDrag: ((CGFloat) -> Void)?     // translationX during long-press drag
     var onPopupRelease: (() -> Void)?          // finger up after long-press
+    /// Long-press handler for the English-mode shift key. Fires
+    /// caps-lock toggle so users can hold shift to lock instead of
+    /// having to time a precise double-tap.
+    var onShiftLongPress: (() -> Void)? = nil
 
     @State private var isHighlighted = false
     @State private var showNumberPopup = false
@@ -294,10 +298,18 @@ struct KeyView: View {
     }
 
     private func startLongPressTimer() {
-        guard longPressNumber != nil else { return }
+        let isShiftKey: Bool = {
+            if case .functional(.shift) = content { return true }
+            return false
+        }()
+        guard longPressNumber != nil || isShiftKey else { return }
         cancelLongPressTimer()
 
         let timer = Timer(timeInterval: KeyboardSettings.shared.longPressDelay, repeats: false) { _ in
+            if isShiftKey {
+                onShiftLongPress?()
+                return
+            }
             showNumberPopup = true
             if let number = longPressNumber {
                 onLongPress?(number)

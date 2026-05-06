@@ -50,7 +50,7 @@ struct TutorialCompletionView: View {
                 Image(systemName: "lightbulb.fill")
                     .foregroundColor(.yellow)
                     .font(.caption)
-                Text("처음엔 느려도 며칠이면 익숙해집니다. 설정에서 단축어를 등록하면 더 빠르게 입력할 수 있어요.")
+                Text("처음엔 느려도 며칠이면 익숙해집니다. 스페이스바 좌우 드래그로 커서 이동, 단축어 등록·복원, 설정의 컬럼별 보정까지 하나씩 활용해 보세요.")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
             }

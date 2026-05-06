@@ -152,8 +152,17 @@ struct ColumnCorrectionDetailView: View {
                     Text("\(binding.wrappedValue.horizontalEuWidthDelta, specifier: "%.1f")°")
                 }
                 Slider(value: binding.horizontalEuWidthDelta, in: 0...10, step: 0.5)
+
+                HStack {
+                    Text("방향 전환 거리 보정")
+                    Spacer()
+                    Text("\(binding.wrappedValue.directionChangeThresholdDelta, specifier: "%+.0f")pt")
+                }
+                Slider(value: binding.directionChangeThresholdDelta, in: -5...15, step: 1)
             } header: {
                 Text("보정값")
+            } footer: {
+                Text("‘방향 전환 거리 보정’이 클수록 두 번째 방향 stroke 등록이 까다로워집니다. 정수직 ↑로 그었는데 끝부분이 살짝 휘어 ㅘ로 잡힐 때 +값으로 올리세요.")
             }
 
             if columnId == 1 || columnId == 5 {

@@ -307,12 +307,17 @@ struct SpaceKeyView: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         if !isPressed { isPressed = true }
+                        // When the cursor-by-drag toggle is off, never enter
+                        // drag mode — small finger movements (≥ dragThreshold)
+                        // would otherwise suppress the onTap fallback in
+                        // `onEnded`, dropping the space input on the floor.
+                        guard KeyboardSettings.shared.cursorMoveBySpaceDragEnabled else { return }
                         let dx = value.translation.width
                         if !didDrag && abs(dx) >= Self.dragThreshold {
                             didDrag = true
                             lastReportedOffset = 0
                         }
-                        if didDrag && KeyboardSettings.shared.cursorMoveBySpaceDragEnabled {
+                        if didDrag {
                             let totalSteps = Int(dx / Self.pixelsPerStep)
                             let lastSteps = Int(lastReportedOffset / Self.pixelsPerStep)
                             let delta = totalSteps - lastSteps

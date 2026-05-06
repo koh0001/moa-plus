@@ -17,13 +17,27 @@ struct ColumnGestureOverride: Codable, Equatable {
     /// Distance multiplier for outward swipes (>1.0 = more lenient)
     var outwardDistanceMultiplier: Double = 1.0
 
+    /// Delta (points) added to the global direction-change threshold
+    /// for this column. Positive = stricter (less likely to register a
+    /// second stroke from end-of-swipe drift), negative = more lenient.
+    var directionChangeThresholdDelta: Double = 0.0
+
     /// Whether this column uses override values or falls back to global
     var isEnabled: Bool = true
 
-    /// Default overrides for each column
+    /// Default overrides for each column.
+    ///
+    /// Edge columns (1, 5) had a known issue where a steep ↗/↖ swipe (≥70°)
+    /// for ㅣ would slip into the ↑ sector after rotation correction shaved
+    /// the diagonal's upper bound below 70°, producing [.up, .upRight] →
+    /// ㅘ instead of [.upRight] → ㅣ. The rotation magnitude is reduced
+    /// (5° → 3°) and the ㅣ sector widening is increased (3° → 5°) so a
+    /// 78° vector at column 5 still lands inside ↗ even with rotation
+    /// applied. See `testColumn5SteepDiagonalStaysAsI` in
+    /// `GestureAnalyzerTests.swift`.
     static let defaults: [ColumnGestureOverride] = [
         // Column 1 (ㅃ/ㅂ/ㅁ/ㅋ) - leftmost, needs outward compensation
-        ColumnGestureOverride(columnId: 1, rotationOffsetDeg: 5.0, verticalIWidthDelta: 3.0, horizontalEuWidthDelta: 2.0, outwardDistanceMultiplier: 0.85),
+        ColumnGestureOverride(columnId: 1, rotationOffsetDeg: 3.0, verticalIWidthDelta: 5.0, horizontalEuWidthDelta: 2.0, outwardDistanceMultiplier: 0.85),
         // Column 2 (ㅉ/ㅈ/ㄴ/ㅌ) - near-left, mild compensation
         ColumnGestureOverride(columnId: 2, rotationOffsetDeg: 2.0, verticalIWidthDelta: 1.5, horizontalEuWidthDelta: 1.0),
         // Column 3 (ㄸ/ㄷ/ㅇ/ㅊ) - center, use global defaults
@@ -31,7 +45,7 @@ struct ColumnGestureOverride: Codable, Equatable {
         // Column 4 (ㄲ/ㄱ/ㄹ/ㅍ) - near-right, mild compensation
         ColumnGestureOverride(columnId: 4, rotationOffsetDeg: -2.0, verticalIWidthDelta: 1.5, horizontalEuWidthDelta: 1.0),
         // Column 5 (ㅆ/ㅅ/ㅎ) - rightmost, needs outward compensation
-        ColumnGestureOverride(columnId: 5, rotationOffsetDeg: -5.0, verticalIWidthDelta: 3.0, horizontalEuWidthDelta: 2.0, outwardDistanceMultiplier: 0.85),
+        ColumnGestureOverride(columnId: 5, rotationOffsetDeg: -3.0, verticalIWidthDelta: 5.0, horizontalEuWidthDelta: 2.0, outwardDistanceMultiplier: 0.85),
     ]
 
     /// Get the override for a given column, returning the default if not found

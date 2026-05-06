@@ -86,6 +86,17 @@ final class TutorialViewModel: ObservableObject {
             showKeyboardWarning = false
             return
         }
+        // The "switch to MoaPlus keyboard" warning only makes sense when the
+        // target line is Korean. Practice lines for English mode or numeric
+        // input legitimately contain non-Hangul characters; warning there
+        // would scold the user for following instructions.
+        let targetIsKorean = currentTargetLine.contains { ch in
+            HangulUnicode.isHangulSyllable(ch) || isHangulJamo(ch)
+        }
+        guard targetIsKorean else {
+            showKeyboardWarning = false
+            return
+        }
         let lastChar = inputText.last!
         let isKorean = HangulUnicode.isHangulSyllable(lastChar)
             || isHangulJamo(lastChar)

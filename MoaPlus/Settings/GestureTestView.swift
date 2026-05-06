@@ -61,6 +61,7 @@ final class GestureTestModel: ObservableObject {
         let s = settings.gestureSettings
         analyzer.settings = s
         analyzer.columnId = selectedColumn
+        analyzer.keyWidth = deviceCenterKeyWidth
         resolver.swipeProfile = s.swipeProfile
     }
 
@@ -78,8 +79,18 @@ final class GestureTestModel: ObservableObject {
         settings.gestureSettings.horizontalEuWidthDelta(forColumn: selectedColumn)
     }
 
+    /// Center-key width on the current device — used to keep the test
+    /// view's threshold preview honest about what the actual keyboard
+    /// will apply at the user's screen size.
+    var deviceCenterKeyWidth: CGFloat {
+        KeyboardMetrics.centerKeyWidth(for: UIScreen.main.bounds.width)
+    }
+
     var effectiveThreshold: CGFloat {
-        settings.gestureSettings.effectiveSwipeThreshold(forColumn: selectedColumn)
+        settings.gestureSettings.effectiveSwipeThreshold(
+            forColumn: selectedColumn,
+            keyWidth: deviceCenterKeyWidth
+        )
     }
 
     var sectors: [DirectionSector] {

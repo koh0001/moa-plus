@@ -148,11 +148,11 @@ enum TutorialContent {
             tip: "ㅒ와 ㅖ는 ㅐ/ㅔ를 두 번 왕복하면 됩니다."
         ),
 
-        // Stage 6: Long-press & shortcuts
+        // Stage 6: Long-press, space drag, shortcuts
         TutorialStage(
             id: 6,
-            title: "숫자, 기호, 단축어",
-            description: "길게 누르면 숫자와 기호를 빠르게 입력할 수 있습니다.\n길게 누른 채로 드래그하면 다른 후보를 선택할 수 있어요.\n\n설정에서 단축어를 등록하면 자음 몇 개만으로 긴 문장을 입력할 수 있습니다.",
+            title: "보조 입력 — 숫자, 커서, 단축어",
+            description: "자음 키를 길게 누르면 숫자와 기호가 입력됩니다. 그대로 드래그하면 다른 후보를 선택할 수 있어요.\n\n스페이스바를 좌우로 드래그하면 커서가 한 글자씩 이동합니다.\n\n설정에서 단축어를 등록하면 자음 몇 개로 긴 문장을 입력할 수 있어요. 같은 글자로 시작하는 단축어가 여러 개면 후보 바에서 골라 쓸 수 있고, 입력 직후 백스페이스를 한 번 누르면 원래 글자로 되돌립니다.",
             practiceLines: [
                 "12345",
                 "67890",
@@ -160,9 +160,22 @@ enum TutorialContent {
             tip: "예: ㅇㅎ + 스페이스 → '확인했습니다' (단축어 설정 후)"
         ),
 
-        // Stage 7: Real sentences
+        // Stage 7: English mode & caps lock
         TutorialStage(
             id: 7,
+            title: "영문 모드 & Caps Lock",
+            description: "키보드 하단의 한/영 키를 누르면 영문 QWERTY 모드로 전환됩니다.\n123 키를 누르면 숫자·기호 모드입니다.\n\n영문 모드의 Shift 키:\n• 한 번 탭 → 다음 한 글자만 대문자\n• 더블탭 또는 길게 누르기 → Caps Lock (대문자 고정). 다시 길게 누르면 풀립니다.",
+            practiceLines: [
+                "Hello",
+                "MOA Plus",
+                "iOS 26",
+            ],
+            tip: "한↔영 / 123 / 한글은 같은 자리의 모드 키로 순환됩니다."
+        ),
+
+        // Stage 8: Real sentences
+        TutorialStage(
+            id: 8,
             title: "실전 문장 연습",
             description: "지금까지 배운 모든 제스처를 활용해 문장을 입력해보세요.\n틀려도 괜찮아요. 연습하면 빨라집니다!",
             practiceLines: [
