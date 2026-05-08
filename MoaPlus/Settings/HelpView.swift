@@ -23,11 +23,27 @@ struct HelpView: View {
         }
         .navigationTitle("도움말")
         .fullScreenCover(isPresented: $showTutorial) {
-            TutorialContainerView()
+            NavigationStack {
+                TutorialContainerView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("닫기") {
+                                showTutorial = false
+                            }
+                        }
+                    }
+            }
         }
         .fullScreenCover(isPresented: $showPractice) {
             NavigationStack {
                 TypingPracticeListView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("닫기") {
+                                showPractice = false
+                            }
+                        }
+                    }
             }
         }
     }
