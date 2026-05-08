@@ -233,8 +233,12 @@ struct FunctionRowView: View {
     // MARK: - Default layout widths
 
     private var returnWidth: CGFloat {
-        // Match backspace width: sideWidth + centerKeyWidth + spacing
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
+        if layoutCustomization.slotA == .fullPackage {
+            // 확장형(A3): match wide backspace width (*1.3) so right edges align with row 3.
+            return KeyboardMetrics.keyWidth(forBackspaceWideAt: 0, centerKeyWidth: centerKeyWidth)
+        }
+        // Default: match standard backspace width (sideWidth + centerKeyWidth + spacing).
         let sideWidth = centerKeyWidth * KeyboardMetrics.symbolWidthRatio
         return sideWidth + centerKeyWidth + KeyboardMetrics.keySpacing
     }
