@@ -6,13 +6,17 @@
 
 Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 8-directional gesture combinations.
 
-**New in v1.2**: English QWERTY keyboard, Cheonjiin vowel input (ㅣ · dot · ㅡ), space-bar drag for cursor movement, unified gesture settings screen.
+**New in v1.4**: Three layout presets (Modern / Classic / Extended), Slot B vowel key beside the space bar, first-launch layout selection modal, flat 6-item settings structure, last-keyboard-mode persistence, Help section (tutorial replay + typing practice), redesigned gesture test screen.
+
+**v1.3**: Caps Lock via long-press Shift, abbreviation master ON/OFF toggle, per-column gesture correction sliders, device-proportional swipe thresholds.
+
+**v1.2**: English QWERTY keyboard, Cheonjiin vowel input (ㅣ · dot · ㅡ), space-bar drag for cursor movement, unified gesture settings screen.
 
 > Based on [ios-moaki](https://github.com/vkehfdl1/ios-moaki) by Jeffrey (Dongkyu) Kim
 
 ## Screenshots
 
-### v1.2 — Keyboard and Appearance preview
+### v1.4 — Keyboard and Appearance preview
 
 | Korean keyboard | English keyboard | Appearance preview |
 |:--:|:--:|:--:|
@@ -33,6 +37,8 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 - **Long-press auxiliary input** — Hold for numbers/symbols, drag to select candidates
 - **English number specials** (v1.2) — Long-press number keys in English mode for ! @ # $ % ^ & * ( )
 - **Abbreviation expansion** — Type a few consonants to expand into full phrases (e.g. ㅇㅎ → 확인했습니다)
+- **Abbreviation master toggle** (v1.3) — Pause auto-expansion without losing saved phrases; backspace immediately after expansion restores the original input
+- **English QWERTY Caps Lock** (v1.3) — Long-press Shift to toggle Caps Lock
 
 ### Editing
 - **Space-drag cursor** (v1.2) — Drag the space bar left/right to move the cursor
@@ -40,9 +46,13 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 - **Word-level delete** — Long-press backspace for fast word-by-word deletion
 
 ### Customization
+- **Layout presets** (v1.4) — Choose from Modern, Classic, or Extended at Settings → Keyboard → Layout. A selection modal appears on first launch.
+- **Slot B vowel key** (v1.4) — Assign the key next to the space bar as a vowel input key. Supports the same multi-stroke gestures as consonant keys (ㅑ ㅕ ㅛ ㅠ ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅒ ㅖ ㅢ).
+- **Last-mode persistence** (v1.4) — Optionally restore the last used Korean/English mode on next launch (Settings → Keyboard → Input Behavior).
 - **Custom themes** — 5 presets + custom colors + background image + key opacity
 - **Unified gesture settings** (v1.2) — Angle, length, direction mapping, and per-column correction managed in one screen
-- **Live gesture visualization** (v1.2) — Test your gestures with the same engine the keyboard uses
+- **Per-column gesture correction** (v1.3) — Per-column sliders to tune false positives like ㅗ → ㅘ end-curve misreads
+- **Gesture test screen** (v1.4, redesigned) — Test directly on a real keyboard layout; sector canvas shows live input results
 - **Typing practice** (v1.2) — 33 scenarios covering cheonjiin, English, and cursor movement
 
 ### Privacy
@@ -137,13 +147,26 @@ Select the `MoaPlus` scheme in Xcode → Choose device/simulator → `Cmd + R`
 
 > For device installation, see [Build & Install Guide](docs/moakey_ios_custom_docs/03_빌드_및_설치_가이드.md)
 
+## Settings Structure (v1.4)
+
+The host app settings were reorganized into a flat 6-item structure:
+
+| Section | Contents |
+|---------|----------|
+| Keyboard | Layout presets / Input behavior / Long-press / Backspace |
+| Appearance | Theme / Colors / Background image / Key opacity |
+| Feedback | Haptics / Click sound |
+| Abbreviations | Phrase CRUD + master ON/OFF |
+| Help | Tutorial replay + Typing practice |
+| About | Credits / License |
+
 ## Project Structure
 
 ```
 moa-plus/
 ├── MoaPlus/                    # Main app (home, settings, tutorial, typing practice)
 │   ├── Practice/               # Typing practice (33 scenarios)
-│   └── Settings/               # Appearance / gesture / shortcut / long-press + live test
+│   └── Settings/               # Keyboard / Appearance / Feedback / Abbreviations / Help / About (v1.4 flat structure)
 ├── MoaPlusKeyboard/            # Keyboard extension
 │   ├── Engine/                 # Hangul composer (with cheonjiin dotPending), gesture analyzer, abbreviation
 │   ├── Models/                 # Jamo, gesture, theme, shortcut, keyboard mode (Korean/English/Symbol)
