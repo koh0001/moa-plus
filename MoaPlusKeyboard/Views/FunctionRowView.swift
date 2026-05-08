@@ -361,8 +361,13 @@ struct SlotBVowelKey: View {
 
     var body: some View {
         VStack(spacing: 1) {
-            Text("ㆍ").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
-            Text("모음").font(.system(size: 8)).foregroundColor(fg.opacity(0.5))
+            Text("ㅗ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            HStack(spacing: 4) {
+                Text("ㅓ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+                Text("ㆍ").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
+                Text("ㅏ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            }
+            Text("ㅜ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
         }
         .frame(width: width, height: height)
         .background(
