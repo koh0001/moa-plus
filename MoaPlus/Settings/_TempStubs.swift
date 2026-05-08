@@ -4,7 +4,6 @@
 // MARK: - Temporary stubs (replaced in later tasks)
 // HelpView -> Task 17
 // LongPressSettingsView -> Task 16
-// InputBehaviorSettingsView -> Task 15
 // This file is deleted in Task 19 once all real views exist.
 
 import SwiftUI
@@ -22,13 +21,5 @@ struct LongPressSettingsView: View {
         Text("TODO: implemented in Task 16")
             .foregroundColor(.secondary)
             .navigationTitle("롱프레스")
-    }
-}
-
-struct InputBehaviorSettingsView: View {
-    var body: some View {
-        Text("TODO: implemented in Task 15")
-            .foregroundColor(.secondary)
-            .navigationTitle("입력 동작")
     }
 }
