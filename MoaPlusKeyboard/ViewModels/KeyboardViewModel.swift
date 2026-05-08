@@ -61,12 +61,6 @@ class KeyboardViewModel: ObservableObject {
     /// and the resolved final vowel on `.ended`.
     var onPreviewConsonantGesture: ((PreviewGesturePhase, [GestureDirection], Jungseong?) -> Void)? = nil
 
-    /// When set, overrides the column id detected from `KeyboardMetrics` so
-    /// the gesture test screen can force a specific column's per-column
-    /// rotation/width corrections. 0 (default) means "use the auto-detected
-    /// column from the touched key".
-    var previewColumnOverride: Int = 0
-
     /// When `true`, the gesture overlay is always shown in Korean mode regardless
     /// of the global `showGesturePreview` setting. Set by `KeyboardPreviewView`
     /// when embedded in the gesture test screen so the direction trail is always
@@ -592,9 +586,7 @@ class KeyboardViewModel: ObservableObject {
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
-        if previewMode, previewColumnOverride > 0 {
-            gestureAnalyzer.columnId = previewColumnOverride
-        } else if keyboardMode == .korean,
+        if keyboardMode == .korean,
            let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean),
            case .consonant(let consonant) = content {
             gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)

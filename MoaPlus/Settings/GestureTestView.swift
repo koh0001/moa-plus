@@ -196,7 +196,6 @@ struct GestureTestView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                columnPicker
                 keyboardPreviewSection
                 resultCards
                 disclosureCanvas
@@ -206,25 +205,6 @@ struct GestureTestView: View {
         .navigationTitle("긋기 테스트")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { model.configureEngine() }
-    }
-
-    // MARK: - Column picker
-
-    private var columnPicker: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("테스트할 자음 컬럼")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.secondary)
-            Picker("열", selection: $model.selectedColumn) {
-                ForEach(1...5, id: \.self) { col in
-                    Text("\(col)열").tag(col)
-                }
-            }
-            .pickerStyle(.segmented)
-            Text("선택한 열의 회전·폭 보정이 실제 키보드 미리보기에 반영됩니다.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
     }
 
     // MARK: - Real keyboard preview
@@ -248,7 +228,6 @@ struct GestureTestView: View {
                 onConsonantPreview: { phase, directions, vowel in
                     model.ingestKeyboardPreview(phase: phase, directions: directions, vowel: vowel)
                 },
-                consonantPreviewColumnOverride: model.selectedColumn,
                 forceShowGesturePreview: true
             )
 

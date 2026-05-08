@@ -31,12 +31,6 @@ struct KeyboardPreviewView: View {
     /// output without affecting any text field.
     var onConsonantPreview: ((KeyboardViewModel.PreviewGesturePhase, [GestureDirection], Jungseong?) -> Void)? = nil
 
-    /// Forces a specific column id (1-5) for per-column gesture corrections,
-    /// regardless of which consonant key the user actually touched. Used by
-    /// the gesture test screen so the column-picker selection drives the
-    /// rotation/width corrections applied to the live trace.
-    var consonantPreviewColumnOverride: Int = 0
-
     /// When `true`, the gesture overlay (trail + direction arrows) is always
     /// shown inside this preview regardless of the global `showGesturePreview`
     /// setting. Set to `true` in `GestureTestView` so users can always observe
@@ -72,7 +66,6 @@ struct KeyboardPreviewView: View {
             viewModel.onPreviewVowel = onVowelPreview
             viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
             viewModel.onPreviewConsonantGesture = onConsonantPreview
-            viewModel.previewColumnOverride = consonantPreviewColumnOverride
             viewModel.forceShowGesturePreview = forceShowGesturePreview
         }
         .onChange(of: isInteractive) { _, newValue in
@@ -80,11 +73,7 @@ struct KeyboardPreviewView: View {
             viewModel.onPreviewVowel = onVowelPreview
             viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
             viewModel.onPreviewConsonantGesture = onConsonantPreview
-            viewModel.previewColumnOverride = consonantPreviewColumnOverride
             viewModel.forceShowGesturePreview = forceShowGesturePreview
-        }
-        .onChange(of: consonantPreviewColumnOverride) { _, newValue in
-            viewModel.previewColumnOverride = newValue
         }
     }
 }
