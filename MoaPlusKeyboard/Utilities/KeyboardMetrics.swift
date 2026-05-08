@@ -121,6 +121,12 @@ enum KeyboardMetrics {
         }
     }
 
+    /// `backspaceWide` 의 폭 = 일반 자음 키 2 칸 + spacing.
+    /// 인접 셀 (col 5) 만 사용하며 col 6 은 `[3].count == 6` 으로 그리드에 존재 안 함.
+    static func keyWidth(forBackspaceWideAt column: Int, centerKeyWidth: CGFloat) -> CGFloat {
+        return centerKeyWidth * 2 + keySpacing
+    }
+
     // Get number of columns for a row in the active layout.
     static func columnCount(for row: Int, isSymbolMode: Bool) -> Int {
         let layout = isSymbolMode ? symbolLayout : koreanLayout

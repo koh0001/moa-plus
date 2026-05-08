@@ -43,4 +43,11 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         let grid = KeyboardMetrics.koreanLayout(layout)
         XCTAssertEqual(grid[3][5], .backspaceWide)
     }
+
+    func testKeyWidth_backspaceWideIsTwoCellsPlusGap() {
+        let centerWidth: CGFloat = 40.0
+        let normal = KeyboardMetrics.keyWidth(for: 5, row: 3, centerKeyWidth: centerWidth, mode: .korean)
+        let wide = KeyboardMetrics.keyWidth(forBackspaceWideAt: 5, centerKeyWidth: centerWidth)
+        XCTAssertEqual(wide, normal * 2 + KeyboardMetrics.keySpacing, accuracy: 0.01)
+    }
 }
