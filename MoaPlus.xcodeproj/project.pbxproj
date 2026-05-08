@@ -85,6 +85,7 @@
 				Models/GestureDirection.swift,
 				Models/HangulJamo.swift,
 				Models/KeyboardMode.swift,
+				Models/LayoutCustomization.swift,
 				Models/SecondaryKeyAction.swift,
 				Models/ShortcutExpansion.swift,
 				Models/SwipeProfile.swift,

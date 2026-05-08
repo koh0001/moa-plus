@@ -151,6 +151,26 @@ enum KeyboardMetrics {
         return CGSize(width: keyWidth, height: keyHeightValue)
     }
 
+    /// Returns the Korean grid layout for the given LayoutCustomization.
+    /// A1 (vowel preset): reproduces v1.3 layout with col 0 from slotC and optional ㆍ↔⌫ swap.
+    /// A2 (classic11 preset): placeholder — implemented in Task 4.
+    static func koreanLayout(_ layout: LayoutCustomization) -> [[KeyContent]] {
+        let leftCol = layout.slotC.map { KeyContent.symbol($0) }
+        switch layout.slotA {
+        case .vowel:
+            let row1Right: KeyContent = layout.slotABackspaceSwap ? .vowelPrimitive(.dot) : .backspace
+            let row3Right: KeyContent = layout.slotABackspaceSwap ? .backspace : .vowelPrimitive(.dot)
+            return [
+                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol("#")],
+                [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), row1Right],
+                [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .vowelPrimitive(.bar)],
+                [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .vowelPrimitive(.dash), row3Right],
+            ]
+        case .classic11:
+            fatalError("Implemented in Task 4")
+        }
+    }
+
     // Korean mode layout (7 columns × 4 rows, all rows uniform width)
     // Left column: special symbols, Center: consonants, Right column: backspace/vowel primitives
     static let koreanLayout: [[KeyContent]] = [
