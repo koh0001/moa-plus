@@ -29,7 +29,7 @@ final class LayoutCustomizationTests: XCTestCase {
         XCTAssertEqual(decoded?.slotC.count, 4)
     }
 
-    func testSwapDefaultIsFalse() {
+    func testSwapDefaultIsFalse() throws {
         let json = #"{"slotA":"vowel","slotB":"punctuation","slotC":["~","^",";","*"]}"#
         let data = json.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
