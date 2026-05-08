@@ -32,5 +32,8 @@ Pods/
 # Claude Code local state
 .claude/
 
+# Superpowers brainstorm session files
+.superpowers/
+
 # Rendered/generated docs
 docs/moakey_ios_custom_docs/rendered/
