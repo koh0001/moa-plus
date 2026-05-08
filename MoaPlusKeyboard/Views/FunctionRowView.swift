@@ -249,7 +249,8 @@ struct FunctionRowView: View {
     }
 
     private var symbolToggleWidth: CGFloat {
-        KeyboardMetrics.centerKeyWidth(for: totalWidth)
+        let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
+        return centerKeyWidth * KeyboardMetrics.symbolWidthRatio * 1.3
     }
 
     private var letterToggleWidth: CGFloat {
