@@ -42,9 +42,9 @@ struct KeyboardSettingsView: View {
     private var layoutSummary: String {
         let c = settings.layoutCustomization
         switch c.slotA {
-        case .vowel: return c.slotABackspaceSwap ? "모음 (swap)" : "모던"
-        case .classic11: return "클래식 1.1"
-        case .fullPackage: return "풀 패키지"
+        case .vowel: return c.slotABackspaceSwap ? "모던 (swap)" : "모던"
+        case .classic11: return "클래식"
+        case .fullPackage: return "확장형"
         }
     }
 

@@ -24,13 +24,13 @@ struct FirstLaunchLayoutModalView: View {
 
             VStack(spacing: 12) {
                 ChoiceCard(
-                    title: "모던 (현재)",
+                    title: "모던",
                     subtitle: "우측에 모음 키 ㅣ ㅡ ㆍ + 백스페이스 위쪽",
                     preview: ModernPreviewMini(),
                     onSelect: applyModern
                 )
                 ChoiceCard(
-                    title: "클래식 1.1",
+                    title: "클래식",
                     subtitle: "! ? . + 가로 백스페이스. 모음 키 없음.",
                     preview: ClassicPreviewMini(),
                     onSelect: applyClassic

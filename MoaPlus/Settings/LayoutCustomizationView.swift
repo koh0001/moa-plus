@@ -68,15 +68,15 @@ struct LayoutCustomizationView: View {
                 Text("미리보기")
             } footer: {
                 if isVowelKeyAvailable {
-                    Text("스페이스 옆 모음 키(또는 풀 패키지의 모음 키)를 직접 드래그하면 어떤 모음이 입력되는지 표시됩니다. 결과 표시 위치는 손가락 반대편에 나타납니다.")
+                    Text("스페이스 옆 모음 키(또는 확장형의 모음 키)를 직접 드래그하면 어떤 모음이 입력되는지 표시됩니다. 결과 표시 위치는 손가락 반대편에 나타납니다.")
                 }
             }
 
             // Slot A
             Section {
-                slotARadioRow(.vowel, title: "모음 (현재)", desc: "⌫ + ㅣ ㅡ ㆍ")
-                slotARadioRow(.classic11, title: "1.1 특수문자", desc: "! ? . + 가로 ⌫")
-                slotARadioRow(.fullPackage, title: "풀 패키지", desc: "Classic 베이스 + col 6 에 모음/특수문자 + 긴 스페이스. 슬롯 B 자동 비활성.")
+                slotARadioRow(.vowel, title: "모던", desc: "⌫ + ㅣ ㅡ ㆍ")
+                slotARadioRow(.classic11, title: "클래식", desc: "! ? . + 가로 ⌫")
+                slotARadioRow(.fullPackage, title: "확장형", desc: "Classic 베이스 + col 6 에 모음/특수문자 + 긴 스페이스. 슬롯 B 자동 비활성.")
                 if settings.layoutCustomization.slotA == .vowel {
                     Toggle("백스페이스 ↔ ㆍ 위치 swap", isOn: Binding(
                         get: { settings.layoutCustomization.slotABackspaceSwap },
@@ -117,13 +117,13 @@ struct LayoutCustomizationView: View {
 
             // Slot B
             Section {
-                slotBRadioRow(.punctuation, title: "특수문자 (현재)", desc: "tap=. ←=? →=! ↑=, ↓=.")
+                slotBRadioRow(.punctuation, title: "특수문자", desc: "tap=. ←=? →=! ↑=, ↓=.")
                 slotBRadioRow(.vowelKey, title: "모음 키", desc: "tap=ㆍ + 8방향 모음")
             } header: {
                 slotHeader(label: "스페이스 옆 키 (슬롯 B)", slot: .b, systemImage: "rectangle.bottomthird.inset.filled")
             } footer: {
                 if settings.layoutCustomization.slotA == .fullPackage {
-                    Text("풀 패키지 모드에서는 슬롯 B 가 col 6 으로 이동했습니다.")
+                    Text("확장형 모드에서는 슬롯 B 가 col 6 으로 이동했습니다.")
                         .foregroundColor(.orange)
                 } else {
                     Text("스페이스바 옆 키 동작.")
