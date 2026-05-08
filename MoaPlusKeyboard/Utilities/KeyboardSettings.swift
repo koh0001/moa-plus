@@ -27,6 +27,8 @@ final class KeyboardSettings: ObservableObject {
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
         static let abbreviationEnabled = "abbreviationEnabled"
+        static let layoutCustomization = "layoutCustomization"
+        static let firstLaunchModalShown = "firstLaunchModalShown"
     }
 
     /// Shared UserDefaults (App Group) with fallback to standard
@@ -128,6 +130,16 @@ final class KeyboardSettings: ObservableObject {
     /// Space-bar drag moves the cursor (default ON)
     @Published var cursorMoveBySpaceDragEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(cursorMoveBySpaceDragEnabled, forKey: Keys.cursorMoveBySpaceDragEnabled) }
+    }
+
+    // MARK: - Layout Customization (v1.4)
+
+    @Published var layoutCustomization: LayoutCustomization = LayoutCustomization() {
+        didSet { guard !isLoading else { return }; save(layoutCustomization, forKey: Keys.layoutCustomization) }
+    }
+
+    @Published var firstLaunchModalShown: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(firstLaunchModalShown, forKey: Keys.firstLaunchModalShown) }
     }
 
     /// Computed repeat interval from speed setting
@@ -263,6 +275,8 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
         wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5
         cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
+        layoutCustomization = load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization()
+        firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
     }
 
     private func save<T: Encodable>(_ value: T, forKey key: String) {
@@ -310,6 +324,8 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true
+        layoutCustomization = LayoutCustomization()
+        firstLaunchModalShown = false
     }
 
     /// Reset gesture settings only
