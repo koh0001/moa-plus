@@ -20,6 +20,13 @@ struct KeyboardPreviewView: View {
     /// model's `previewMode` flag.
     var onVowelPreview: ((Jungseong) -> Void)? = nil
 
+    /// Same as `onVowelPreview` but also delivers the gesture start point in
+    /// the keyboard preview's coordinate space (named "keyboardPreview"),
+    /// so callers can position UI relative to where the user touched.
+    var onVowelPreviewWithPoint: ((Jungseong, CGPoint) -> Void)? = nil
+
+    private var isInteractive: Bool { onVowelPreview != nil || onVowelPreviewWithPoint != nil }
+
     /// Real keyboard aspect ratio (375pt host width / 260pt extension height).
     private let kbAspect: CGFloat = 375.0 / 260.0
 
@@ -35,18 +42,20 @@ struct KeyboardPreviewView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color(.separator), lineWidth: 0.5)
         )
-        // When `onVowelPreview` is provided, hit testing is enabled but the
-        // view model's `previewMode` neutralises every input path except the
-        // slot B vowel gesture. Otherwise (legacy callers like Appearance
-        // settings) all touches are blocked outright.
-        .allowsHitTesting(onVowelPreview != nil)
+        // When either preview callback is provided, hit testing is enabled
+        // but the view model's `previewMode` neutralises every input path
+        // except the slot B vowel gesture. Otherwise (legacy callers like
+        // Appearance settings) all touches are blocked outright.
+        .allowsHitTesting(isInteractive)
         .onAppear {
-            viewModel.previewMode = onVowelPreview != nil
-            viewModel.onPreviewVowel = onVowelPreview
-        }
-        .onChange(of: onVowelPreview != nil) { _, isInteractive in
             viewModel.previewMode = isInteractive
             viewModel.onPreviewVowel = onVowelPreview
+            viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
+        }
+        .onChange(of: isInteractive) { _, newValue in
+            viewModel.previewMode = newValue
+            viewModel.onPreviewVowel = onVowelPreview
+            viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
         }
     }
 }

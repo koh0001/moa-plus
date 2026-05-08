@@ -10,6 +10,9 @@ struct LayoutCustomizationView: View {
     @State private var slotAEditText: String = ""
     @State private var showingSlotAEdit = false
     @State private var previewVowelOutput: String = ""
+    /// True when the user touched the LEFT half of the preview (so the
+    /// result bubble should appear on the right, opposite the finger).
+    @State private var previewBubbleOnRight: Bool = false
 
     enum HighlightedSlot { case a, b, c }
 
@@ -25,45 +28,47 @@ struct LayoutCustomizationView: View {
         List {
             // Live preview
             Section {
-                VStack(spacing: 8) {
+                // GeometryReader gives us the preview's pixel width so the
+                // result bubble can render on the half OPPOSITE the gesture
+                // start point — keeps the user's finger from covering it.
+                GeometryReader { geo in
                     ZStack(alignment: .topLeading) {
                         KeyboardPreviewView(
-                            onVowelPreview: isVowelKeyAvailable
-                                ? { vowel in
+                            onVowelPreviewWithPoint: isVowelKeyAvailable
+                                ? { vowel, startPoint in
                                     previewVowelOutput = String(vowel.compatibilityCharacter)
+                                    // startPoint.x is in the keyboardPreview
+                                    // coordinate space (== this GeometryReader's
+                                    // width). Touch on left half → bubble right.
+                                    previewBubbleOnRight = startPoint.x < geo.size.width / 2
                                   }
                                 : nil
                         )
                         SlotHighlightOverlay(slot: highlightedSlot)
                             .allowsHitTesting(false)
-                    }
 
-                    if isVowelKeyAvailable {
-                        HStack(spacing: 8) {
-                            Text("입력 결과")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(previewVowelOutput.isEmpty ? "—" : previewVowelOutput)
-                                .font(.title3.bold())
-                                .foregroundColor(previewVowelOutput.isEmpty ? .secondary : .accentColor)
-                            Spacer()
-                            if !previewVowelOutput.isEmpty {
-                                Button("지우기") { previewVowelOutput = "" }
-                                    .font(.caption)
-                            }
+                        if isVowelKeyAvailable, !previewVowelOutput.isEmpty {
+                            VowelResultBubble(
+                                text: previewVowelOutput,
+                                onClear: { previewVowelOutput = "" }
+                            )
+                            .padding(8)
+                            .frame(
+                                maxWidth: .infinity,
+                                maxHeight: .infinity,
+                                alignment: previewBubbleOnRight ? .topTrailing : .topLeading
+                            )
+                            .allowsHitTesting(true)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(8)
                     }
                 }
+                .aspectRatio(375.0 / 260.0, contentMode: .fit)
                 .padding(.vertical, 4)
             } header: {
                 Text("미리보기")
             } footer: {
                 if isVowelKeyAvailable {
-                    Text("스페이스 옆 모음 키(또는 풀 패키지의 모음 키)를 직접 드래그해서 어떤 모음이 입력되는지 확인할 수 있습니다.")
+                    Text("스페이스 옆 모음 키(또는 풀 패키지의 모음 키)를 직접 드래그하면 어떤 모음이 입력되는지 표시됩니다. 결과 표시 위치는 손가락 반대편에 나타납니다.")
                 }
             }
 
@@ -321,6 +326,36 @@ struct SlotHighlightOverlay: View {
             .frame(width: geo.size.width * width, height: geo.size.height * height)
             .position(x: geo.size.width * x + (geo.size.width * width) / 2,
                       y: geo.size.height * y + (geo.size.height * height) / 2)
+    }
+}
+
+/// Floating callout that surfaces the resolved vowel from a slot-B-vowel
+/// preview gesture. Positioned by the parent (`LayoutCustomizationView`) on
+/// the half opposite the gesture start point so the user's finger doesn't
+/// cover the result.
+private struct VowelResultBubble: View {
+    let text: String
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(text)
+                .font(.title2.bold())
+                .foregroundColor(.accentColor)
+            Button(action: onClear) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.secondary)
+                    .imageScale(.medium)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.tertiarySystemBackground))
+        )
+        .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
     }
 }
 

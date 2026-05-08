@@ -211,6 +211,12 @@ struct KeyboardView: View {
                     viewModel.setCenterKeyWidth(newValue)
                 }
         }
+        // Named coordinate space lets the slot-B vowel key report its
+        // gesture start point in the keyboard's frame (instead of the key's
+        // local frame), so the settings preview can position UI based on
+        // which half of the keyboard the user touched. Production keyboard
+        // ignores this — the value is only consumed in preview mode.
+        .coordinateSpace(name: "keyboardPreview")
         .onAppear { loadBackgroundIfNeeded() }
         .onChange(of: settings.themeSettings.backgroundImageId) { _ in loadBackgroundIfNeeded() }
     }

@@ -43,6 +43,15 @@ class KeyboardViewModel: ObservableObject {
     /// (consonants, backspace, function keys) silently no-op in preview mode.
     var previewMode: Bool = false
     var onPreviewVowel: ((Jungseong) -> Void)? = nil
+    /// Same as `onPreviewVowel` but also forwards the gesture start point in
+    /// the named "keyboardPreview" coordinate space so callers can position
+    /// UI relative to where the user touched (e.g. show a result bubble on
+    /// the opposite half of the keyboard).
+    var onPreviewVowelDetailed: ((Jungseong, CGPoint) -> Void)? = nil
+
+    /// Captured at slot-B-vowel gesture start so it can be forwarded in the
+    /// `onPreviewVowelDetailed` callback when the gesture ends.
+    private var slotBVowelStartPoint: CGPoint = .zero
 
     private var lastShiftTapTimestamp: Date?
     private static let doubleTapInterval: TimeInterval = 0.3
@@ -245,6 +254,7 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.columnId = 0
         gestureAnalyzer.reset()
         gestureAnalyzer.addPoint(point)
+        slotBVowelStartPoint = point
     }
 
     func slotBVowelGestureMoved(to point: CGPoint) {
@@ -257,7 +267,7 @@ class KeyboardViewModel: ObservableObject {
         if directions.isEmpty {
             // Tap with no drag → ㆍ (pending), matches prior behaviour.
             if previewMode {
-                onPreviewVowel?(.ㆍ)
+                emitPreviewVowel(.ㆍ)
             } else {
                 inputVowel(.ㆍ)
             }
@@ -266,11 +276,20 @@ class KeyboardViewModel: ObservableObject {
         let resolution = vowelResolver.resolve(directions: directions)
         if let vowel = resolution.vowel {
             if previewMode {
-                onPreviewVowel?(vowel)
+                emitPreviewVowel(vowel)
             } else {
                 inputVowel(vowel)
             }
         }
+    }
+
+    /// Fan-out for preview-mode vowel emission. Calls both the legacy
+    /// `onPreviewVowel` and the detailed variant that forwards the gesture
+    /// start point so callers (LayoutCustomizationView) can position UI
+    /// relative to the user's touch.
+    private func emitPreviewVowel(_ vowel: Jungseong) {
+        onPreviewVowel?(vowel)
+        onPreviewVowelDetailed?(vowel, slotBVowelStartPoint)
     }
 
     /// Input a vowel primitive (천지인 ㅣ/ㅡ/ㆍ).

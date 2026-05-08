@@ -380,7 +380,13 @@ struct SlotBVowelKey: View {
                 .fill(isPressed ? bg.opacity(0.7) : bg)
         )
         .gesture(
-            DragGesture(minimumDistance: 0)
+            // Named coordinate space ("keyboardPreview") so points are in the
+            // keyboard's frame, not the key's local frame. Used by settings
+            // preview for opposite-side bubble positioning. Falls back to
+            // local coords if the named space isn't on an ancestor (it's
+            // declared on KeyboardView's root, present in both production
+            // and preview).
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("keyboardPreview"))
                 .onChanged { value in
                     if !isPressed {
                         isPressed = true
