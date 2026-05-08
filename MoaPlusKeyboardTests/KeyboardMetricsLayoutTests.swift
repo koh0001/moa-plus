@@ -44,11 +44,32 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertEqual(grid[3][5], .backspaceWide)
     }
 
-    func testKeyWidth_backspaceWideIsTwoCellsPlusGap() {
+    func testKeyWidth_backspaceWideMatchesRow0Width() {
+        // Wide ⌫ should equal (col 5 + spacing + col 6) of upper rows so the
+        // grid stays rectangular regardless of side-key-width slider position.
         let centerWidth: CGFloat = 40.0
-        let normal = KeyboardMetrics.keyWidth(for: 5, row: 3, centerKeyWidth: centerWidth, mode: .korean)
+        let sideWidth = centerWidth * KeyboardMetrics.symbolWidthRatio * 1.3
         let wide = KeyboardMetrics.keyWidth(forBackspaceWideAt: 5, centerKeyWidth: centerWidth)
-        XCTAssertEqual(wide, normal * 2 + KeyboardMetrics.keySpacing, accuracy: 0.01)
+        XCTAssertEqual(wide, centerWidth + sideWidth + KeyboardMetrics.keySpacing, accuracy: 0.01)
+    }
+
+    func testA3Layout_col6HasEmbeddedSlotBKeys() {
+        var layout = LayoutCustomization()
+        layout.slotA = .fullPackage
+        let grid = KeyboardMetrics.koreanLayout(layout)
+        XCTAssertEqual(grid[0][6], .symbol("#"))
+        XCTAssertEqual(grid[1][6], .slotBVowelKey)
+        XCTAssertEqual(grid[2][6], .slotBPunctuation)
+        XCTAssertEqual(grid[3].count, 6)
+        XCTAssertEqual(grid[3][5], .backspaceWide)
+    }
+
+    func testA3_longPressNumberCol6IsAllNil() {
+        var layout = LayoutCustomization()
+        layout.slotA = .fullPackage
+        for row in 0..<4 {
+            XCTAssertNil(KeyboardMetrics.longPressNumber(at: row, column: 6, layout: layout))
+        }
     }
 
     func testLongPressNumber_A2Col6IsAllNil() {

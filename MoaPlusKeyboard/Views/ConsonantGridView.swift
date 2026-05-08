@@ -21,12 +21,15 @@ struct KeyGridView: View {
     let onGestureEnd: (Int, Int) -> Void
     var onPopupDrag: ((CGFloat) -> Void)?
     var onPopupRelease: (() -> Void)?
+    var onSlotBVowelKey: ((GestureDirection?) -> Void)? = nil
 
     /// Returns the rendered width for a single cell, accounting for .backspaceWide.
     private func cellWidth(content: KeyContent, column: Int, row: Int) -> CGFloat {
         if case .backspaceWide = content {
             return KeyboardMetrics.keyWidth(forBackspaceWideAt: column, centerKeyWidth: centerKeyWidth)
         }
+        // Slot B embedded keys (A3 col 6) use the same width as other col 6 cells.
+        // The mode-aware key width helper already handles col 6 sizing (sideRatio*1.3).
         return KeyboardMetrics.keyWidth(for: column, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
     }
 
@@ -93,6 +96,22 @@ struct KeyGridView: View {
 
                         let width = cellWidth(content: content ?? .symbol(""), column: column, row: row)
 
+                        // A3 (.fullPackage) embeds slot B keys in col 6.
+                        // KeyGridView intercepts those content types and renders the
+                        // dedicated standalone views (already used in FunctionRowView).
+                        if case .slotBVowelKey = content {
+                            SlotBVowelKey(
+                                width: width,
+                                height: keyHeight,
+                                onAction: { direction in onSlotBVowelKey?(direction) }
+                            )
+                        } else if case .slotBPunctuation = content {
+                            PunctuationSwipeKey(
+                                width: width,
+                                height: keyHeight,
+                                onPunctuation: { symbol in onSymbolTap(symbol) }
+                            )
+                        } else {
                         KeyView(
                             content: content ?? .symbol(""),
                             keySize: CGSize(width: width, height: keyHeight),
@@ -141,6 +160,7 @@ struct KeyGridView: View {
                             },
                             onShiftLongPress: onShiftLongPress
                         )
+                        }   // close else branch (slot B intercept)
                     }
                 }
                 .frame(width: rowWidth(for: row))

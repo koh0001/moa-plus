@@ -90,6 +90,9 @@ struct KeyboardView: View {
                             },
                             onPopupRelease: {
                                 viewModel.confirmPopupSelection()
+                            },
+                            onSlotBVowelKey: { direction in
+                                viewModel.handleSlotBVowelKey(direction: direction)
                             }
                         )
 

@@ -230,6 +230,15 @@ struct KeyView: View {
             Text(punct)
                 .font(.system(size: fontSize))
                 .foregroundColor(themedTextColor)
+
+        case .slotBVowelKey:
+            // KeyGridView intercepts this case and renders SlotBVowelKey directly.
+            // This stub exists only to satisfy exhaustive switch.
+            EmptyView()
+
+        case .slotBPunctuation:
+            // KeyGridView intercepts this case and renders PunctuationSwipeKey directly.
+            EmptyView()
         }
     }
 
@@ -286,7 +295,8 @@ struct KeyView: View {
                 return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
             }
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
-        case .functional, .systemSwitch, .backspace, .backspaceWide:
+        case .functional, .systemSwitch, .backspace, .backspaceWide,
+             .slotBVowelKey, .slotBPunctuation:
             return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
         }
     }

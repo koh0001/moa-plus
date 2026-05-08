@@ -3,6 +3,7 @@ import Foundation
 enum SlotAPreset: String, Codable, CaseIterable {
     case vowel        // A1 — 모음 (기본, 1.3)
     case classic11    // A2 — 1.1 특수문자
+    case fullPackage  // A3 — Classic 기반 + col 6 에 모음/특수 키 + 긴 스페이스
 }
 
 enum SlotBPreset: String, Codable, CaseIterable {

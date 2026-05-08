@@ -34,9 +34,62 @@ struct FunctionRowView: View {
     var body: some View {
         if useBimanualLayout {
             bimanualLayoutBody
+        } else if mode == .korean && layoutCustomization.slotA == .fullPackage {
+            longSpaceLayoutBody
         } else {
             defaultLayoutBody
         }
+    }
+
+    // MARK: - Long-space layout (A3 .fullPackage)
+    // Slot B is embedded in col 6 of the grid, so the function row drops it
+    // and absorbs the freed width into the space bar.
+    // [123/한글] [한/영] [        space        ] [return]
+
+    private var longSpaceLayoutBody: some View {
+        HStack(spacing: spacing) {
+            FunctionKeyView(
+                content: AnyView(
+                    Text(symbolToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
+                ),
+                width: symbolToggleWidth,
+                height: height,
+                action: onToggleSymbolPressed
+            )
+
+            FunctionKeyView(
+                content: AnyView(
+                    Text(letterToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
+                ),
+                width: letterToggleWidth,
+                height: height,
+                action: onToggleLetterPressed
+            )
+
+            SpaceKeyView(
+                width: longSpaceWidth,
+                height: height,
+                onTap: onSpacePressed,
+                onCursorMove: onCursorMoveDelta ?? { _ in }
+            )
+
+            FunctionKeyView(
+                content: AnyView(
+                    Image(systemName: "return")
+                        .font(.system(size: 20))
+                ),
+                width: returnWidth,
+                height: height,
+                action: onReturnPressed
+            )
+        }
+    }
+
+    /// Space bar absorbs the slot B punctuation key + 1 internal gap.
+    private var longSpaceWidth: CGFloat {
+        spaceWidth + punctuationWidth + spacing
     }
 
     // MARK: - Default layout

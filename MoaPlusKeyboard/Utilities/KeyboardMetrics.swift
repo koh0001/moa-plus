@@ -7,6 +7,8 @@ enum KeyContent: Equatable {
     case symbol(String)
     case backspace
     case backspaceWide       // A2 의 row 3 가로 2칸 ⌫
+    case slotBVowelKey       // A3 col 6 row 1 — function-row vowel key 와 동일 동작
+    case slotBPunctuation    // A3 col 6 row 2 — function-row 특수문자 swipe 와 동일 동작
     // Moakey bimanual layout key types
     case vowelPrimitive(VowelPrimitiveType)  // ㆍ, ㅣ, ㅡ
     case functional(FunctionalKeyType)        // Mode switch, settings, etc.
@@ -121,10 +123,12 @@ enum KeyboardMetrics {
         }
     }
 
-    /// `backspaceWide` 의 폭 = 일반 자음 키 2 칸 + spacing.
+    /// `backspaceWide` 의 폭 = 일반 자음 1칸 + 우측 사이드 키(1.3·sideRatio) + spacing.
     /// 인접 셀 (col 5) 만 사용하며 col 6 은 `[3].count == 6` 으로 그리드에 존재 안 함.
+    /// 위쪽 row (col 5 + spacing + col 6) 와 같은 폭으로 정렬되도록 한다.
     static func keyWidth(forBackspaceWideAt column: Int, centerKeyWidth: CGFloat) -> CGFloat {
-        return centerKeyWidth * 2 + keySpacing
+        let sideWidth = centerKeyWidth * symbolWidthRatio * 1.3
+        return centerKeyWidth + sideWidth + keySpacing
     }
 
     // Get number of columns for a row in the active layout.
@@ -188,6 +192,15 @@ enum KeyboardMetrics {
                 [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol(rightCol[0])],
                 [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), .symbol(rightCol[1])],
                 [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .symbol(rightCol[2])],
+                [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .backspaceWide],
+            ]
+        case .fullPackage:
+            // Classic 베이스 + col 6 에 슬롯 B 임베디드 (모음/특수문자) + wide ⌫.
+            // Function row 의 슬롯 B 키는 비활성, 그 폭만큼 스페이스 확장.
+            return [
+                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol("#")],
+                [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), .slotBVowelKey],
+                [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .slotBPunctuation],
                 [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .backspaceWide],
             ]
         }
@@ -289,8 +302,9 @@ enum KeyboardMetrics {
     static func longPressNumber(at row: Int, column: Int, layout: LayoutCustomization) -> String? {
         if column == 6 {
             switch layout.slotA {
-            case .vowel:     return longPressNumber(at: row, column: column)
-            case .classic11: return nil
+            case .vowel:       return longPressNumber(at: row, column: column)
+            case .classic11:   return nil
+            case .fullPackage: return nil
             }
         }
         return longPressNumber(at: row, column: column)

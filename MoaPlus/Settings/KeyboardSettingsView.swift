@@ -44,6 +44,7 @@ struct KeyboardSettingsView: View {
         switch c.slotA {
         case .vowel: return c.slotABackspaceSwap ? "모음 (swap)" : "모던"
         case .classic11: return "클래식 1.1"
+        case .fullPackage: return "풀 패키지"
         }
     }
 
