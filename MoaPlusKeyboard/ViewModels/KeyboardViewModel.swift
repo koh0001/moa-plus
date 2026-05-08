@@ -135,6 +135,11 @@ class KeyboardViewModel: ObservableObject {
 
     init(backspaceRepeatInitialDelay: TimeInterval = 0.4) {
         self.backspaceRepeatInitialDelay = backspaceRepeatInitialDelay
+        // Restore last letter mode before first render so there is no flicker.
+        let settings = KeyboardSettings.shared
+        if settings.rememberLastKeyboardMode, settings.lastKeyboardLetterMode == "english" {
+            keyboardMode = .english
+        }
         reloadAbbreviationEngine()
     }
 
@@ -173,7 +178,19 @@ class KeyboardViewModel: ObservableObject {
         // buffer so half-typed triggers don't leak across modes.
         abbreviationEngine.resetBuffer()
         shiftState = .off  // reset shift when switching language mode
+        persistLetterModeIfEnabled()
         triggerHapticFeedback()
+    }
+
+    /// Persist the current letter mode to UserDefaults if the user opted in.
+    /// Called after any operation that switches between Korean and English.
+    private func persistLetterModeIfEnabled() {
+        let settings = KeyboardSettings.shared
+        guard settings.rememberLastKeyboardMode else { return }
+        let raw = (keyboardMode.letterMode == .english) ? "english" : "korean"
+        if settings.lastKeyboardLetterMode != raw {
+            settings.lastKeyboardLetterMode = raw
+        }
     }
 
     func toggleShift() {

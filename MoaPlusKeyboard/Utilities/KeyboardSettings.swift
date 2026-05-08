@@ -29,6 +29,8 @@ final class KeyboardSettings: ObservableObject {
         static let abbreviationEnabled = "abbreviationEnabled"
         static let layoutCustomization = "layoutCustomization"
         static let firstLaunchModalShown = "firstLaunchModalShown"
+        static let rememberLastKeyboardMode = "rememberLastKeyboardMode"
+        static let lastKeyboardLetterMode = "lastKeyboardLetterMode"
     }
 
     /// Shared UserDefaults (App Group) with fallback to standard
@@ -140,6 +142,20 @@ final class KeyboardSettings: ObservableObject {
 
     @Published var firstLaunchModalShown: Bool = false {
         didSet { guard !isLoading else { return }; writePrimitive(firstLaunchModalShown, forKey: Keys.firstLaunchModalShown) }
+    }
+
+    // MARK: - Mode Persistence
+
+    /// When true, the keyboard restores the last-used letter mode (Korean/English)
+    /// on launch instead of always starting in Korean.
+    @Published var rememberLastKeyboardMode: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(rememberLastKeyboardMode, forKey: Keys.rememberLastKeyboardMode) }
+    }
+
+    /// Persisted last-used letter mode. Only restored on launch if `rememberLastKeyboardMode == true`.
+    /// Stored as a raw string ("korean" / "english") to keep KeyboardSettings independent of KeyboardMode types.
+    @Published var lastKeyboardLetterMode: String = "korean" {
+        didSet { guard !isLoading else { return }; writePrimitive(lastKeyboardLetterMode, forKey: Keys.lastKeyboardLetterMode) }
     }
 
     /// Computed repeat interval from speed setting
@@ -277,6 +293,8 @@ final class KeyboardSettings: ObservableObject {
         cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
         layoutCustomization = load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization()
         firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
+        rememberLastKeyboardMode = defaults.bool(forKey: Keys.rememberLastKeyboardMode)
+        lastKeyboardLetterMode = defaults.string(forKey: Keys.lastKeyboardLetterMode) ?? "korean"
     }
 
     private func save<T: Encodable>(_ value: T, forKey key: String) {
@@ -326,6 +344,8 @@ final class KeyboardSettings: ObservableObject {
         cursorMoveBySpaceDragEnabled = true
         layoutCustomization = LayoutCustomization()
         firstLaunchModalShown = false
+        rememberLastKeyboardMode = false
+        lastKeyboardLetterMode = "korean"
     }
 
     /// Reset gesture settings only
