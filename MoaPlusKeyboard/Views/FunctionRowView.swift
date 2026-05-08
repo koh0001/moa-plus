@@ -232,6 +232,16 @@ struct FunctionRowView: View {
 
     // MARK: - Default layout widths
 
+    /// The KeyboardView wraps its VStack in `.padding(KeyboardMetrics.keySpacing)`,
+    /// which steals `2 * spacing` from the horizontal axis. The grid above us
+    /// absorbs that slack via its center-key formula (8 internal gaps), but the
+    /// function row's child widths sum *exactly* to `totalWidth`, so without
+    /// compensating here the rightmost child (return key) overflows and gets
+    /// clipped. Subtract the outer padding once so all downstream math fits.
+    private var effectiveTotalWidth: CGFloat {
+        max(0, totalWidth - spacing * 2)
+    }
+
     private var returnWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         if layoutCustomization.slotA == .fullPackage {
@@ -244,8 +254,8 @@ struct FunctionRowView: View {
     }
 
     private var availableWidthWithoutReturn: CGFloat {
-        // 5 internal gaps for 5 buttons (4 widgets + return) plus 2 outer paddings
-        totalWidth - returnWidth - spacing * 5
+        // Default layout: 5 children (toggles + space + punct + return) → 4 internal gaps.
+        max(0, effectiveTotalWidth - returnWidth - spacing * 4)
     }
 
     private var symbolToggleWidth: CGFloat {
@@ -262,8 +272,9 @@ struct FunctionRowView: View {
     }
 
     private var spaceWidth: CGFloat {
-        // 5 children in defaultLayoutBody → 4 inner gaps
-        totalWidth - symbolToggleWidth - letterToggleWidth - punctuationWidth - returnWidth - spacing * 4
+        // Default layout: 5 children → 4 internal gaps.
+        let consumedByOthers = symbolToggleWidth + letterToggleWidth + punctuationWidth + returnWidth
+        return max(0, effectiveTotalWidth - consumedByOthers - spacing * 4)
     }
 
     // MARK: - Bimanual layout widths
@@ -284,10 +295,10 @@ struct FunctionRowView: View {
     }
 
     private var bimanualSpaceWidth: CGFloat {
-        // Remaining width after all fixed elements and gaps
-        let gapCount: CGFloat = 7  // 6 keys = 5 gaps, plus 2 outer edges omitted (HStack handles)
+        // Bimanual layout: 6 children (globe + toggle + letterToggle + space + slotB + return)
+        // → 5 internal gaps. Uses effectiveTotalWidth to compensate for parent padding.
         let fixedWidths = bimanualGlobeWidth + bimanualToggleWidth + bimanualPunctuationWidth * 2 + returnWidth
-        return totalWidth - fixedWidths - spacing * (gapCount - 2)
+        return max(0, effectiveTotalWidth - fixedWidths - spacing * 5)
     }
 }
 
