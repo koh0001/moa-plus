@@ -9,21 +9,62 @@ struct LayoutCustomizationView: View {
     @State private var editingSlotAIndex: Int? = nil
     @State private var slotAEditText: String = ""
     @State private var showingSlotAEdit = false
+    @State private var previewVowelOutput: String = ""
 
     enum HighlightedSlot { case a, b, c }
+
+    /// Whether the live preview should accept gestures on the slot B vowel key.
+    /// True when the user has selected a layout that exposes a vowel key —
+    /// either slot B `.vowelKey` (function row) or slot A `.fullPackage` (col 6 row 3).
+    private var isVowelKeyAvailable: Bool {
+        let cust = settings.layoutCustomization
+        return cust.slotA == .fullPackage || cust.slotB == .vowelKey
+    }
 
     var body: some View {
         List {
             // Live preview
             Section {
-                ZStack(alignment: .topLeading) {
-                    KeyboardPreviewView()
-                    SlotHighlightOverlay(slot: highlightedSlot)
-                        .allowsHitTesting(false)
+                VStack(spacing: 8) {
+                    ZStack(alignment: .topLeading) {
+                        KeyboardPreviewView(
+                            onVowelPreview: isVowelKeyAvailable
+                                ? { vowel in
+                                    previewVowelOutput = String(vowel.compatibilityCharacter)
+                                  }
+                                : nil
+                        )
+                        SlotHighlightOverlay(slot: highlightedSlot)
+                            .allowsHitTesting(false)
+                    }
+
+                    if isVowelKeyAvailable {
+                        HStack(spacing: 8) {
+                            Text("입력 결과")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(previewVowelOutput.isEmpty ? "—" : previewVowelOutput)
+                                .font(.title3.bold())
+                                .foregroundColor(previewVowelOutput.isEmpty ? .secondary : .accentColor)
+                            Spacer()
+                            if !previewVowelOutput.isEmpty {
+                                Button("지우기") { previewVowelOutput = "" }
+                                    .font(.caption)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(8)
+                    }
                 }
                 .padding(.vertical, 4)
             } header: {
                 Text("미리보기")
+            } footer: {
+                if isVowelKeyAvailable {
+                    Text("스페이스 옆 모음 키(또는 풀 패키지의 모음 키)를 직접 드래그해서 어떤 모음이 입력되는지 확인할 수 있습니다.")
+                }
             }
 
             // Slot A

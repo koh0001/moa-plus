@@ -13,6 +13,13 @@ import SwiftUI
 struct KeyboardPreviewView: View {
     @StateObject private var viewModel = KeyboardViewModel()
 
+    /// When set, the preview routes the slot B vowel-key gesture into this
+    /// closure (with the resolved Jungseong) so callers can show "what would
+    /// be input" without affecting any text field. Setting this also enables
+    /// hit testing on the preview — all other keys still no-op via the view
+    /// model's `previewMode` flag.
+    var onVowelPreview: ((Jungseong) -> Void)? = nil
+
     /// Real keyboard aspect ratio (375pt host width / 260pt extension height).
     private let kbAspect: CGFloat = 375.0 / 260.0
 
@@ -28,7 +35,18 @@ struct KeyboardPreviewView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color(.separator), lineWidth: 0.5)
         )
-        // Block all touches so the preview cannot mutate composer state.
-        .allowsHitTesting(false)
+        // When `onVowelPreview` is provided, hit testing is enabled but the
+        // view model's `previewMode` neutralises every input path except the
+        // slot B vowel gesture. Otherwise (legacy callers like Appearance
+        // settings) all touches are blocked outright.
+        .allowsHitTesting(onVowelPreview != nil)
+        .onAppear {
+            viewModel.previewMode = onVowelPreview != nil
+            viewModel.onPreviewVowel = onVowelPreview
+        }
+        .onChange(of: onVowelPreview != nil) { _, isInteractive in
+            viewModel.previewMode = isInteractive
+            viewModel.onPreviewVowel = onVowelPreview
+        }
     }
 }

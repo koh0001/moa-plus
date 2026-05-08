@@ -36,6 +36,14 @@ class KeyboardViewModel: ObservableObject {
     @Published var isSpecialCharLayerVisible: Bool = false
     @Published var shiftState: ShiftState = .off
 
+    /// Preview mode flag — when true, the slot B vowel key gesture routes to
+    /// `onPreviewVowel` instead of feeding the composer/delegate. Used by the
+    /// settings preview (LayoutCustomizationView) so the user can try the
+    /// vowel key without affecting any text field. All other input methods
+    /// (consonants, backspace, function keys) silently no-op in preview mode.
+    var previewMode: Bool = false
+    var onPreviewVowel: ((Jungseong) -> Void)? = nil
+
     private var lastShiftTapTimestamp: Date?
     private static let doubleTapInterval: TimeInterval = 0.3
 
@@ -140,6 +148,7 @@ class KeyboardViewModel: ObservableObject {
     // MARK: - Mode Toggle
 
     func toggleSymbolMode() {
+        if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
         keyboardMode = keyboardMode.toggleSymbol()
@@ -147,6 +156,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func toggleLetterMode() {
+        if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
         keyboardMode = keyboardMode.toggleLetter()
@@ -246,12 +256,20 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.reset()
         if directions.isEmpty {
             // Tap with no drag → ㆍ (pending), matches prior behaviour.
-            inputVowel(.ㆍ)
+            if previewMode {
+                onPreviewVowel?(.ㆍ)
+            } else {
+                inputVowel(.ㆍ)
+            }
             return
         }
         let resolution = vowelResolver.resolve(directions: directions)
         if let vowel = resolution.vowel {
-            inputVowel(vowel)
+            if previewMode {
+                onPreviewVowel?(vowel)
+            } else {
+                inputVowel(vowel)
+            }
         }
     }
 
@@ -277,6 +295,7 @@ class KeyboardViewModel: ObservableObject {
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
 
     func inputSymbol(_ symbol: String) {
+        if previewMode { return }
         let resolved = shiftedSymbolIfNeeded(symbol)
         commitCurrent()
         if insertWithAutoBracket(resolved) {
@@ -291,6 +310,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputNumber(_ number: String) {
+        if previewMode { return }
         commitCurrent()
         if insertWithAutoBracket(number) {
             // Bracket pair inserted
@@ -387,6 +407,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func deleteBackward() {
+        if previewMode { return }
         if abbreviationEngine.processBackspace() {
             triggerHapticFeedback()
             return
@@ -401,6 +422,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputSpace() {
+        if previewMode { return }
         // Commit composing text first (feeds abbreviation engine via commitCurrent)
         commitCurrent()
         // Process delimiter - if abbreviation matches, delegate handles replacement
@@ -414,6 +436,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputReturn() {
+        if previewMode { return }
         commitCurrent()
         abbreviationEngine.processCharacter("\n")
         if !abbreviationEngine.canRestoreLastExpansion {
@@ -467,6 +490,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func beginBackspacePress() {
+        if previewMode { return }
         guard !isBackspacePressing else { return }
 
         isBackspacePressing = true
@@ -533,6 +557,17 @@ class KeyboardViewModel: ObservableObject {
         }
         if didHandleShiftLongPressInCurrentGesture {
             didHandleShiftLongPressInCurrentGesture = false
+            resetGestureState()
+            return
+        }
+
+        // In preview mode, only the slot B vowel key produces output (via its
+        // own dedicated gesture pipeline). All consonant / symbol / backspace
+        // taps from KeyGridView are dropped so the preview cannot mutate any
+        // composer state or insert into a host text field.
+        if previewMode {
+            // Still consume any gesture-analyzer state so the next press starts clean.
+            _ = gestureAnalyzer.finalizeGesture()
             resetGestureState()
             return
         }
