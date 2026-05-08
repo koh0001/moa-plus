@@ -6,6 +6,9 @@ struct LayoutCustomizationView: View {
     @State private var editingCellIndex: Int? = nil
     @State private var cellEditText: String = ""
     @State private var showingCellEdit = false
+    @State private var editingSlotAIndex: Int? = nil
+    @State private var slotAEditText: String = ""
+    @State private var showingSlotAEdit = false
 
     enum HighlightedSlot { case a, b, c }
 
@@ -41,6 +44,28 @@ struct LayoutCustomizationView: View {
                 slotHeader(label: "우측 컬럼 (슬롯 A)", slot: .a, systemImage: "rectangle.righthalf.inset.filled")
             } footer: {
                 Text("우측 끝 컬럼의 키 매핑.")
+            }
+
+            // Slot A right column (only for classic11)
+            if settings.layoutCustomization.slotA == .classic11 {
+                Section {
+                    ForEach(0..<3, id: \.self) { i in
+                        HStack {
+                            Text("\(i + 1)번 셀 (row \(i))")
+                            Spacer()
+                            Button(settings.layoutCustomization.slotARightColumn[i]) {
+                                startSlotAEdit(index: i)
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                        }
+                    }
+                    Button("기본값으로 초기화 (! ? .)", action: resetSlotARightColumn)
+                        .foregroundColor(.red)
+                } header: {
+                    Text("우측 컬럼 셀 (1.1 클래식)")
+                } footer: {
+                    Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
+                }
             }
 
             // Slot B
@@ -94,6 +119,13 @@ struct LayoutCustomizationView: View {
             Button("저장", action: commitCellEdit)
         } message: {
             Text("1~4 자 입력")
+        }
+        .alert("우측 셀 편집", isPresented: $showingSlotAEdit) {
+            TextField("문자", text: $slotAEditText)
+            Button("취소", role: .cancel) {}
+            Button("저장", action: commitSlotAEdit)
+        } message: {
+            Text("1~4 자 입력 (모음/특수문자/일반 글자)")
         }
     }
 
@@ -175,6 +207,31 @@ struct LayoutCustomizationView: View {
     private func resetSlotC() {
         var c = settings.layoutCustomization
         c.slotC = LayoutCustomization.defaultSlotC
+        settings.layoutCustomization = c
+    }
+
+    private func startSlotAEdit(index: Int) {
+        editingSlotAIndex = index
+        slotAEditText = settings.layoutCustomization.slotARightColumn[index]
+        showingSlotAEdit = true
+    }
+
+    private func commitSlotAEdit() {
+        guard let i = editingSlotAIndex else { return }
+        let trimmed = String(slotAEditText.prefix(4))
+        guard !trimmed.isEmpty else {
+            editingSlotAIndex = nil
+            return
+        }
+        var c = settings.layoutCustomization
+        c.slotARightColumn[i] = trimmed
+        settings.layoutCustomization = c
+        editingSlotAIndex = nil
+    }
+
+    private func resetSlotARightColumn() {
+        var c = settings.layoutCustomization
+        c.slotARightColumn = LayoutCustomization.defaultSlotARightColumn
         settings.layoutCustomization = c
     }
 }

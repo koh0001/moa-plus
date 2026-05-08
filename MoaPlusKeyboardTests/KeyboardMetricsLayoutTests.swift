@@ -64,4 +64,24 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         layout.slotA = .classic11
         XCTAssertEqual(KeyboardMetrics.longPressNumber(at: 1, column: 1, layout: layout), "6")
     }
+
+    func testA2_customRightColumnReflected() {
+        var layout = LayoutCustomization()
+        layout.slotA = .classic11
+        layout.slotARightColumn = ["A", "B", "C"]
+        let grid = KeyboardMetrics.koreanLayout(layout)
+        XCTAssertEqual(grid[0][6], .symbol("A"))
+        XCTAssertEqual(grid[1][6], .symbol("B"))
+        XCTAssertEqual(grid[2][6], .symbol("C"))
+        XCTAssertEqual(grid[3][5], .backspaceWide)
+    }
+
+    func testA2_defaultRightColumnIsBangQuestionDot() {
+        var layout = LayoutCustomization()
+        layout.slotA = .classic11
+        let grid = KeyboardMetrics.koreanLayout(layout)
+        XCTAssertEqual(grid[0][6], .symbol("!"))
+        XCTAssertEqual(grid[1][6], .symbol("?"))
+        XCTAssertEqual(grid[2][6], .symbol("."))
+    }
 }

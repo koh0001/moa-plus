@@ -35,4 +35,16 @@ final class LayoutCustomizationTests: XCTestCase {
         let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
         XCTAssertFalse(decoded.slotABackspaceSwap, "swap 필드 없는 디스크 데이터는 false 로 시작")
     }
+
+    func testDefaultSlotARightColumn() {
+        let layout = LayoutCustomization()
+        XCTAssertEqual(layout.slotARightColumn, ["!", "?", "."])
+    }
+
+    func testSlotARightColumnNormalizesTo3Elements() throws {
+        let json = #"{"slotARightColumn":["a","b"]}"#
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
+        XCTAssertEqual(decoded.slotARightColumn.count, 3)
+    }
 }
