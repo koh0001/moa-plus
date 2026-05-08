@@ -197,6 +197,11 @@ final class GestureTestModel: ObservableObject {
 final class GestureTestKeyboardDelegate: ObservableObject, KeyboardViewModelDelegate {
     @Published var typedText: String = ""
 
+    var lastCharacter: String {
+        guard let last = typedText.last else { return "" }
+        return String(last)
+    }
+
     func insertText(_ text: String) {
         typedText.append(text)
     }
@@ -255,7 +260,6 @@ struct GestureTestView: View {
         ScrollView {
             VStack(spacing: 18) {
                 canvasSection
-                typedTextSection
                 keyboardPreviewSection
                 resultCards
             }
@@ -276,6 +280,12 @@ struct GestureTestView: View {
                 Text("실시간 분석")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
+                Button("글자 지우기") {
+                    inputDelegate.typedText = ""
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(inputDelegate.typedText.isEmpty)
                 Button("초기화") {
                     model.reset()
                 }
@@ -285,40 +295,9 @@ struct GestureTestView: View {
 
             visualization
 
-            Text("아래 키보드에서 자음 키를 끌면 같은 동작이 이 캔버스에 그대로 그려져 8방향 섹터와 어떻게 만나는지 확인할 수 있습니다.")
+            Text("아래 키보드에서 자음 키를 끌면 같은 동작이 이 캔버스에 그대로 그려져 8방향 섹터와 어떻게 만나는지 확인할 수 있습니다. 입력한 글자는 섹터 그래프 가운데에 표시됩니다.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-        )
-    }
-
-    // MARK: - Typed-text TextField (middle)
-
-    private var typedTextSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "text.cursor")
-                    .foregroundColor(.accentColor)
-                Text("입력 결과")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Button("지우기") {
-                    inputDelegate.typedText = ""
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(inputDelegate.typedText.isEmpty)
-            }
-
-            TextField("여기에 입력됨", text: $inputDelegate.typedText, axis: .vertical)
-                .lineLimit(2...4)
-                .textFieldStyle(.roundedBorder)
-                .disabled(true)  // Read-only: the live keyboard below is the only writer.
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -347,7 +326,7 @@ struct GestureTestView: View {
                 liveInputDelegate: inputDelegate
             )
 
-            Text("실제 키보드와 동일하게 동작합니다. 입력한 글자는 위쪽 ‘입력 결과’에 그대로 들어갑니다.")
+            Text("실제 키보드와 동일하게 동작합니다.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -473,6 +452,17 @@ struct GestureTestView: View {
                     .stroke(Color.green, lineWidth: 2)
                     .frame(width: 10, height: 10)
                     .position(sp)
+            }
+
+            // Last typed character — shown at canvas centre so the TextField
+            // section is no longer needed for visual feedback.
+            if !inputDelegate.lastCharacter.isEmpty {
+                Text(inputDelegate.lastCharacter)
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundColor(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
             }
         }
         .frame(width: Self.canvasDimension, height: Self.canvasDimension)
