@@ -68,7 +68,11 @@ struct KeyView: View {
         }
         .frame(width: keySize.width, height: keySize.height)
         .gesture(
-            DragGesture(minimumDistance: 0)
+            // Use the keyboard-frame coordinate space so start point and
+            // current location are reported in the keyboard's frame, not
+            // the key's local frame. GestureOverlayView positions itself
+            // using these coords (opposite-side rendering).
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("keyboardPreview"))
                 .onChanged { value in
                     if !isHighlighted {
                         isHighlighted = true

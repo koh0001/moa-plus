@@ -255,15 +255,34 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.reset()
         gestureAnalyzer.addPoint(point)
         slotBVowelStartPoint = point
+        // Feed gestureState so GestureOverlayView activates for slot B too.
+        // Sentinel (-1, -1) marks "slot B vowel key" (not a grid cell). The
+        // overlay only checks startPoint + directions, so the row/col value
+        // is for internal book-keeping; the existing popup gating uses
+        // popupState.text and is unaffected.
+        gestureStartPoint = point
+        gestureDirections = []
+        previewVowel = nil
+        activeKey = (row: -1, column: -1)
     }
 
     func slotBVowelGestureMoved(to point: CGPoint) {
         gestureAnalyzer.addPoint(point)
+        let directions = gestureAnalyzer.getDirections()
+        gestureDirections = directions
+        // Slot B is a bare-vowel key (no consonant prefix); the resolver's
+        // pattern trie still gives the best matching Jungseong for preview.
+        previewVowel = vowelResolver.peekVowel(directions: directions)
     }
 
     func slotBVowelGestureEnded() {
         let directions = gestureAnalyzer.finalizeGesture()
         gestureAnalyzer.reset()
+        // Clear gestureState so the overlay disappears.
+        activeKey = nil
+        gestureStartPoint = nil
+        gestureDirections = []
+        previewVowel = nil
         if directions.isEmpty {
             // Tap with no drag → ㆍ (pending), matches prior behaviour.
             if previewMode {

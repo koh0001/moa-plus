@@ -36,9 +36,8 @@ struct GestureOverlayView: View {
 
     private func indicatorPosition(start: CGPoint, in size: CGSize) -> CGPoint {
         let overlayHeight: CGFloat = 80
-        let overlayWidth: CGFloat = 80
 
-        // Vertical: upper half → below, lower half → above
+        // Vertical: upper half → below, lower half → above (keep existing rule)
         let y: CGFloat
         if start.y < size.height * 0.45 {
             y = start.y + overlayHeight
@@ -46,15 +45,11 @@ struct GestureOverlayView: View {
             y = start.y - overlayHeight
         }
 
-        // Horizontal: left edge → push right, right edge → push left
-        let x: CGFloat
-        if start.x < size.width * 0.25 {
-            x = start.x + overlayWidth
-        } else if start.x > size.width * 0.75 {
-            x = start.x - overlayWidth
-        } else {
-            x = start.x
-        }
+        // Horizontal: render on the opposite half so the user's finger
+        // never covers the preview. Left half touch → anchor at 75% width
+        // (right half), right half touch → anchor at 25% width (left half).
+        let isOnLeft = start.x < size.width / 2
+        let x: CGFloat = isOnLeft ? size.width * 0.75 : size.width * 0.25
 
         return CGPoint(
             x: max(50, min(size.width - 50, x)),
