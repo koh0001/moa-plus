@@ -138,8 +138,8 @@ struct KeyboardView: View {
                     }
                     .padding(KeyboardMetrics.keySpacing)
 
-                    // Gesture overlay (only shown when enabled and in Korean mode)
-                    if settings.showGesturePreview && viewModel.keyboardMode == .korean {
+                    // Gesture overlay (shown when enabled or forced, and in Korean mode)
+                    if (settings.showGesturePreview || viewModel.forceShowGesturePreview) && viewModel.keyboardMode == .korean {
                         GestureOverlayView(
                             directions: gestureState.directions,
                             startPoint: gestureState.startPoint,

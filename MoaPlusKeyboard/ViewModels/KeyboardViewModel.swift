@@ -67,6 +67,12 @@ class KeyboardViewModel: ObservableObject {
     /// column from the touched key".
     var previewColumnOverride: Int = 0
 
+    /// When `true`, the gesture overlay is always shown in Korean mode regardless
+    /// of the global `showGesturePreview` setting. Set by `KeyboardPreviewView`
+    /// when embedded in the gesture test screen so the direction trail is always
+    /// visible while testing column-angle differences.
+    var forceShowGesturePreview: Bool = false
+
     /// Captured at slot-B-vowel gesture start so it can be forwarded in the
     /// `onPreviewVowelDetailed` callback when the gesture ends.
     private var slotBVowelStartPoint: CGPoint = .zero

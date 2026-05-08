@@ -248,7 +248,8 @@ struct GestureTestView: View {
                 onConsonantPreview: { phase, directions, vowel in
                     model.ingestKeyboardPreview(phase: phase, directions: directions, vowel: vowel)
                 },
-                consonantPreviewColumnOverride: model.selectedColumn
+                consonantPreviewColumnOverride: model.selectedColumn,
+                forceShowGesturePreview: true
             )
 
             Text("자음 키 위에서 손가락을 끌어 보면 실제 입력과 동일한 분석 결과가 아래에 표시됩니다.")

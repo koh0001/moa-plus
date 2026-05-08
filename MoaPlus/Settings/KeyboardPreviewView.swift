@@ -37,6 +37,12 @@ struct KeyboardPreviewView: View {
     /// rotation/width corrections applied to the live trace.
     var consonantPreviewColumnOverride: Int = 0
 
+    /// When `true`, the gesture overlay (trail + direction arrows) is always
+    /// shown inside this preview regardless of the global `showGesturePreview`
+    /// setting. Set to `true` in `GestureTestView` so users can always observe
+    /// the angle effect even if they have the global toggle off.
+    var forceShowGesturePreview: Bool = false
+
     private var isInteractive: Bool {
         onVowelPreview != nil || onVowelPreviewWithPoint != nil || onConsonantPreview != nil
     }
@@ -67,6 +73,7 @@ struct KeyboardPreviewView: View {
             viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
             viewModel.onPreviewConsonantGesture = onConsonantPreview
             viewModel.previewColumnOverride = consonantPreviewColumnOverride
+            viewModel.forceShowGesturePreview = forceShowGesturePreview
         }
         .onChange(of: isInteractive) { _, newValue in
             viewModel.previewMode = newValue
@@ -74,6 +81,7 @@ struct KeyboardPreviewView: View {
             viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
             viewModel.onPreviewConsonantGesture = onConsonantPreview
             viewModel.previewColumnOverride = consonantPreviewColumnOverride
+            viewModel.forceShowGesturePreview = forceShowGesturePreview
         }
         .onChange(of: consonantPreviewColumnOverride) { _, newValue in
             viewModel.previewColumnOverride = newValue
