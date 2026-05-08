@@ -2,15 +2,8 @@
 // MoaPlus
 //
 // MARK: - Temporary stubs (replaced in later tasks)
-// HelpView -> Task 17
-// This file is deleted in Task 19 once all real views exist.
+// All stubs have been replaced by real views.
+// This file is deleted in Task 19 once the build is verified one final time
+// without any stub references.
 
 import SwiftUI
-
-struct HelpView: View {
-    var body: some View {
-        Text("TODO: implemented in Task 17")
-            .foregroundColor(.secondary)
-            .navigationTitle("도움말")
-    }
-}
