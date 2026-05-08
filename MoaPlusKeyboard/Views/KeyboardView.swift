@@ -53,6 +53,7 @@ struct KeyboardView: View {
                             keyHeight: keyHeight,
                             totalWidth: geometry.size.width,
                             mode: viewModel.keyboardMode,
+                            layoutCustomization: settings.layoutCustomization,
                             activeKey: viewModel.activeKey,
                             previewVowel: viewModel.previewVowel,
                             isGestureActive: gestureState.activeKey != nil,

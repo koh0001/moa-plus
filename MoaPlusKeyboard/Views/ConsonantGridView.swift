@@ -5,6 +5,7 @@ struct KeyGridView: View {
     let keyHeight: CGFloat
     let totalWidth: CGFloat
     let mode: KeyboardMode
+    let layoutCustomization: LayoutCustomization
     let activeKey: (row: Int, column: Int)?
     let previewVowel: Jungseong?
     var isGestureActive: Bool = false
@@ -23,7 +24,9 @@ struct KeyGridView: View {
 
     /// Compute total width of a single row (sum of key widths + gaps)
     private func rowWidth(for row: Int) -> CGFloat {
-        let columnCount = KeyboardMetrics.columnCount(for: row, mode: mode)
+        let grid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+        guard row >= 0 && row < grid.count else { return 0 }
+        let columnCount = grid[row].count
         var width: CGFloat = 0
         for col in 0..<columnCount {
             width += KeyboardMetrics.keyWidth(for: col, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
@@ -36,17 +39,18 @@ struct KeyGridView: View {
 
     /// Number of rows in the active layout.
     private var rowCount: Int {
-        KeyboardMetrics.activeLayout(for: mode).count
+        KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization).count
     }
 
     var body: some View {
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
         VStack(spacing: KeyboardMetrics.keySpacing) {
             ForEach(0..<rowCount, id: \.self) { row in
                 HStack(spacing: KeyboardMetrics.keySpacing) {
-                    let columnCount = KeyboardMetrics.columnCount(for: row, mode: mode)
+                    let columnCount = layoutGrid[row].count
 
                     ForEach(0..<columnCount, id: \.self) { column in
-                        let content = KeyboardMetrics.keyContent(at: row, column: column, mode: mode)
+                        let content: KeyContent? = layoutGrid[row][column]
                         let isActive = activeKey?.row == row && activeKey?.column == column
 
                         // Determine the key ID used for secondaryAction lookup:
@@ -69,7 +73,7 @@ struct KeyGridView: View {
                         // - English mode: digit keys use their primaryLongPressOutput from secondaryAction
                         let longPressNumber: String? = {
                             if mode == .korean {
-                                return KeyboardMetrics.longPressNumber(at: row, column: column)
+                                return KeyboardMetrics.longPressNumber(at: row, column: column, layout: layoutCustomization)
                             }
                             if mode == .english,
                                case .symbol(let s) = content,

@@ -150,6 +150,16 @@ enum KeyboardMetrics {
         }
     }
 
+    /// Layout-aware overload. Uses the user's LayoutCustomization for Korean mode;
+    /// English and symbol modes are unaffected.
+    static func activeLayout(for mode: KeyboardMode, layout: LayoutCustomization) -> [[KeyContent]] {
+        switch mode {
+        case .korean: return koreanLayout(layout)
+        case .english: return englishLayout
+        case .symbolFromKorean, .symbolFromEnglish: return symbolLayout
+        }
+    }
+
     // Calculate key size based on available width (legacy method for compatibility)
     static func keySize(for totalWidth: CGFloat, totalHeight: CGFloat) -> CGSize {
         let keyWidth = centerKeyWidth(for: totalWidth)
