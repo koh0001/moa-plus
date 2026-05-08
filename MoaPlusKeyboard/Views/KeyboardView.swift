@@ -91,8 +91,14 @@ struct KeyboardView: View {
                             onPopupRelease: {
                                 viewModel.confirmPopupSelection()
                             },
-                            onSlotBVowelKey: { direction in
-                                viewModel.handleSlotBVowelKey(direction: direction)
+                            onSlotBVowelGestureStart: { point in
+                                viewModel.slotBVowelGestureStarted(at: point)
+                            },
+                            onSlotBVowelGestureMove: { point in
+                                viewModel.slotBVowelGestureMoved(to: point)
+                            },
+                            onSlotBVowelGestureEnd: {
+                                viewModel.slotBVowelGestureEnded()
                             }
                         )
 
@@ -119,8 +125,14 @@ struct KeyboardView: View {
                                 viewModel.moveCursor(by: offset)
                             },
                             layoutCustomization: settings.layoutCustomization,
-                            onSlotBVowelKey: { direction in
-                                viewModel.handleSlotBVowelKey(direction: direction)
+                            onSlotBVowelGestureStart: { point in
+                                viewModel.slotBVowelGestureStarted(at: point)
+                            },
+                            onSlotBVowelGestureMove: { point in
+                                viewModel.slotBVowelGestureMoved(to: point)
+                            },
+                            onSlotBVowelGestureEnd: {
+                                viewModel.slotBVowelGestureEnded()
                             }
                         )
                     }

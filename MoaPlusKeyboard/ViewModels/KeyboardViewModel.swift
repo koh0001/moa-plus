@@ -219,19 +219,38 @@ class KeyboardViewModel: ObservableObject {
         triggerHapticFeedback()
     }
 
-    /// Slot B `.vowelKey` 프리셋 입력 처리.
-    /// `direction == nil` → tap → ㆍ.
-    /// 그 외 → VowelResolver 의 단일 스트로크 매핑 (자음 드래그 첫 스트로크와 동일).
-    /// 멀티 스트로크 합성은 하지 않는다 — 한 번의 호출 = 한 번의 모음 입력.
-    func handleSlotBVowelKey(direction: GestureDirection?) {
-        guard let direction = direction else {
+    // MARK: - Slot B Vowel Key (multi-stroke)
+    //
+    // Mirrors the consonant-key gesture pipeline (gestureStarted/Moved/Ended)
+    // but produces a bare vowel — no consonant prefix. Routes points through
+    // the same GestureAnalyzer + VowelResolver so the resolved Jungseong
+    // covers ALL patterns (basic ㅏ/ㅓ/ㅗ/ㅜ/ㅡ/ㅣ, y-vowels ㅑ/ㅕ/ㅛ/ㅠ,
+    // diphthongs ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ, ㅐ/ㅒ/ㅔ/ㅖ, ㅢ).
+    // Tap (no drag) → ㆍ.
+
+    func slotBVowelGestureStarted(at point: CGPoint) {
+        gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
+        vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        // Slot B is not associated with any consonant column override.
+        gestureAnalyzer.columnId = 0
+        gestureAnalyzer.reset()
+        gestureAnalyzer.addPoint(point)
+    }
+
+    func slotBVowelGestureMoved(to point: CGPoint) {
+        gestureAnalyzer.addPoint(point)
+    }
+
+    func slotBVowelGestureEnded() {
+        let directions = gestureAnalyzer.finalizeGesture()
+        gestureAnalyzer.reset()
+        if directions.isEmpty {
+            // Tap with no drag → ㆍ (pending), matches prior behaviour.
             inputVowel(.ㆍ)
             return
         }
-        // Sync the resolver's swipe profile with current settings so diagonal
-        // mappings reflect the user's gesture configuration.
-        vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
-        if let vowel = vowelResolver.resolveSingleStroke(direction: direction) {
+        let resolution = vowelResolver.resolve(directions: directions)
+        if let vowel = resolution.vowel {
             inputVowel(vowel)
         }
     }

@@ -12,7 +12,9 @@ struct FunctionRowView: View {
     var onLanguageSwitchPressed: (() -> Void)? = nil
     var useBimanualLayout: Bool = false
     var layoutCustomization: LayoutCustomization = LayoutCustomization()
-    var onSlotBVowelKey: ((GestureDirection?) -> Void)? = nil
+    var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureEnd: (() -> Void)? = nil
 
     private let spacing: CGFloat = KeyboardMetrics.keySpacing
     private let height: CGFloat = KeyboardMetrics.functionRowHeight
@@ -159,7 +161,9 @@ struct FunctionRowView: View {
             SlotBVowelKey(
                 width: width,
                 height: height,
-                onAction: onSlotBVowelKey ?? { _ in }
+                onGestureStart: onSlotBVowelGestureStart ?? { _ in },
+                onGestureMove: onSlotBVowelGestureMove ?? { _ in },
+                onGestureEnd: onSlotBVowelGestureEnd ?? {}
             )
         }
     }
@@ -344,17 +348,18 @@ struct PunctuationSwipeKey: View {
 
 // MARK: - Slot B vowel key (B1 preset)
 
-/// 슬롯 B `.vowelKey` 프리셋. tap = ㆍ; 8방향 드래그 = 단일 스트로크 모음.
-/// 자음 드래그의 첫 스트로크와 동일한 매핑을 사용 (멀티 스트로크 합성 X).
+/// 슬롯 B `.vowelKey` 프리셋. tap = ㆍ; 드래그 = 자음 키와 동일한 멀티 스트로크
+/// 모음 파이프라인 (GestureAnalyzer + VowelResolver). 단일 스트로크 ㅏ/ㅓ/ㅗ/ㅜ
+/// 부터 합성 모음 ㅑ/ㅕ/ㅛ/ㅠ/ㅒ/ㅖ/ㅢ/ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ 까지 모두 지원.
+/// 뷰는 제스처 포인트만 ViewModel 로 전달한다 — 방향 판정은 ViewModel 에서.
 struct SlotBVowelKey: View {
     let width: CGFloat
     let height: CGFloat
-    let onAction: (GestureDirection?) -> Void
+    let onGestureStart: (CGPoint) -> Void
+    let onGestureMove: (CGPoint) -> Void
+    let onGestureEnd: () -> Void
 
     @State private var isPressed = false
-    @State private var didDrag = false
-
-    private static let dragThreshold: CGFloat = 12
 
     private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
     private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
@@ -377,42 +382,17 @@ struct SlotBVowelKey: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
-                    if !isPressed { isPressed = true }
-                    if !didDrag {
-                        let dx = value.translation.width
-                        let dy = value.translation.height
-                        if abs(dx) >= Self.dragThreshold || abs(dy) >= Self.dragThreshold {
-                            didDrag = true
-                            onAction(Self.directionFor(dx: dx, dy: dy))
-                        }
+                    if !isPressed {
+                        isPressed = true
+                        onGestureStart(value.startLocation)
                     }
+                    onGestureMove(value.location)
                 }
                 .onEnded { _ in
                     isPressed = false
-                    if !didDrag {
-                        onAction(nil)   // tap = ㆍ
-                    }
-                    didDrag = false
+                    onGestureEnd()
                 }
         )
-    }
-
-    /// Map an (dx, dy) translation into one of 8 GestureDirections.
-    /// Diagonal sectors require both axes to contribute substantially
-    /// (≥ 40% of total magnitude), matching the visual sector model.
-    private static func directionFor(dx: CGFloat, dy: CGFloat) -> GestureDirection {
-        let absX = abs(dx)
-        let absY = abs(dy)
-        let total = absX + absY
-        let isDiagonal = total > 0 && absX > 0.4 * total && absY > 0.4 * total
-        if isDiagonal {
-            if dx > 0 && dy < 0 { return .upRight }
-            if dx < 0 && dy < 0 { return .upLeft }
-            if dx > 0 && dy > 0 { return .downRight }
-            return .downLeft
-        }
-        if absX > absY { return dx > 0 ? .right : .left }
-        return dy > 0 ? .down : .up
     }
 }
 

@@ -21,7 +21,9 @@ struct KeyGridView: View {
     let onGestureEnd: (Int, Int) -> Void
     var onPopupDrag: ((CGFloat) -> Void)?
     var onPopupRelease: (() -> Void)?
-    var onSlotBVowelKey: ((GestureDirection?) -> Void)? = nil
+    var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureEnd: (() -> Void)? = nil
 
     /// Returns the rendered width for a single cell, accounting for .backspaceWide.
     private func cellWidth(content: KeyContent, column: Int, row: Int) -> CGFloat {
@@ -103,7 +105,9 @@ struct KeyGridView: View {
                             SlotBVowelKey(
                                 width: width,
                                 height: keyHeight,
-                                onAction: { direction in onSlotBVowelKey?(direction) }
+                                onGestureStart: { point in onSlotBVowelGestureStart?(point) },
+                                onGestureMove: { point in onSlotBVowelGestureMove?(point) },
+                                onGestureEnd: { onSlotBVowelGestureEnd?() }
                             )
                         } else if case .slotBPunctuation = content {
                             PunctuationSwipeKey(

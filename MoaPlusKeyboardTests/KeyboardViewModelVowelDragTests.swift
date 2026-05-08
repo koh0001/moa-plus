@@ -132,53 +132,96 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.up, .up]), .ㅗ)
     }
 
-    // MARK: - Slot B vowel key (B1 preset, Task 10)
+    // MARK: - Slot B vowel key (B1 preset, multi-stroke pipeline)
+    //
+    // Drives the gesture trio (start/move/end) with synthetic point streams,
+    // exercising the same GestureAnalyzer + VowelResolver pipeline used by
+    // consonant keys. The view layer normally feeds these from DragGesture;
+    // here we pump points directly.
+
+    /// Start point used for every synthetic gesture in this section.
+    private static let slotBOrigin = CGPoint(x: 100, y: 100)
+
+    /// Magnitude that comfortably exceeds the default swipe threshold so the
+    /// analyzer registers each stroke. Threshold is keyWidth-derived; the
+    /// unit-test default keyWidth is 50 pt, giving thresholds well below 80.
+    private static let slotBStrokeLength: CGFloat = 80
+
+    /// Drive the slot-B gesture trio with the supplied direction sequence.
+    /// Each direction is a single straight stroke from the previous endpoint.
+    private func driveSlotBGesture(_ directions: [(dx: CGFloat, dy: CGFloat)]) {
+        vm.slotBVowelGestureStarted(at: Self.slotBOrigin)
+        var current = Self.slotBOrigin
+        for delta in directions {
+            // Emit a few intermediate points so the analyzer sees a clean
+            // straight-line stroke rather than a single jump.
+            let steps = 4
+            for i in 1...steps {
+                let frac = CGFloat(i) / CGFloat(steps)
+                let p = CGPoint(x: current.x + delta.dx * frac,
+                                y: current.y + delta.dy * frac)
+                vm.slotBVowelGestureMoved(to: p)
+            }
+            current = CGPoint(x: current.x + delta.dx, y: current.y + delta.dy)
+        }
+        vm.slotBVowelGestureEnded()
+    }
+
+    private static let strokeRight: (dx: CGFloat, dy: CGFloat) = (slotBStrokeLength, 0)
+    private static let strokeLeft: (dx: CGFloat, dy: CGFloat) = (-slotBStrokeLength, 0)
+    private static let strokeUp: (dx: CGFloat, dy: CGFloat) = (0, -slotBStrokeLength)
+    private static let strokeDown: (dx: CGFloat, dy: CGFloat) = (0, slotBStrokeLength)
 
     func test_slotBVowelKey_tapInsertsDot() {
-        vm.handleSlotBVowelKey(direction: nil)
-        // ㆍ alone enters dotPending(nil, 1) → composingDisplay == "ㆍ".
+        // No movement at all → empty direction sequence → ㆍ.
+        vm.slotBVowelGestureStarted(at: Self.slotBOrigin)
+        vm.slotBVowelGestureEnded()
         XCTAssertEqual(vm.composingText, "ㆍ")
     }
 
     func test_slotBVowelKey_rightDragInsertsA() {
-        vm.handleSlotBVowelKey(direction: .right)
+        driveSlotBGesture([Self.strokeRight])
         XCTAssertEqual(vm.composingText, "ㅏ")
     }
 
     func test_slotBVowelKey_leftDragInsertsEo() {
-        vm.handleSlotBVowelKey(direction: .left)
+        driveSlotBGesture([Self.strokeLeft])
         XCTAssertEqual(vm.composingText, "ㅓ")
     }
 
     func test_slotBVowelKey_upDragInsertsO() {
-        vm.handleSlotBVowelKey(direction: .up)
+        driveSlotBGesture([Self.strokeUp])
         XCTAssertEqual(vm.composingText, "ㅗ")
     }
 
     func test_slotBVowelKey_downDragInsertsU() {
-        vm.handleSlotBVowelKey(direction: .down)
+        driveSlotBGesture([Self.strokeDown])
         XCTAssertEqual(vm.composingText, "ㅜ")
     }
 
-    func test_slotBVowelKey_diagonalUpRightInsertsI_perDefaultProfile() {
-        // Default SwipeProfile.bothHands maps ↗ → ㅣ (vowelI).
-        vm.handleSlotBVowelKey(direction: .upRight)
-        XCTAssertEqual(vm.composingText, "ㅣ")
+    // MARK: Multi-stroke compound vowels (the bug fix)
+
+    func test_slotBVowelKey_upRight_yieldsWa() {
+        // ↑→ pattern → ㅘ (same as consonant-drag pipeline)
+        driveSlotBGesture([Self.strokeUp, Self.strokeRight])
+        XCTAssertEqual(vm.composingText, "ㅘ")
     }
 
-    func test_slotBVowelKey_diagonalDownRightInsertsEu_perDefaultProfile() {
-        // Default SwipeProfile.bothHands maps ↘ → ㅡ (vowelEu).
-        vm.handleSlotBVowelKey(direction: .downRight)
-        XCTAssertEqual(vm.composingText, "ㅡ")
+    func test_slotBVowelKey_downLeft_yieldsWeo() {
+        // ↓← pattern → ㅝ
+        driveSlotBGesture([Self.strokeDown, Self.strokeLeft])
+        XCTAssertEqual(vm.composingText, "ㅝ")
     }
 
-    func test_slotBVowelKey_singleStrokeOnly_noMultiCompose() {
-        // Two right drags should NOT compose — second call combines via the
-        // composer, not via primitive multi-stroke logic. ㅏ then ㅏ → ㅏ
-        // commits and a fresh ㅏ becomes the new composing vowel.
-        vm.handleSlotBVowelKey(direction: .right)
-        vm.handleSlotBVowelKey(direction: .right)
-        // After two separate ㅏ inputs, displayText is committed "ㅏ" + composing "ㅏ".
-        XCTAssertEqual(vm.composingText, "ㅏㅏ")
+    func test_slotBVowelKey_rightLeftRight_yieldsYa() {
+        // →←→ pattern → ㅑ (y-vowel)
+        driveSlotBGesture([Self.strokeRight, Self.strokeLeft, Self.strokeRight])
+        XCTAssertEqual(vm.composingText, "ㅑ")
+    }
+
+    func test_slotBVowelKey_leftRight_yieldsE() {
+        // ←→ pattern → ㅔ
+        driveSlotBGesture([Self.strokeLeft, Self.strokeRight])
+        XCTAssertEqual(vm.composingText, "ㅔ")
     }
 }
