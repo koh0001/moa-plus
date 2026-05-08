@@ -249,11 +249,11 @@ struct FunctionRowView: View {
     }
 
     private var symbolToggleWidth: CGFloat {
-        availableWidthWithoutReturn * 0.20
+        KeyboardMetrics.centerKeyWidth(for: totalWidth)
     }
 
     private var letterToggleWidth: CGFloat {
-        availableWidthWithoutReturn * 0.16
+        KeyboardMetrics.centerKeyWidth(for: totalWidth)
     }
 
     private var punctuationWidth: CGFloat {
@@ -261,7 +261,8 @@ struct FunctionRowView: View {
     }
 
     private var spaceWidth: CGFloat {
-        availableWidthWithoutReturn * 0.48
+        // 5 children in defaultLayoutBody → 4 inner gaps
+        totalWidth - symbolToggleWidth - letterToggleWidth - punctuationWidth - returnWidth - spacing * 4
     }
 
     // MARK: - Bimanual layout widths
