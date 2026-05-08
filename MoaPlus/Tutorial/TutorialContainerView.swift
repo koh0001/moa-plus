@@ -43,5 +43,15 @@ struct TutorialContainerView: View {
         .navigationTitle("제스처 연습")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if !viewModel.isCompletion {
+                    Button("건너뛰기") {
+                        viewModel.skipToCompletion()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
     }
 }

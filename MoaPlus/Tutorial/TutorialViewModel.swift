@@ -70,6 +70,10 @@ final class TutorialViewModel: ObservableObject {
         }
     }
 
+    func skipToCompletion() {
+        currentStageIndex = stages.count
+    }
+
     func restart() {
         currentStageIndex = 0
         startStage()
