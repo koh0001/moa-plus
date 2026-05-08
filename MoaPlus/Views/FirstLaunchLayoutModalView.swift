@@ -35,6 +35,12 @@ struct FirstLaunchLayoutModalView: View {
                     preview: ClassicPreviewMini(),
                     onSelect: applyClassic
                 )
+                ChoiceCard(
+                    title: "확장형",
+                    subtitle: "클래식 + 모음 키 / 특수문자 키를 우측에 통합",
+                    preview: ExtendedPreviewMini(),
+                    onSelect: applyExtended
+                )
             }
 
             Button("나중에") {
@@ -67,6 +73,14 @@ struct FirstLaunchLayoutModalView: View {
         var c = LayoutCustomization()
         c.slotA = .classic11
         c.slotB = .vowelKey
+        settings.layoutCustomization = c
+        markShown()
+        dismiss()
+    }
+
+    private func applyExtended() {
+        var c = LayoutCustomization()
+        c.slotA = .fullPackage
         settings.layoutCustomization = c
         markShown()
         dismiss()
@@ -139,6 +153,21 @@ private struct ClassicPreviewMini: View {
             rows: [
                 ["~", "ㅃ", "ㅉ", "ㄸ", "ㄲ", "ㅆ", "!"],
                 ["^", "ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "?"],
+                [";", "ㅁ", "ㄴ", "ㅇ", "ㄹ", "ㅎ", "."],
+                ["*", "ㅋ", "ㅌ", "ㅊ", "ㅍ", "⌫⌫", ""],
+            ],
+            highlightLast: true
+        )
+    }
+}
+
+/// Mini preview of A3 (extended / full package) layout.
+private struct ExtendedPreviewMini: View {
+    var body: some View {
+        SimpleKeyboardSketch(
+            rows: [
+                ["~", "ㅃ", "ㅉ", "ㄸ", "ㄲ", "ㅆ", "#"],
+                ["^", "ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "ㆍ"],
                 [";", "ㅁ", "ㄴ", "ㅇ", "ㄹ", "ㅎ", "."],
                 ["*", "ㅋ", "ㅌ", "ㅊ", "ㅍ", "⌫⌫", ""],
             ],
