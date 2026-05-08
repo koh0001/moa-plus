@@ -6,6 +6,7 @@ enum KeyContent: Equatable {
     case consonant(Choseong)
     case symbol(String)
     case backspace
+    case backspaceWide       // A2 의 row 3 가로 2칸 ⌫
     // Moakey bimanual layout key types
     case vowelPrimitive(VowelPrimitiveType)  // ㆍ, ㅣ, ㅡ
     case functional(FunctionalKeyType)        // Mode switch, settings, etc.

@@ -156,6 +156,11 @@ struct KeyView: View {
                 .font(.system(size: keySize.height * 0.35))
                 .foregroundColor(themedTextColor)
 
+        case .backspaceWide:
+            Image(systemName: "delete.left")
+                .font(.system(size: 20))
+                .foregroundColor(themedTextColor)
+
         case .vowelPrimitive(let type):
             switch type {
             case .bar:
@@ -281,7 +286,7 @@ struct KeyView: View {
                 return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
             }
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
-        case .functional, .systemSwitch, .backspace:
+        case .functional, .systemSwitch, .backspace, .backspaceWide:
             return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
         }
     }
@@ -291,9 +296,8 @@ struct KeyView: View {
     }
 
     private var isBackspaceKey: Bool {
-        if case .backspace = content {
-            return true
-        }
+        if case .backspace = content { return true }
+        if case .backspaceWide = content { return true }
         return false
     }
 
