@@ -22,15 +22,23 @@ struct KeyGridView: View {
     var onPopupDrag: ((CGFloat) -> Void)?
     var onPopupRelease: (() -> Void)?
 
+    /// Returns the rendered width for a single cell, accounting for .backspaceWide.
+    private func cellWidth(content: KeyContent, column: Int, row: Int) -> CGFloat {
+        if case .backspaceWide = content {
+            return KeyboardMetrics.keyWidth(forBackspaceWideAt: column, centerKeyWidth: centerKeyWidth)
+        }
+        return KeyboardMetrics.keyWidth(for: column, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
+    }
+
     /// Compute total width of a single row (sum of key widths + gaps)
     private func rowWidth(for row: Int) -> CGFloat {
-        let grid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
-        guard row >= 0 && row < grid.count else { return 0 }
-        let columnCount = grid[row].count
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+        guard row >= 0 && row < layoutGrid.count else { return 0 }
+        let cells = layoutGrid[row]
         var width: CGFloat = 0
-        for col in 0..<columnCount {
-            width += KeyboardMetrics.keyWidth(for: col, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
-            if col < columnCount - 1 {
+        for (col, content) in cells.enumerated() {
+            width += cellWidth(content: content, column: col, row: row)
+            if col < cells.count - 1 {
                 width += KeyboardMetrics.keySpacing
             }
         }
@@ -83,12 +91,7 @@ struct KeyGridView: View {
                             return nil
                         }()
 
-                        let width = KeyboardMetrics.keyWidth(
-                            for: column,
-                            row: row,
-                            centerKeyWidth: centerKeyWidth,
-                            mode: mode
-                        )
+                        let width = cellWidth(content: content ?? .symbol(""), column: column, row: row)
 
                         KeyView(
                             content: content ?? .symbol(""),
@@ -108,11 +111,17 @@ struct KeyGridView: View {
                                 onLongPressNumber(number)
                             },
                             onBackspacePressStart: {
-                                guard case .backspace = content else { return }
+                                guard case .backspace = content else {
+                                    if case .backspaceWide = content { onBackspacePressStart() }
+                                    return
+                                }
                                 onBackspacePressStart()
                             },
                             onBackspacePressEnd: {
-                                guard case .backspace = content else { return }
+                                guard case .backspace = content else {
+                                    if case .backspaceWide = content { onBackspacePressEnd() }
+                                    return
+                                }
                                 onBackspacePressEnd()
                             },
                             onGestureStart: { point in
