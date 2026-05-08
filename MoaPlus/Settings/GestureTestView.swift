@@ -101,7 +101,7 @@ final class GestureTestModel: ObservableObject {
         settings.gestureSettings.swipeProfile
     }
 
-    // MARK: Drag handling
+    // MARK: Drag handling (abstract canvas)
 
     func onDragChanged(_ value: DragGesture.Value) {
         if startPoint == nil {
@@ -125,6 +125,34 @@ final class GestureTestModel: ObservableObject {
         finalDirections = normalized
         let resolution = resolver.resolve(directions: normalized)
         finalVowel = resolution.vowel ?? liveVowel
+    }
+
+    // MARK: Real-keyboard preview ingestion
+
+    /// Receive a `(phase, directions, vowel)` snapshot from the real keyboard
+    /// preview's consonant gesture pipeline. Mirrors the abstract canvas's
+    /// `liveDirections / finalDirections` fields so the same status panel
+    /// can render results from either source.
+    func ingestKeyboardPreview(phase: KeyboardViewModel.PreviewGesturePhase,
+                               directions: [GestureDirection],
+                               vowel: Jungseong?) {
+        switch phase {
+        case .began:
+            liveDirections = []
+            liveVowel = nil
+            liveDirectionIndex = nil
+            finalDirections = []
+            finalVowel = nil
+        case .moved:
+            liveDirections = directions
+            liveVowel = vowel
+            liveDirectionIndex = directions.last.flatMap { Self.sectorIndex[$0] }
+        case .ended:
+            finalDirections = directions
+            finalVowel = vowel ?? liveVowel
+            liveDirections = directions
+            liveDirectionIndex = directions.last.flatMap { Self.sectorIndex[$0] }
+        }
     }
 
     func reset() {
@@ -151,24 +179,27 @@ final class GestureTestModel: ObservableObject {
 
 /// Live visualization for swipe gestures.
 ///
-/// Now backed by the production keyboard engine: `GestureAnalyzer` performs
-/// per-column rotation-aware sector detection, `VowelResolver` handles direct
-/// diagonal mapping (↗→ㅣ, ↘→ㅡ, etc.) plus multi-stroke patterns
-/// (e.g. ↑→← → ㅙ, ←→← → ㅕ). The test view now mirrors what users actually
-/// experience while typing, including ㅙ/ㅞ/ㅖ/ㅒ multi-stroke compounds.
+/// The screen now centres on the **real keyboard** (`KeyboardPreviewView` in
+/// interactive consonant-preview mode) so users test gestures on the same
+/// SwiftUI tree the keyboard extension renders. The production
+/// `GestureAnalyzer` + `VowelResolver` resolve direction/vowel and the result
+/// is shown in compact cards directly under the keyboard.
+///
+/// The legacy abstract canvas is preserved in a collapsible section at the
+/// bottom for power users who want to inspect sector geometry directly.
 struct GestureTestView: View {
     @StateObject private var model = GestureTestModel()
+    @State private var showAbstractCanvas: Bool = false
 
     private static let canvasDimension: CGFloat = 280
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
                 columnPicker
-                visualization
-                statusPanel
-                Button("초기화") { model.reset() }
-                    .buttonStyle(.bordered)
+                keyboardPreviewSection
+                resultCards
+                disclosureCanvas
             }
             .padding()
         }
@@ -177,12 +208,12 @@ struct GestureTestView: View {
         .onAppear { model.configureEngine() }
     }
 
-    // MARK: - Subviews
+    // MARK: - Column picker
 
     private var columnPicker: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("열 선택")
-                .font(.subheadline)
+            Text("테스트할 자음 컬럼")
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
             Picker("열", selection: $model.selectedColumn) {
                 ForEach(1...5, id: \.self) { col in
@@ -190,7 +221,146 @@ struct GestureTestView: View {
                 }
             }
             .pickerStyle(.segmented)
+            Text("선택한 열의 회전·폭 보정이 실제 키보드 미리보기에 반영됩니다.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
+    }
+
+    // MARK: - Real keyboard preview
+
+    private var keyboardPreviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.accentColor)
+                Text("실제 키보드에서 긋기 테스트")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button("초기화") {
+                    model.reset()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            KeyboardPreviewView(
+                onConsonantPreview: { phase, directions, vowel in
+                    model.ingestKeyboardPreview(phase: phase, directions: directions, vowel: vowel)
+                },
+                consonantPreviewColumnOverride: model.selectedColumn
+            )
+
+            Text("자음 키 위에서 손가락을 끌어 보면 실제 입력과 동일한 분석 결과가 아래에 표시됩니다.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    // MARK: - Result cards
+
+    private var resultCards: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                resultCard(
+                    title: "실시간",
+                    vowel: liveVowelLabel,
+                    sequence: liveStrokeSequence,
+                    accent: .blue
+                )
+                resultCard(
+                    title: "최종 결과",
+                    vowel: finalVowelLabel,
+                    sequence: finalStrokeSequence,
+                    accent: .accentColor
+                )
+            }
+
+            metricsCard
+        }
+    }
+
+    private func resultCard(title: String, vowel: String, sequence: String, accent: Color) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(vowel)
+                .font(.system(size: 44, weight: .bold))
+                .foregroundColor(accent)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 56)
+            Text(sequence)
+                .font(.system(.body, design: .monospaced))
+                .foregroundColor(.primary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private var metricsCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            metricRow("스트로크 수", "\(model.liveDirections.count)")
+            metricRow("적용된 회전 보정", String(format: "%.1f°", model.rotationOffset))
+            metricRow("ㅣ 폭 보정", String(format: "+%.1f°", model.iDelta))
+            metricRow("ㅡ 폭 보정", String(format: "+%.1f°", model.euDelta))
+            metricRow("필요 길이", String(format: "%.0f pt", model.effectiveThreshold))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private func metricRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(.subheadline, design: .monospaced))
+                .fontWeight(.medium)
+        }
+    }
+
+    // MARK: - Disclosure: abstract canvas
+
+    private var disclosureCanvas: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DisclosureGroup(isExpanded: $showAbstractCanvas) {
+                VStack(spacing: 12) {
+                    visualization
+                    Text("가상의 가운데 키 주변에서 직접 긋기 동작을 그려 8방향 섹터 구조를 확인할 수 있습니다.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.top, 8)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "scope")
+                        .foregroundColor(.accentColor)
+                    Text("섹터 캔버스 (고급)")
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 
     private var visualization: some View {
@@ -256,34 +426,6 @@ struct GestureTestView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var statusPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            row("스트로크", strokeSequence)
-            row("스트로크 수", "\(model.liveDirections.count)")
-            row("실시간 모음", liveVowelLabel)
-            row("최종 모음", finalVowelLabel)
-            row("적용된 회전 보정", String(format: "%.1f°", model.rotationOffset))
-            row("ㅣ 폭 보정", String(format: "+%.1f°", model.iDelta))
-            row("ㅡ 폭 보정", String(format: "+%.1f°", model.euDelta))
-            row("필요 길이(threshold)", String(format: "%.0f pt", model.effectiveThreshold))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func row(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .font(.system(.body, design: .monospaced))
-                .fontWeight(.medium)
-        }
-    }
-
     // MARK: - Computed labels
 
     private var centerKeyLabel: String {
@@ -297,9 +439,14 @@ struct GestureTestView: View {
         }
     }
 
-    private var strokeSequence: String {
+    private var liveStrokeSequence: String {
         guard !model.liveDirections.isEmpty else { return "—" }
         return model.liveDirections.map { $0.symbol }.joined()
+    }
+
+    private var finalStrokeSequence: String {
+        guard !model.finalDirections.isEmpty else { return "—" }
+        return model.finalDirections.map { $0.symbol }.joined()
     }
 
     private var liveVowelLabel: String {

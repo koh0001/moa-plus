@@ -25,7 +25,21 @@ struct KeyboardPreviewView: View {
     /// so callers can position UI relative to where the user touched.
     var onVowelPreviewWithPoint: ((Jungseong, CGPoint) -> Void)? = nil
 
-    private var isInteractive: Bool { onVowelPreview != nil || onVowelPreviewWithPoint != nil }
+    /// When set, consonant-key gestures inside the preview route their
+    /// (phase, directions, vowel) snapshot to this closure so callers (the
+    /// gesture test screen) can mirror the production analyzer/resolver
+    /// output without affecting any text field.
+    var onConsonantPreview: ((KeyboardViewModel.PreviewGesturePhase, [GestureDirection], Jungseong?) -> Void)? = nil
+
+    /// Forces a specific column id (1-5) for per-column gesture corrections,
+    /// regardless of which consonant key the user actually touched. Used by
+    /// the gesture test screen so the column-picker selection drives the
+    /// rotation/width corrections applied to the live trace.
+    var consonantPreviewColumnOverride: Int = 0
+
+    private var isInteractive: Bool {
+        onVowelPreview != nil || onVowelPreviewWithPoint != nil || onConsonantPreview != nil
+    }
 
     /// Real keyboard aspect ratio (375pt host width / 260pt extension height).
     private let kbAspect: CGFloat = 375.0 / 260.0
@@ -51,11 +65,18 @@ struct KeyboardPreviewView: View {
             viewModel.previewMode = isInteractive
             viewModel.onPreviewVowel = onVowelPreview
             viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
+            viewModel.onPreviewConsonantGesture = onConsonantPreview
+            viewModel.previewColumnOverride = consonantPreviewColumnOverride
         }
         .onChange(of: isInteractive) { _, newValue in
             viewModel.previewMode = newValue
             viewModel.onPreviewVowel = onVowelPreview
             viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
+            viewModel.onPreviewConsonantGesture = onConsonantPreview
+            viewModel.previewColumnOverride = consonantPreviewColumnOverride
+        }
+        .onChange(of: consonantPreviewColumnOverride) { _, newValue in
+            viewModel.previewColumnOverride = newValue
         }
     }
 }

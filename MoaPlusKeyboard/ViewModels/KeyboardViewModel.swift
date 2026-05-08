@@ -49,6 +49,24 @@ class KeyboardViewModel: ObservableObject {
     /// the opposite half of the keyboard).
     var onPreviewVowelDetailed: ((Jungseong, CGPoint) -> Void)? = nil
 
+    /// Phase markers for `onPreviewConsonantGesture` so callers (the gesture
+    /// test screen) can distinguish in-flight previews from the final result
+    /// without reverse-engineering the directions array.
+    enum PreviewGesturePhase { case began, moved, ended }
+
+    /// Fires from the consonant-key gesture pipeline while `previewMode` is
+    /// on. Lets the gesture test screen visualise the same analyzer +
+    /// resolver output the production keyboard uses, without affecting any
+    /// host text field. `vowel` is the live/peek vowel during `.began`/`.moved`
+    /// and the resolved final vowel on `.ended`.
+    var onPreviewConsonantGesture: ((PreviewGesturePhase, [GestureDirection], Jungseong?) -> Void)? = nil
+
+    /// When set, overrides the column id detected from `KeyboardMetrics` so
+    /// the gesture test screen can force a specific column's per-column
+    /// rotation/width corrections. 0 (default) means "use the auto-detected
+    /// column from the touched key".
+    var previewColumnOverride: Int = 0
+
     /// Captured at slot-B-vowel gesture start so it can be forwarded in the
     /// `onPreviewVowelDetailed` callback when the gesture ends.
     private var slotBVowelStartPoint: CGPoint = .zero
@@ -568,7 +586,9 @@ class KeyboardViewModel: ObservableObject {
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
-        if keyboardMode == .korean,
+        if previewMode, previewColumnOverride > 0 {
+            gestureAnalyzer.columnId = previewColumnOverride
+        } else if keyboardMode == .korean,
            let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean),
            case .consonant(let consonant) = content {
             gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
@@ -579,6 +599,9 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.addPoint(point)
         gestureDirections = []
         previewVowel = nil
+        if previewMode {
+            onPreviewConsonantGesture?(.began, [], nil)
+        }
     }
 
     func gestureMoved(to point: CGPoint) {
@@ -602,6 +625,9 @@ class KeyboardViewModel: ObservableObject {
         } else {
             previewVowel = vowelResolver.peekVowel(directions: directions)
         }
+        if previewMode {
+            onPreviewConsonantGesture?(.moved, directions, previewVowel)
+        }
     }
 
     func gestureEnded(row: Int, column: Int) {
@@ -622,7 +648,13 @@ class KeyboardViewModel: ObservableObject {
         // composer state or insert into a host text field.
         if previewMode {
             // Still consume any gesture-analyzer state so the next press starts clean.
-            _ = gestureAnalyzer.finalizeGesture()
+            let directions = gestureAnalyzer.finalizeGesture()
+            // Surface the final resolved vowel so the gesture test screen
+            // shows what the production keyboard would have committed.
+            if onPreviewConsonantGesture != nil {
+                let resolved = vowelResolver.resolve(directions: directions).vowel
+                onPreviewConsonantGesture?(.ended, directions, resolved)
+            }
             resetGestureState()
             return
         }
