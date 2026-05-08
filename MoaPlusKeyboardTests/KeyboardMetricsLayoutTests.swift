@@ -105,4 +105,69 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertEqual(grid[1][6], .symbol("?"))
         XCTAssertEqual(grid[2][6], .symbol("."))
     }
+
+    // MARK: - Symbol layout follows Korean backspace position
+
+    func testSymbolLayout_A1NoSwap_BackspaceAtRow1Col6() {
+        let layout = LayoutCustomization()  // A1, no swap
+        let grid = KeyboardMetrics.symbolLayout(layout)
+        XCTAssertEqual(grid[1][6], .backspace)
+        XCTAssertNotEqual(grid[3][6], .backspace)
+    }
+
+    func testSymbolLayout_A1WithSwap_BackspaceAtRow3Col6() {
+        var layout = LayoutCustomization()
+        layout.slotABackspaceSwap = true
+        let grid = KeyboardMetrics.symbolLayout(layout)
+        XCTAssertEqual(grid[3][6], .backspace)
+        XCTAssertNotEqual(grid[1][6], .backspace)
+    }
+
+    func testSymbolLayout_A2_WideBackspaceAtRow3() {
+        var layout = LayoutCustomization()
+        layout.slotA = .classic11
+        let grid = KeyboardMetrics.symbolLayout(layout)
+        XCTAssertEqual(grid[3].count, 6)
+        XCTAssertEqual(grid[3][5], .backspaceWide)
+    }
+
+    func testSymbolLayout_A3_WideBackspaceAtRow3() {
+        var layout = LayoutCustomization()
+        layout.slotA = .fullPackage
+        let grid = KeyboardMetrics.symbolLayout(layout)
+        XCTAssertEqual(grid[3].count, 6)
+        XCTAssertEqual(grid[3][5], .backspaceWide)
+    }
+
+    func testActiveLayout_SymbolModeUsesLayoutCustomization() {
+        var layout = LayoutCustomization()
+        layout.slotA = .classic11
+        let grid = KeyboardMetrics.activeLayout(for: .symbolFromKorean, layout: layout)
+        XCTAssertEqual(grid[3].count, 6)
+        XCTAssertEqual(grid[3][5], .backspaceWide)
+    }
+
+    // MARK: - English row 3 shift/backspace widths
+
+    func testEnglishKeyWidth_shiftAndBackspaceAreWiderOnRow3() {
+        let center: CGFloat = 40.0
+        let shiftWidth = KeyboardMetrics.keyWidth(for: 0, row: 3, centerKeyWidth: center, mode: .english)
+        let bkspWidth = KeyboardMetrics.keyWidth(for: 8, row: 3, centerKeyWidth: center, mode: .english)
+        let letterWidth = KeyboardMetrics.keyWidth(for: 4, row: 3, centerKeyWidth: center, mode: .english)
+        XCTAssertGreaterThan(shiftWidth, letterWidth)
+        XCTAssertGreaterThan(bkspWidth, letterWidth)
+        XCTAssertEqual(shiftWidth, center * 1.5, accuracy: 0.01)
+        XCTAssertEqual(bkspWidth, center * 1.5, accuracy: 0.01)
+    }
+
+    func testEnglishKeyWidth_otherRowsUnchanged() {
+        let center: CGFloat = 40.0
+        // Row 0-2 letter keys are still uniform width.
+        XCTAssertEqual(KeyboardMetrics.keyWidth(for: 0, row: 0, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
+        XCTAssertEqual(KeyboardMetrics.keyWidth(for: 9, row: 1, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
+        XCTAssertEqual(KeyboardMetrics.keyWidth(for: 4, row: 2, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
+        // Row 3 inner letters are still 1×.
+        XCTAssertEqual(KeyboardMetrics.keyWidth(for: 1, row: 3, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
+        XCTAssertEqual(KeyboardMetrics.keyWidth(for: 7, row: 3, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
+    }
 }

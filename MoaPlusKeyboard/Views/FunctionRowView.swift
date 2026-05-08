@@ -36,16 +36,19 @@ struct FunctionRowView: View {
     var body: some View {
         if useBimanualLayout {
             bimanualLayoutBody
-        } else if mode == .korean && layoutCustomization.slotA == .fullPackage {
+        } else if mode != .korean || layoutCustomization.slotA == .fullPackage {
+            // Slot B is irrelevant in English/Symbol modes (no Korean vowel
+            // input), and it's embedded in the grid for A3 .fullPackage.
+            // In all three cases, drop the slot B function-row key and let
+            // the space bar absorb the freed width.
             longSpaceLayoutBody
         } else {
             defaultLayoutBody
         }
     }
 
-    // MARK: - Long-space layout (A3 .fullPackage)
-    // Slot B is embedded in col 6 of the grid, so the function row drops it
-    // and absorbs the freed width into the space bar.
+    // MARK: - Long-space layout (A3 .fullPackage + non-Korean modes)
+    // Slot B is dropped and the space bar absorbs the freed width.
     // [123/한글] [한/영] [        space        ] [return]
 
     private var longSpaceLayoutBody: some View {
@@ -244,8 +247,17 @@ struct FunctionRowView: View {
 
     private var returnWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
-        if layoutCustomization.slotA == .fullPackage {
-            // 확장형(A3): match wide backspace width (*1.3) so right edges align with row 3.
+        if mode == .english {
+            // English row 3's backspace is 1.5×centerKeyWidth (see
+            // KeyboardMetrics.keyWidth). Match it so right edges align.
+            // Use the 10-col formula since english grid is 10-wide.
+            let englishCenterKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth, columnCount: 10, mode: .english)
+            return englishCenterKeyWidth * 1.5
+        }
+        let usesWideBackspace = layoutCustomization.slotA == .fullPackage
+            || (mode.isSymbol && layoutCustomization.slotA != .vowel)
+        if usesWideBackspace {
+            // 확장형(A3) / classic11 symbol: match wide backspace width (*1.3) so right edges align with row 3.
             return KeyboardMetrics.keyWidth(forBackspaceWideAt: 0, centerKeyWidth: centerKeyWidth)
         }
         // Default: match standard backspace width (sideWidth + centerKeyWidth + spacing).
