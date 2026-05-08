@@ -247,20 +247,15 @@ struct FunctionRowView: View {
 
     private var returnWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
-        if mode == .english {
-            // English row 3's backspace is 1.5×centerKeyWidth (see
-            // KeyboardMetrics.keyWidth). Match it so right edges align.
-            // Use the 10-col formula since english grid is 10-wide.
-            let englishCenterKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth, columnCount: 10, mode: .english)
-            return englishCenterKeyWidth * 1.5
-        }
         let usesWideBackspace = layoutCustomization.slotA == .fullPackage
             || (mode.isSymbol && layoutCustomization.slotA != .vowel)
         if usesWideBackspace {
             // 확장형(A3) / classic11 symbol: match wide backspace width (*1.3) so right edges align with row 3.
             return KeyboardMetrics.keyWidth(forBackspaceWideAt: 0, centerKeyWidth: centerKeyWidth)
         }
-        // Default: match standard backspace width (sideWidth + centerKeyWidth + spacing).
+        // Default (Korean and English): use the Korean 7-col formula so the
+        // enter key is the same pixel width in both modes. The space bar
+        // absorbs the difference in English mode.
         let sideWidth = centerKeyWidth * KeyboardMetrics.symbolWidthRatio
         return sideWidth + centerKeyWidth + KeyboardMetrics.keySpacing
     }
