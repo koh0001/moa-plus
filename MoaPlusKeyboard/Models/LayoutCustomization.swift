@@ -1,0 +1,41 @@
+import Foundation
+
+enum SlotAPreset: String, Codable, CaseIterable {
+    case vowel        // A1 — 모음 (기본, 1.3)
+    case classic11    // A2 — 1.1 특수문자
+}
+
+enum SlotBPreset: String, Codable, CaseIterable {
+    case punctuation  // B2 — 특수문자 (기본, 1.3)
+    case vowelKey     // B1 — 자음드래그 패턴 모음 키
+}
+
+struct LayoutCustomization: Codable, Equatable {
+    var slotA: SlotAPreset = .vowel
+    /// A1 일 때 백스페이스 ↔ ㆍ 위치 swap. A2 일 때 무시.
+    var slotABackspaceSwap: Bool = false
+    var slotB: SlotBPreset = .punctuation
+    var slotC: [String] = LayoutCustomization.defaultSlotC
+
+    static let defaultSlotC: [String] = ["~", "^", ";", "*"]
+
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slotA = try c.decodeIfPresent(SlotAPreset.self, forKey: .slotA) ?? .vowel
+        slotABackspaceSwap = try c.decodeIfPresent(Bool.self, forKey: .slotABackspaceSwap) ?? false
+        slotB = try c.decodeIfPresent(SlotBPreset.self, forKey: .slotB) ?? .punctuation
+        let raw = try c.decodeIfPresent([String].self, forKey: .slotC) ?? Self.defaultSlotC
+        slotC = Self.normalizeSlotC(raw)
+    }
+
+    private static func normalizeSlotC(_ raw: [String]) -> [String] {
+        var result = raw.prefix(4).map { $0.isEmpty ? " " : $0 }
+        while result.count < 4 { result.append(defaultSlotC[result.count]) }
+        return Array(result)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case slotA, slotABackspaceSwap, slotB, slotC
+    }
+}
