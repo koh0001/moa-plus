@@ -188,30 +188,76 @@ final class GestureTestModel: ObservableObject {
     ]
 }
 
+// MARK: - Live input delegate
+
+/// In-memory `KeyboardViewModelDelegate` that captures everything the live
+/// keyboard inserts into a `typedText` buffer the host TextField binds to.
+/// Cursor / haptic / next-keyboard methods no-op — there's no real
+/// document proxy to drive in this host-app context.
+final class GestureTestKeyboardDelegate: ObservableObject, KeyboardViewModelDelegate {
+    @Published var typedText: String = ""
+
+    func insertText(_ text: String) {
+        typedText.append(text)
+    }
+
+    func deleteBackward() {
+        if !typedText.isEmpty {
+            typedText.removeLast()
+        }
+    }
+
+    func updateComposingText(from previous: String, to current: String) {
+        // Simulate the extension's marked-text emulation: drop the previous
+        // composing characters from the buffer, then append the new ones.
+        // Each character in `previous` was inserted via insertText, so we
+        // remove that many graphemes from the tail.
+        var remaining = previous.count
+        while remaining > 0, !typedText.isEmpty {
+            typedText.removeLast()
+            remaining -= 1
+        }
+        if !current.isEmpty {
+            typedText.append(current)
+        }
+    }
+
+    func switchToNextKeyboard() {
+        // No-op: there is no input switcher in the host app preview.
+    }
+
+    func triggerHapticFeedback() {
+        // No-op: HapticManager already runs from KeyboardViewModel on its own.
+    }
+
+    func moveCursor(by offset: Int) {
+        // No-op: a plain string buffer has no cursor concept here.
+        _ = offset
+    }
+}
+
 // MARK: - View
 
 /// Live visualization for swipe gestures.
 ///
-/// The screen now centres on the **real keyboard** (`KeyboardPreviewView` in
-/// interactive consonant-preview mode) so users test gestures on the same
-/// SwiftUI tree the keyboard extension renders. The production
-/// `GestureAnalyzer` + `VowelResolver` resolve direction/vowel and the result
-/// is shown in compact cards directly under the keyboard.
-///
-/// The legacy abstract canvas is preserved in a collapsible section at the
-/// bottom for power users who want to inspect sector geometry directly.
+/// The screen now centres on the **real keyboard** (`KeyboardPreviewView`
+/// running with a live input delegate, not preview-mode) so users test
+/// gestures by actually typing. The sector canvas is rendered above the
+/// keyboard and mirrors every stroke; a TextField between them shows what
+/// the keyboard committed via the production input pipeline.
 struct GestureTestView: View {
     @StateObject private var model = GestureTestModel()
-    @State private var showAbstractCanvas: Bool = false
+    @StateObject private var inputDelegate = GestureTestKeyboardDelegate()
 
     private static let canvasDimension: CGFloat = 280
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
+                canvasSection
+                typedTextSection
                 keyboardPreviewSection
                 resultCards
-                disclosureCanvas
             }
             .padding()
         }
@@ -220,14 +266,14 @@ struct GestureTestView: View {
         .onAppear { model.configureEngine() }
     }
 
-    // MARK: - Real keyboard preview
+    // MARK: - Sector canvas (top)
 
-    private var keyboardPreviewSection: some View {
+    private var canvasSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Image(systemName: "keyboard")
+                Image(systemName: "scope")
                     .foregroundColor(.accentColor)
-                Text("실제 키보드에서 긋기 테스트")
+                Text("실시간 분석")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 Button("초기화") {
@@ -237,17 +283,80 @@ struct GestureTestView: View {
                 .controlSize(.small)
             }
 
+            visualization
+
+            Text("아래 키보드에서 자음 키를 끌면 같은 동작이 이 캔버스에 그대로 그려져 8방향 섹터와 어떻게 만나는지 확인할 수 있습니다.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    // MARK: - Typed-text TextField (middle)
+
+    private var typedTextSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "text.cursor")
+                    .foregroundColor(.accentColor)
+                Text("입력 결과")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button("지우기") {
+                    inputDelegate.typedText = ""
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(inputDelegate.typedText.isEmpty)
+            }
+
+            TextField("여기에 입력됨", text: $inputDelegate.typedText, axis: .vertical)
+                .lineLimit(2...4)
+                .textFieldStyle(.roundedBorder)
+                .disabled(true)  // Read-only: the live keyboard below is the only writer.
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    // MARK: - Real keyboard (bottom)
+
+    private var keyboardPreviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.accentColor)
+                Text("실제 키보드 입력")
+                    .font(.subheadline.weight(.semibold))
+            }
+
             KeyboardPreviewView(
                 onConsonantPreview: { phase, directions, vowel in
                     model.ingestKeyboardPreview(phase: phase, directions: directions, vowel: vowel)
                 },
-                forceShowGesturePreview: true
+                forceShowGesturePreview: true,
+                liveInputDelegate: inputDelegate
             )
 
-            Text("자음 키 위에서 손가락을 끌어 보면 실제 입력과 동일한 분석 결과가 아래에 표시됩니다.")
+            Text("실제 키보드와 동일하게 동작합니다. 입력한 글자는 위쪽 ‘입력 결과’에 그대로 들어갑니다.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 
     // MARK: - Result cards
@@ -325,35 +434,6 @@ struct GestureTestView: View {
                 .font(.system(.subheadline, design: .monospaced))
                 .fontWeight(.medium)
         }
-    }
-
-    // MARK: - Disclosure: abstract canvas
-
-    private var disclosureCanvas: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            DisclosureGroup(isExpanded: $showAbstractCanvas) {
-                VStack(spacing: 12) {
-                    visualization
-                    Text("위 키보드에서 자음 키를 끌면 같은 동작이 이 캔버스에 그대로 그려져 8방향 섹터와 어떻게 만나는지 확인할 수 있습니다.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.top, 8)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "scope")
-                        .foregroundColor(.accentColor)
-                    Text("섹터 캔버스 (고급)")
-                        .font(.subheadline.weight(.semibold))
-                }
-            }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-        )
     }
 
     /// Read-only mirror of the live keyboard gesture. The canvas no longer

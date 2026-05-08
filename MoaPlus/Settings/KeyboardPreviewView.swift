@@ -37,8 +37,24 @@ struct KeyboardPreviewView: View {
     /// the angle effect even if they have the global toggle off.
     var forceShowGesturePreview: Bool = false
 
+    /// When set, the preview switches OFF `previewMode` and routes production
+    /// input (insertText / deleteBackward / cursor moves) to this delegate so
+    /// callers can show what's typed in their own buffer. Used by
+    /// `GestureTestView` to embed a fully-functional keyboard that writes
+    /// into a host TextField. Existing callers (LayoutCustomizationView,
+    /// AppearanceSettingsView) leave this nil and keep preview-mode behaviour.
+    var liveInputDelegate: KeyboardViewModelDelegate? = nil
+
     private var isInteractive: Bool {
-        onVowelPreview != nil || onVowelPreviewWithPoint != nil || onConsonantPreview != nil
+        onVowelPreview != nil || onVowelPreviewWithPoint != nil
+            || onConsonantPreview != nil || liveInputDelegate != nil
+    }
+
+    /// Live input wins over preview mode: when a delegate is supplied we run
+    /// the keyboard exactly like the extension does, so all keys insert
+    /// characters, deleteBackward fires, etc.
+    private var shouldRunInPreviewMode: Bool {
+        liveInputDelegate == nil && isInteractive
     }
 
     /// Real keyboard aspect ratio (375pt host width / 260pt extension height).
@@ -61,19 +77,16 @@ struct KeyboardPreviewView: View {
         // except the slot B vowel gesture. Otherwise (legacy callers like
         // Appearance settings) all touches are blocked outright.
         .allowsHitTesting(isInteractive)
-        .onAppear {
-            viewModel.previewMode = isInteractive
-            viewModel.onPreviewVowel = onVowelPreview
-            viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
-            viewModel.onPreviewConsonantGesture = onConsonantPreview
-            viewModel.forceShowGesturePreview = forceShowGesturePreview
-        }
-        .onChange(of: isInteractive) { _, newValue in
-            viewModel.previewMode = newValue
-            viewModel.onPreviewVowel = onVowelPreview
-            viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
-            viewModel.onPreviewConsonantGesture = onConsonantPreview
-            viewModel.forceShowGesturePreview = forceShowGesturePreview
-        }
+        .onAppear { applyConfiguration() }
+        .onChange(of: isInteractive) { _, _ in applyConfiguration() }
+    }
+
+    private func applyConfiguration() {
+        viewModel.previewMode = shouldRunInPreviewMode
+        viewModel.onPreviewVowel = onVowelPreview
+        viewModel.onPreviewVowelDetailed = onVowelPreviewWithPoint
+        viewModel.onPreviewConsonantGesture = onConsonantPreview
+        viewModel.forceShowGesturePreview = forceShowGesturePreview
+        viewModel.delegate = liveInputDelegate
     }
 }

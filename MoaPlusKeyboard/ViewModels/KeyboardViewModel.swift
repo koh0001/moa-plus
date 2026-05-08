@@ -614,7 +614,11 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.addPoint(point)
         gestureDirections = []
         previewVowel = nil
-        if previewMode {
+        // Gesture observation fires whenever the callback is set, independent
+        // of `previewMode`. The gesture test screen wires this callback while
+        // running in production input mode so the sector canvas can mirror
+        // the user's stroke even though the keyboard is also inserting text.
+        if onPreviewConsonantGesture != nil {
             previewGesturePoints = [point]
             previewGestureColumnId = gestureAnalyzer.columnId
             onPreviewConsonantGesture?(
@@ -646,7 +650,7 @@ class KeyboardViewModel: ObservableObject {
         } else {
             previewVowel = vowelResolver.peekVowel(directions: directions)
         }
-        if previewMode {
+        if onPreviewConsonantGesture != nil {
             previewGesturePoints.append(point)
             onPreviewConsonantGesture?(
                 .moved(currentPoint: point,
@@ -691,6 +695,23 @@ class KeyboardViewModel: ObservableObject {
             previewGesturePoints.removeAll()
             resetGestureState()
             return
+        }
+
+        // Production-input + observation path: when the callback is set but
+        // previewMode is off (live keyboard inside GestureTestView), peek the
+        // analyzer state and emit `.ended` BEFORE handing off to the normal
+        // input handlers. We must not finalize/reset the analyzer here — the
+        // mode-specific handlers below call `finalizeGesture()` themselves.
+        if onPreviewConsonantGesture != nil {
+            let directions = gestureAnalyzer.getDirections()
+            let resolved = vowelResolver.resolve(directions: directions).vowel
+            onPreviewConsonantGesture?(
+                .ended(points: previewGesturePoints,
+                       columnId: previewGestureColumnId),
+                directions,
+                resolved
+            )
+            previewGesturePoints.removeAll()
         }
 
         switch keyboardMode {
