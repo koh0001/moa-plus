@@ -50,4 +50,18 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         let wide = KeyboardMetrics.keyWidth(forBackspaceWideAt: 5, centerKeyWidth: centerWidth)
         XCTAssertEqual(wide, normal * 2 + KeyboardMetrics.keySpacing, accuracy: 0.01)
     }
+
+    func testLongPressNumber_A2Col6IsAllNil() {
+        var layout = LayoutCustomization()
+        layout.slotA = .classic11
+        for row in 0..<4 {
+            XCTAssertNil(KeyboardMetrics.longPressNumber(at: row, column: 6, layout: layout))
+        }
+    }
+
+    func testLongPressNumber_consonantPositionsUnchanged() {
+        var layout = LayoutCustomization()
+        layout.slotA = .classic11
+        XCTAssertEqual(KeyboardMetrics.longPressNumber(at: 1, column: 1, layout: layout), "6")
+    }
 }

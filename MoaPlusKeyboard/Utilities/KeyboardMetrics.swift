@@ -271,6 +271,20 @@ enum KeyboardMetrics {
         return longPressNumbers[row][column]
     }
 
+    /// Layout-aware long-press number lookup.
+    /// A2 (classic11) places punctuation and a wide backspace in col 6,
+    /// so the digit hint table does not apply there — returns nil for col 6.
+    /// All other columns delegate to the layout-agnostic overload.
+    static func longPressNumber(at row: Int, column: Int, layout: LayoutCustomization) -> String? {
+        if column == 6 {
+            switch layout.slotA {
+            case .vowel:     return longPressNumber(at: row, column: column)
+            case .classic11: return nil
+            }
+        }
+        return longPressNumber(at: row, column: column)
+    }
+
     // MARK: - Bimanual Layout
 
     /// Bimanual layout metrics
