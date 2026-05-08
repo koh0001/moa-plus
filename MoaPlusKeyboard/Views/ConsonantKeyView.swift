@@ -68,7 +68,11 @@ struct KeyView: View {
         }
         .frame(width: keySize.width, height: keySize.height)
         .gesture(
-            DragGesture(minimumDistance: 0)
+            // Use the keyboard-frame coordinate space so start point and
+            // current location are reported in the keyboard's frame, not
+            // the key's local frame. GestureOverlayView positions itself
+            // using these coords (opposite-side rendering).
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("keyboardPreview"))
                 .onChanged { value in
                     if !isHighlighted {
                         isHighlighted = true
@@ -156,6 +160,11 @@ struct KeyView: View {
                 .font(.system(size: keySize.height * 0.35))
                 .foregroundColor(themedTextColor)
 
+        case .backspaceWide:
+            Image(systemName: "delete.left")
+                .font(.system(size: 20))
+                .foregroundColor(themedTextColor)
+
         case .vowelPrimitive(let type):
             switch type {
             case .bar:
@@ -225,6 +234,15 @@ struct KeyView: View {
             Text(punct)
                 .font(.system(size: fontSize))
                 .foregroundColor(themedTextColor)
+
+        case .slotBVowelKey:
+            // KeyGridView intercepts this case and renders SlotBVowelKey directly.
+            // This stub exists only to satisfy exhaustive switch.
+            EmptyView()
+
+        case .slotBPunctuation:
+            // KeyGridView intercepts this case and renders PunctuationSwipeKey directly.
+            EmptyView()
         }
     }
 
@@ -281,7 +299,8 @@ struct KeyView: View {
                 return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
             }
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
-        case .functional, .systemSwitch, .backspace:
+        case .functional, .systemSwitch, .backspace, .backspaceWide,
+             .slotBVowelKey, .slotBPunctuation:
             return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
         }
     }
@@ -291,9 +310,8 @@ struct KeyView: View {
     }
 
     private var isBackspaceKey: Bool {
-        if case .backspace = content {
-            return true
-        }
+        if case .backspace = content { return true }
+        if case .backspaceWide = content { return true }
         return false
     }
 

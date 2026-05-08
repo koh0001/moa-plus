@@ -5,6 +5,7 @@ struct KeyGridView: View {
     let keyHeight: CGFloat
     let totalWidth: CGFloat
     let mode: KeyboardMode
+    let layoutCustomization: LayoutCustomization
     let activeKey: (row: Int, column: Int)?
     let previewVowel: Jungseong?
     var isGestureActive: Bool = false
@@ -20,14 +21,29 @@ struct KeyGridView: View {
     let onGestureEnd: (Int, Int) -> Void
     var onPopupDrag: ((CGFloat) -> Void)?
     var onPopupRelease: (() -> Void)?
+    var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureEnd: (() -> Void)? = nil
+
+    /// Returns the rendered width for a single cell, accounting for .backspaceWide.
+    private func cellWidth(content: KeyContent, column: Int, row: Int) -> CGFloat {
+        if case .backspaceWide = content {
+            return KeyboardMetrics.keyWidth(forBackspaceWideAt: column, centerKeyWidth: centerKeyWidth)
+        }
+        // Slot B embedded keys (A3 col 6) use the same width as other col 6 cells.
+        // The mode-aware key width helper already handles col 6 sizing (sideRatio*1.3).
+        return KeyboardMetrics.keyWidth(for: column, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
+    }
 
     /// Compute total width of a single row (sum of key widths + gaps)
     private func rowWidth(for row: Int) -> CGFloat {
-        let columnCount = KeyboardMetrics.columnCount(for: row, mode: mode)
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+        guard row >= 0 && row < layoutGrid.count else { return 0 }
+        let cells = layoutGrid[row]
         var width: CGFloat = 0
-        for col in 0..<columnCount {
-            width += KeyboardMetrics.keyWidth(for: col, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
-            if col < columnCount - 1 {
+        for (col, content) in cells.enumerated() {
+            width += cellWidth(content: content, column: col, row: row)
+            if col < cells.count - 1 {
                 width += KeyboardMetrics.keySpacing
             }
         }
@@ -36,17 +52,18 @@ struct KeyGridView: View {
 
     /// Number of rows in the active layout.
     private var rowCount: Int {
-        KeyboardMetrics.activeLayout(for: mode).count
+        KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization).count
     }
 
     var body: some View {
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
         VStack(spacing: KeyboardMetrics.keySpacing) {
             ForEach(0..<rowCount, id: \.self) { row in
                 HStack(spacing: KeyboardMetrics.keySpacing) {
-                    let columnCount = KeyboardMetrics.columnCount(for: row, mode: mode)
+                    let columnCount = layoutGrid[row].count
 
                     ForEach(0..<columnCount, id: \.self) { column in
-                        let content = KeyboardMetrics.keyContent(at: row, column: column, mode: mode)
+                        let content: KeyContent? = layoutGrid[row][column]
                         let isActive = activeKey?.row == row && activeKey?.column == column
 
                         // Determine the key ID used for secondaryAction lookup:
@@ -69,7 +86,7 @@ struct KeyGridView: View {
                         // - English mode: digit keys use their primaryLongPressOutput from secondaryAction
                         let longPressNumber: String? = {
                             if mode == .korean {
-                                return KeyboardMetrics.longPressNumber(at: row, column: column)
+                                return KeyboardMetrics.longPressNumber(at: row, column: column, layout: layoutCustomization)
                             }
                             if mode == .english,
                                case .symbol(let s) = content,
@@ -79,13 +96,26 @@ struct KeyGridView: View {
                             return nil
                         }()
 
-                        let width = KeyboardMetrics.keyWidth(
-                            for: column,
-                            row: row,
-                            centerKeyWidth: centerKeyWidth,
-                            mode: mode
-                        )
+                        let width = cellWidth(content: content ?? .symbol(""), column: column, row: row)
 
+                        // A3 (.fullPackage) embeds slot B keys in col 6.
+                        // KeyGridView intercepts those content types and renders the
+                        // dedicated standalone views (already used in FunctionRowView).
+                        if case .slotBVowelKey = content {
+                            SlotBVowelKey(
+                                width: width,
+                                height: keyHeight,
+                                onGestureStart: { point in onSlotBVowelGestureStart?(point) },
+                                onGestureMove: { point in onSlotBVowelGestureMove?(point) },
+                                onGestureEnd: { onSlotBVowelGestureEnd?() }
+                            )
+                        } else if case .slotBPunctuation = content {
+                            PunctuationSwipeKey(
+                                width: width,
+                                height: keyHeight,
+                                onPunctuation: { symbol in onSymbolTap(symbol) }
+                            )
+                        } else {
                         KeyView(
                             content: content ?? .symbol(""),
                             keySize: CGSize(width: width, height: keyHeight),
@@ -104,11 +134,17 @@ struct KeyGridView: View {
                                 onLongPressNumber(number)
                             },
                             onBackspacePressStart: {
-                                guard case .backspace = content else { return }
+                                guard case .backspace = content else {
+                                    if case .backspaceWide = content { onBackspacePressStart() }
+                                    return
+                                }
                                 onBackspacePressStart()
                             },
                             onBackspacePressEnd: {
-                                guard case .backspace = content else { return }
+                                guard case .backspace = content else {
+                                    if case .backspaceWide = content { onBackspacePressEnd() }
+                                    return
+                                }
                                 onBackspacePressEnd()
                             },
                             onGestureStart: { point in
@@ -128,6 +164,7 @@ struct KeyGridView: View {
                             },
                             onShiftLongPress: onShiftLongPress
                         )
+                        }   // close else branch (slot B intercept)
                     }
                 }
                 .frame(width: rowWidth(for: row))

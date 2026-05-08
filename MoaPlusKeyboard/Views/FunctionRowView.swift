@@ -11,6 +11,10 @@ struct FunctionRowView: View {
     var onCursorMoveDelta: ((Int) -> Void)? = nil
     var onLanguageSwitchPressed: (() -> Void)? = nil
     var useBimanualLayout: Bool = false
+    var layoutCustomization: LayoutCustomization = LayoutCustomization()
+    var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
+    var onSlotBVowelGestureEnd: (() -> Void)? = nil
 
     private let spacing: CGFloat = KeyboardMetrics.keySpacing
     private let height: CGFloat = KeyboardMetrics.functionRowHeight
@@ -32,9 +36,65 @@ struct FunctionRowView: View {
     var body: some View {
         if useBimanualLayout {
             bimanualLayoutBody
+        } else if mode != .korean || layoutCustomization.slotA == .fullPackage {
+            // Slot B is irrelevant in English/Symbol modes (no Korean vowel
+            // input), and it's embedded in the grid for A3 .fullPackage.
+            // In all three cases, drop the slot B function-row key and let
+            // the space bar absorb the freed width.
+            longSpaceLayoutBody
         } else {
             defaultLayoutBody
         }
+    }
+
+    // MARK: - Long-space layout (A3 .fullPackage + non-Korean modes)
+    // Slot B is dropped and the space bar absorbs the freed width.
+    // [123/한글] [한/영] [        space        ] [return]
+
+    private var longSpaceLayoutBody: some View {
+        HStack(spacing: spacing) {
+            FunctionKeyView(
+                content: AnyView(
+                    Text(symbolToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
+                ),
+                width: symbolToggleWidth,
+                height: height,
+                action: onToggleSymbolPressed
+            )
+
+            FunctionKeyView(
+                content: AnyView(
+                    Text(letterToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
+                ),
+                width: letterToggleWidth,
+                height: height,
+                action: onToggleLetterPressed
+            )
+
+            SpaceKeyView(
+                width: longSpaceWidth,
+                height: height,
+                onTap: onSpacePressed,
+                onCursorMove: onCursorMoveDelta ?? { _ in }
+            )
+
+            FunctionKeyView(
+                content: AnyView(
+                    Image(systemName: "return")
+                        .font(.system(size: 20))
+                ),
+                width: returnWidth,
+                height: height,
+                action: onReturnPressed
+            )
+        }
+    }
+
+    /// Space bar absorbs the slot B punctuation key + 1 internal gap.
+    private var longSpaceWidth: CGFloat {
+        spaceWidth + punctuationWidth + spacing
     }
 
     // MARK: - Default layout
@@ -72,12 +132,8 @@ struct FunctionRowView: View {
                 onCursorMove: onCursorMoveDelta ?? { _ in }
             )
 
-            // Swipe punctuation key (tap = ".", up = ",", left = "?", right = "!", down = ".")
-            PunctuationSwipeKey(
-                width: punctuationWidth,
-                height: height,
-                onPunctuation: onPunctuation
-            )
+            // Slot B — punctuation (B2) or vowel key (B1) per layout customization.
+            slotBKey(width: punctuationWidth)
 
             // Return button
             FunctionKeyView(
@@ -88,6 +144,29 @@ struct FunctionRowView: View {
                 width: returnWidth,
                 height: height,
                 action: onReturnPressed
+            )
+        }
+    }
+
+    /// Renders the slot B key based on layoutCustomization.slotB.
+    /// `.punctuation` → tap=. swipe ←=? →=! ↑=, ↓=.
+    /// `.vowelKey` → tap=ㆍ + 8-direction single-stroke vowels.
+    @ViewBuilder
+    private func slotBKey(width: CGFloat) -> some View {
+        switch layoutCustomization.slotB {
+        case .punctuation:
+            PunctuationSwipeKey(
+                width: width,
+                height: height,
+                onPunctuation: onPunctuation
+            )
+        case .vowelKey:
+            SlotBVowelKey(
+                width: width,
+                height: height,
+                onGestureStart: onSlotBVowelGestureStart ?? { _ in },
+                onGestureMove: onSlotBVowelGestureMove ?? { _ in },
+                onGestureEnd: onSlotBVowelGestureEnd ?? {}
             )
         }
     }
@@ -138,12 +217,8 @@ struct FunctionRowView: View {
                 onCursorMove: onCursorMoveDelta ?? { _ in }
             )
 
-            // Swipe punctuation
-            PunctuationSwipeKey(
-                width: bimanualPunctuationWidth,
-                height: height,
-                onPunctuation: onPunctuation
-            )
+            // Slot B — punctuation (B2) or vowel key (B1) per layout customization.
+            slotBKey(width: bimanualPunctuationWidth)
 
             // Return key
             FunctionKeyView(
@@ -160,24 +235,43 @@ struct FunctionRowView: View {
 
     // MARK: - Default layout widths
 
+    /// The KeyboardView wraps its VStack in `.padding(KeyboardMetrics.keySpacing)`,
+    /// which steals `2 * spacing` from the horizontal axis. The grid above us
+    /// absorbs that slack via its center-key formula (8 internal gaps), but the
+    /// function row's child widths sum *exactly* to `totalWidth`, so without
+    /// compensating here the rightmost child (return key) overflows and gets
+    /// clipped. Subtract the outer padding once so all downstream math fits.
+    private var effectiveTotalWidth: CGFloat {
+        max(0, totalWidth - spacing * 2)
+    }
+
     private var returnWidth: CGFloat {
-        // Match backspace width: sideWidth + centerKeyWidth + spacing
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
+        let usesWideBackspace = layoutCustomization.slotA == .fullPackage
+            || (mode.isSymbol && layoutCustomization.slotA != .vowel)
+        if usesWideBackspace {
+            // 확장형(A3) / classic11 symbol: match wide backspace width (*1.3) so right edges align with row 3.
+            return KeyboardMetrics.keyWidth(forBackspaceWideAt: 0, centerKeyWidth: centerKeyWidth)
+        }
+        // Default (Korean and English): use the Korean 7-col formula so the
+        // enter key is the same pixel width in both modes. The space bar
+        // absorbs the difference in English mode.
         let sideWidth = centerKeyWidth * KeyboardMetrics.symbolWidthRatio
         return sideWidth + centerKeyWidth + KeyboardMetrics.keySpacing
     }
 
     private var availableWidthWithoutReturn: CGFloat {
-        // 5 internal gaps for 5 buttons (4 widgets + return) plus 2 outer paddings
-        totalWidth - returnWidth - spacing * 5
+        // Default layout: 5 children (toggles + space + punct + return) → 4 internal gaps.
+        max(0, effectiveTotalWidth - returnWidth - spacing * 4)
     }
 
     private var symbolToggleWidth: CGFloat {
-        availableWidthWithoutReturn * 0.20
+        let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
+        return centerKeyWidth * KeyboardMetrics.symbolWidthRatio * 1.3
     }
 
     private var letterToggleWidth: CGFloat {
-        availableWidthWithoutReturn * 0.16
+        KeyboardMetrics.centerKeyWidth(for: totalWidth)
     }
 
     private var punctuationWidth: CGFloat {
@@ -185,7 +279,9 @@ struct FunctionRowView: View {
     }
 
     private var spaceWidth: CGFloat {
-        availableWidthWithoutReturn * 0.48
+        // Default layout: 5 children → 4 internal gaps.
+        let consumedByOthers = symbolToggleWidth + letterToggleWidth + punctuationWidth + returnWidth
+        return max(0, effectiveTotalWidth - consumedByOthers - spacing * 4)
     }
 
     // MARK: - Bimanual layout widths
@@ -206,10 +302,10 @@ struct FunctionRowView: View {
     }
 
     private var bimanualSpaceWidth: CGFloat {
-        // Remaining width after all fixed elements and gaps
-        let gapCount: CGFloat = 7  // 6 keys = 5 gaps, plus 2 outer edges omitted (HStack handles)
+        // Bimanual layout: 6 children (globe + toggle + letterToggle + space + slotB + return)
+        // → 5 internal gaps. Uses effectiveTotalWidth to compensate for parent padding.
         let fixedWidths = bimanualGlobeWidth + bimanualToggleWidth + bimanualPunctuationWidth * 2 + returnWidth
-        return totalWidth - fixedWidths - spacing * (gapCount - 2)
+        return max(0, effectiveTotalWidth - fixedWidths - spacing * 5)
     }
 }
 
@@ -269,6 +365,62 @@ struct PunctuationSwipeKey: View {
                         onPunctuation(".")
                     }
                     didDrag = false
+                }
+        )
+    }
+}
+
+// MARK: - Slot B vowel key (B1 preset)
+
+/// 슬롯 B `.vowelKey` 프리셋. tap = ㆍ; 드래그 = 자음 키와 동일한 멀티 스트로크
+/// 모음 파이프라인 (GestureAnalyzer + VowelResolver). 단일 스트로크 ㅏ/ㅓ/ㅗ/ㅜ
+/// 부터 합성 모음 ㅑ/ㅕ/ㅛ/ㅠ/ㅒ/ㅖ/ㅢ/ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ 까지 모두 지원.
+/// 뷰는 제스처 포인트만 ViewModel 로 전달한다 — 방향 판정은 ViewModel 에서.
+struct SlotBVowelKey: View {
+    let width: CGFloat
+    let height: CGFloat
+    let onGestureStart: (CGPoint) -> Void
+    let onGestureMove: (CGPoint) -> Void
+    let onGestureEnd: () -> Void
+
+    @State private var isPressed = false
+
+    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text("ㅗ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            HStack(spacing: 4) {
+                Text("ㅓ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+                Text("ㆍ").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
+                Text("ㅏ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            }
+            Text("ㅜ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+        }
+        .frame(width: width, height: height)
+        .background(
+            RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
+                .fill(isPressed ? bg.opacity(0.7) : bg)
+        )
+        .gesture(
+            // Named coordinate space ("keyboardPreview") so points are in the
+            // keyboard's frame, not the key's local frame. Used by settings
+            // preview for opposite-side bubble positioning. Falls back to
+            // local coords if the named space isn't on an ancestor (it's
+            // declared on KeyboardView's root, present in both production
+            // and preview).
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("keyboardPreview"))
+                .onChanged { value in
+                    if !isPressed {
+                        isPressed = true
+                        onGestureStart(value.startLocation)
+                    }
+                    onGestureMove(value.location)
+                }
+                .onEnded { _ in
+                    isPressed = false
+                    onGestureEnd()
                 }
         )
     }

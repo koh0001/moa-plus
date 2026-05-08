@@ -8,30 +8,24 @@ import SwiftUI
 struct SettingsMainView: View {
     var body: some View {
         List {
-            Section(header: Text("입력")) {
-                NavigationLink(destination: InputSettingsView()) {
-                    Label("모아키 입력", systemImage: "hand.draw")
+            Section {
+                NavigationLink(destination: KeyboardSettingsView()) {
+                    Label("키보드", systemImage: "keyboard")
                 }
-                NavigationLink(destination: SecondaryInputSettingsView()) {
-                    Label("보조 입력", systemImage: "textformat.123")
-                }
-            }
-
-            Section(header: Text("생산성")) {
-                NavigationLink(destination: AbbreviationSettingsView()) {
-                    Label("단축어 / 약어 확장", systemImage: "text.badge.plus")
-                }
-            }
-
-            Section(header: Text("외형")) {
                 NavigationLink(destination: AppearanceSettingsView()) {
                     Label("외형", systemImage: "paintbrush")
                 }
                 NavigationLink(destination: FeedbackSettingsView()) {
                     Label("반응", systemImage: "waveform")
                 }
+                NavigationLink(destination: AbbreviationSettingsView()) {
+                    Label("단축어", systemImage: "text.badge.plus")
+                }
             }
             Section {
+                NavigationLink(destination: HelpView()) {
+                    Label("도움말", systemImage: "questionmark.circle")
+                }
                 NavigationLink(destination: AboutView()) {
                     Label("앱 정보", systemImage: "info.circle")
                 }

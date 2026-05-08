@@ -36,6 +36,58 @@ class KeyboardViewModel: ObservableObject {
     @Published var isSpecialCharLayerVisible: Bool = false
     @Published var shiftState: ShiftState = .off
 
+    /// Preview mode flag — when true, the slot B vowel key gesture routes to
+    /// `onPreviewVowel` instead of feeding the composer/delegate. Used by the
+    /// settings preview (LayoutCustomizationView) so the user can try the
+    /// vowel key without affecting any text field. All other input methods
+    /// (consonants, backspace, function keys) silently no-op in preview mode.
+    var previewMode: Bool = false
+    var onPreviewVowel: ((Jungseong) -> Void)? = nil
+    /// Same as `onPreviewVowel` but also forwards the gesture start point in
+    /// the named "keyboardPreview" coordinate space so callers can position
+    /// UI relative to where the user touched (e.g. show a result bubble on
+    /// the opposite half of the keyboard).
+    var onPreviewVowelDetailed: ((Jungseong, CGPoint) -> Void)? = nil
+
+    /// Phase markers for `onPreviewConsonantGesture` so callers (the gesture
+    /// test screen) can distinguish in-flight previews from the final result
+    /// without reverse-engineering the directions array. Carries the raw
+    /// touch trail (`points`) and the production column id (`columnId`) so
+    /// the abstract sector canvas can mirror what the user is doing on the
+    /// real keyboard above without running its own gesture pipeline.
+    enum PreviewGesturePhase {
+        case began(startPoint: CGPoint, columnId: Int)
+        case moved(currentPoint: CGPoint, points: [CGPoint], columnId: Int)
+        case ended(points: [CGPoint], columnId: Int)
+    }
+
+    /// Fires from the consonant-key gesture pipeline while `previewMode` is
+    /// on. Lets the gesture test screen visualise the same analyzer +
+    /// resolver output the production keyboard uses, without affecting any
+    /// host text field. `vowel` is the live/peek vowel during `.began`/`.moved`
+    /// and the resolved final vowel on `.ended`.
+    var onPreviewConsonantGesture: ((PreviewGesturePhase, [GestureDirection], Jungseong?) -> Void)? = nil
+
+    /// Raw touch trail captured during a preview-mode consonant gesture so
+    /// callers receive the full point list with each `.moved` / `.ended`
+    /// phase. Reset on every `.began`.
+    private var previewGesturePoints: [CGPoint] = []
+    /// Last column id fed to the gesture analyzer during a preview-mode
+    /// gesture. Forwarded in every preview phase so the abstract canvas
+    /// can mirror the column-specific sector geometry of whichever key
+    /// the user is touching on the real keyboard.
+    private var previewGestureColumnId: Int = 0
+
+    /// When `true`, the gesture overlay is always shown in Korean mode regardless
+    /// of the global `showGesturePreview` setting. Set by `KeyboardPreviewView`
+    /// when embedded in the gesture test screen so the direction trail is always
+    /// visible while testing column-angle differences.
+    var forceShowGesturePreview: Bool = false
+
+    /// Captured at slot-B-vowel gesture start so it can be forwarded in the
+    /// `onPreviewVowelDetailed` callback when the gesture ends.
+    private var slotBVowelStartPoint: CGPoint = .zero
+
     private var lastShiftTapTimestamp: Date?
     private static let doubleTapInterval: TimeInterval = 0.3
 
@@ -118,6 +170,11 @@ class KeyboardViewModel: ObservableObject {
 
     init(backspaceRepeatInitialDelay: TimeInterval = 0.4) {
         self.backspaceRepeatInitialDelay = backspaceRepeatInitialDelay
+        // Restore last letter mode before first render so there is no flicker.
+        let settings = KeyboardSettings.shared
+        if settings.rememberLastKeyboardMode, settings.lastKeyboardLetterMode == "english" {
+            keyboardMode = .english
+        }
         reloadAbbreviationEngine()
     }
 
@@ -140,6 +197,7 @@ class KeyboardViewModel: ObservableObject {
     // MARK: - Mode Toggle
 
     func toggleSymbolMode() {
+        if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
         keyboardMode = keyboardMode.toggleSymbol()
@@ -147,6 +205,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func toggleLetterMode() {
+        if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
         keyboardMode = keyboardMode.toggleLetter()
@@ -154,7 +213,19 @@ class KeyboardViewModel: ObservableObject {
         // buffer so half-typed triggers don't leak across modes.
         abbreviationEngine.resetBuffer()
         shiftState = .off  // reset shift when switching language mode
+        persistLetterModeIfEnabled()
         triggerHapticFeedback()
+    }
+
+    /// Persist the current letter mode to UserDefaults if the user opted in.
+    /// Called after any operation that switches between Korean and English.
+    private func persistLetterModeIfEnabled() {
+        let settings = KeyboardSettings.shared
+        guard settings.rememberLastKeyboardMode else { return }
+        let raw = (keyboardMode.letterMode == .english) ? "english" : "korean"
+        if settings.lastKeyboardLetterMode != raw {
+            settings.lastKeyboardLetterMode = raw
+        }
     }
 
     func toggleShift() {
@@ -219,6 +290,79 @@ class KeyboardViewModel: ObservableObject {
         triggerHapticFeedback()
     }
 
+    // MARK: - Slot B Vowel Key (multi-stroke)
+    //
+    // Mirrors the consonant-key gesture pipeline (gestureStarted/Moved/Ended)
+    // but produces a bare vowel — no consonant prefix. Routes points through
+    // the same GestureAnalyzer + VowelResolver so the resolved Jungseong
+    // covers ALL patterns (basic ㅏ/ㅓ/ㅗ/ㅜ/ㅡ/ㅣ, y-vowels ㅑ/ㅕ/ㅛ/ㅠ,
+    // diphthongs ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ, ㅐ/ㅒ/ㅔ/ㅖ, ㅢ).
+    // Tap (no drag) → ㆍ.
+
+    func slotBVowelGestureStarted(at point: CGPoint) {
+        gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
+        vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        // Slot B is not associated with any consonant column override.
+        gestureAnalyzer.columnId = 0
+        gestureAnalyzer.reset()
+        gestureAnalyzer.addPoint(point)
+        slotBVowelStartPoint = point
+        // Feed gestureState so GestureOverlayView activates for slot B too.
+        // Sentinel (-1, -1) marks "slot B vowel key" (not a grid cell). The
+        // overlay only checks startPoint + directions, so the row/col value
+        // is for internal book-keeping; the existing popup gating uses
+        // popupState.text and is unaffected.
+        gestureStartPoint = point
+        gestureDirections = []
+        previewVowel = nil
+        activeKey = (row: -1, column: -1)
+    }
+
+    func slotBVowelGestureMoved(to point: CGPoint) {
+        gestureAnalyzer.addPoint(point)
+        let directions = gestureAnalyzer.getDirections()
+        gestureDirections = directions
+        // Slot B is a bare-vowel key (no consonant prefix); the resolver's
+        // pattern trie still gives the best matching Jungseong for preview.
+        previewVowel = vowelResolver.peekVowel(directions: directions)
+    }
+
+    func slotBVowelGestureEnded() {
+        let directions = gestureAnalyzer.finalizeGesture()
+        gestureAnalyzer.reset()
+        // Clear gestureState so the overlay disappears.
+        activeKey = nil
+        gestureStartPoint = nil
+        gestureDirections = []
+        previewVowel = nil
+        if directions.isEmpty {
+            // Tap with no drag → ㆍ (pending), matches prior behaviour.
+            if previewMode {
+                emitPreviewVowel(.ㆍ)
+            } else {
+                inputVowel(.ㆍ)
+            }
+            return
+        }
+        let resolution = vowelResolver.resolve(directions: directions)
+        if let vowel = resolution.vowel {
+            if previewMode {
+                emitPreviewVowel(vowel)
+            } else {
+                inputVowel(vowel)
+            }
+        }
+    }
+
+    /// Fan-out for preview-mode vowel emission. Calls both the legacy
+    /// `onPreviewVowel` and the detailed variant that forwards the gesture
+    /// start point so callers (LayoutCustomizationView) can position UI
+    /// relative to the user's touch.
+    private func emitPreviewVowel(_ vowel: Jungseong) {
+        onPreviewVowel?(vowel)
+        onPreviewVowelDetailed?(vowel, slotBVowelStartPoint)
+    }
+
     /// Input a vowel primitive (천지인 ㅣ/ㅡ/ㆍ).
     /// All three feed the Hangul composer as `Jungseong` values; ㆍ is held
     /// as a transient pending vowel that combines with subsequent input
@@ -241,6 +385,7 @@ class KeyboardViewModel: ObservableObject {
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
 
     func inputSymbol(_ symbol: String) {
+        if previewMode { return }
         let resolved = shiftedSymbolIfNeeded(symbol)
         commitCurrent()
         if insertWithAutoBracket(resolved) {
@@ -255,6 +400,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputNumber(_ number: String) {
+        if previewMode { return }
         commitCurrent()
         if insertWithAutoBracket(number) {
             // Bracket pair inserted
@@ -351,6 +497,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func deleteBackward() {
+        if previewMode { return }
         if abbreviationEngine.processBackspace() {
             triggerHapticFeedback()
             return
@@ -365,6 +512,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputSpace() {
+        if previewMode { return }
         // Commit composing text first (feeds abbreviation engine via commitCurrent)
         commitCurrent()
         // Process delimiter - if abbreviation matches, delegate handles replacement
@@ -378,6 +526,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputReturn() {
+        if previewMode { return }
         commitCurrent()
         abbreviationEngine.processCharacter("\n")
         if !abbreviationEngine.canRestoreLastExpansion {
@@ -431,6 +580,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func beginBackspacePress() {
+        if previewMode { return }
         guard !isBackspacePressing else { return }
 
         isBackspacePressing = true
@@ -464,6 +614,19 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.addPoint(point)
         gestureDirections = []
         previewVowel = nil
+        // Gesture observation fires whenever the callback is set, independent
+        // of `previewMode`. The gesture test screen wires this callback while
+        // running in production input mode so the sector canvas can mirror
+        // the user's stroke even though the keyboard is also inserting text.
+        if onPreviewConsonantGesture != nil {
+            previewGesturePoints = [point]
+            previewGestureColumnId = gestureAnalyzer.columnId
+            onPreviewConsonantGesture?(
+                .began(startPoint: point, columnId: previewGestureColumnId),
+                [],
+                nil
+            )
+        }
     }
 
     func gestureMoved(to point: CGPoint) {
@@ -487,6 +650,16 @@ class KeyboardViewModel: ObservableObject {
         } else {
             previewVowel = vowelResolver.peekVowel(directions: directions)
         }
+        if onPreviewConsonantGesture != nil {
+            previewGesturePoints.append(point)
+            onPreviewConsonantGesture?(
+                .moved(currentPoint: point,
+                       points: previewGesturePoints,
+                       columnId: previewGestureColumnId),
+                directions,
+                previewVowel
+            )
+        }
     }
 
     func gestureEnded(row: Int, column: Int) {
@@ -499,6 +672,46 @@ class KeyboardViewModel: ObservableObject {
             didHandleShiftLongPressInCurrentGesture = false
             resetGestureState()
             return
+        }
+
+        // In preview mode, only the slot B vowel key produces output (via its
+        // own dedicated gesture pipeline). All consonant / symbol / backspace
+        // taps from KeyGridView are dropped so the preview cannot mutate any
+        // composer state or insert into a host text field.
+        if previewMode {
+            // Still consume any gesture-analyzer state so the next press starts clean.
+            let directions = gestureAnalyzer.finalizeGesture()
+            // Surface the final resolved vowel so the gesture test screen
+            // shows what the production keyboard would have committed.
+            if onPreviewConsonantGesture != nil {
+                let resolved = vowelResolver.resolve(directions: directions).vowel
+                onPreviewConsonantGesture?(
+                    .ended(points: previewGesturePoints,
+                           columnId: previewGestureColumnId),
+                    directions,
+                    resolved
+                )
+            }
+            previewGesturePoints.removeAll()
+            resetGestureState()
+            return
+        }
+
+        // Production-input + observation path: when the callback is set but
+        // previewMode is off (live keyboard inside GestureTestView), peek the
+        // analyzer state and emit `.ended` BEFORE handing off to the normal
+        // input handlers. We must not finalize/reset the analyzer here — the
+        // mode-specific handlers below call `finalizeGesture()` themselves.
+        if onPreviewConsonantGesture != nil {
+            let directions = gestureAnalyzer.getDirections()
+            let resolved = vowelResolver.resolve(directions: directions).vowel
+            onPreviewConsonantGesture?(
+                .ended(points: previewGesturePoints,
+                       columnId: previewGestureColumnId),
+                directions,
+                resolved
+            )
+            previewGesturePoints.removeAll()
         }
 
         switch keyboardMode {

@@ -53,6 +53,7 @@ struct KeyboardView: View {
                             keyHeight: keyHeight,
                             totalWidth: geometry.size.width,
                             mode: viewModel.keyboardMode,
+                            layoutCustomization: settings.layoutCustomization,
                             activeKey: viewModel.activeKey,
                             previewVowel: viewModel.previewVowel,
                             isGestureActive: gestureState.activeKey != nil,
@@ -89,6 +90,15 @@ struct KeyboardView: View {
                             },
                             onPopupRelease: {
                                 viewModel.confirmPopupSelection()
+                            },
+                            onSlotBVowelGestureStart: { point in
+                                viewModel.slotBVowelGestureStarted(at: point)
+                            },
+                            onSlotBVowelGestureMove: { point in
+                                viewModel.slotBVowelGestureMoved(to: point)
+                            },
+                            onSlotBVowelGestureEnd: {
+                                viewModel.slotBVowelGestureEnded()
                             }
                         )
 
@@ -113,13 +123,23 @@ struct KeyboardView: View {
                             },
                             onCursorMoveDelta: { offset in
                                 viewModel.moveCursor(by: offset)
+                            },
+                            layoutCustomization: settings.layoutCustomization,
+                            onSlotBVowelGestureStart: { point in
+                                viewModel.slotBVowelGestureStarted(at: point)
+                            },
+                            onSlotBVowelGestureMove: { point in
+                                viewModel.slotBVowelGestureMoved(to: point)
+                            },
+                            onSlotBVowelGestureEnd: {
+                                viewModel.slotBVowelGestureEnded()
                             }
                         )
                     }
                     .padding(KeyboardMetrics.keySpacing)
 
-                    // Gesture overlay (only shown when enabled and in Korean mode)
-                    if settings.showGesturePreview && viewModel.keyboardMode == .korean {
+                    // Gesture overlay (shown when enabled or forced, and in Korean mode)
+                    if (settings.showGesturePreview || viewModel.forceShowGesturePreview) && viewModel.keyboardMode == .korean {
                         GestureOverlayView(
                             directions: gestureState.directions,
                             startPoint: gestureState.startPoint,
@@ -191,6 +211,12 @@ struct KeyboardView: View {
                     viewModel.setCenterKeyWidth(newValue)
                 }
         }
+        // Named coordinate space lets the slot-B vowel key report its
+        // gesture start point in the keyboard's frame (instead of the key's
+        // local frame), so the settings preview can position UI based on
+        // which half of the keyboard the user touched. Production keyboard
+        // ignores this — the value is only consumed in preview mode.
+        .coordinateSpace(name: "keyboardPreview")
         .onAppear { loadBackgroundIfNeeded() }
         .onChange(of: settings.themeSettings.backgroundImageId) { _ in loadBackgroundIfNeeded() }
     }

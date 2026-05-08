@@ -6,6 +6,9 @@ enum KeyContent: Equatable {
     case consonant(Choseong)
     case symbol(String)
     case backspace
+    case backspaceWide       // A2 의 row 3 가로 2칸 ⌫
+    case slotBVowelKey       // A3 col 6 row 1 — function-row vowel key 와 동일 동작
+    case slotBPunctuation    // A3 col 6 row 2 — function-row 특수문자 swipe 와 동일 동작
     // Moakey bimanual layout key types
     case vowelPrimitive(VowelPrimitiveType)  // ㆍ, ㅣ, ㅡ
     case functional(FunctionalKeyType)        // Mode switch, settings, etc.
@@ -102,12 +105,18 @@ enum KeyboardMetrics {
         return centerKeyWidth
     }
 
-    /// Mode-aware key width. English layout uses uniform widths (with the
-    /// last row's backspace stretched to fill remaining space).
+    /// Mode-aware key width. English layout uses uniform widths, except row 3
+    /// (shift + zxcvbnm + backspace) where shift and backspace are widened
+    /// 1.5x so the row edges align with rows 0-1 (10 keys), matching iOS QWERTY.
     static func keyWidth(for column: Int, row: Int, centerKeyWidth: CGFloat, mode: KeyboardMode) -> CGFloat {
         switch mode {
         case .english:
-            // All keys are equal-width (shift and backspace on last row are same width as letters).
+            // Row 3 = shift, z, x, c, v, b, n, m, backspace (9 cells).
+            // Make shift (col 0) and backspace (col 8) 1.5x wider so the row
+            // visually fills the keyboard like iOS standard QWERTY.
+            if row == 3 && (column == 0 || column == 8) {
+                return centerKeyWidth * 1.5
+            }
             return centerKeyWidth
         case .korean, .symbolFromKorean, .symbolFromEnglish:
             let sideWidth = centerKeyWidth * symbolWidthRatio
@@ -118,6 +127,14 @@ enum KeyboardMetrics {
             }
             return keyWidth(for: column, row: row, centerKeyWidth: centerKeyWidth)
         }
+    }
+
+    /// `backspaceWide` 의 폭 = 일반 자음 1칸 + 우측 사이드 키(1.3·sideRatio) + spacing.
+    /// 인접 셀 (col 5) 만 사용하며 col 6 은 `[3].count == 6` 으로 그리드에 존재 안 함.
+    /// 위쪽 row (col 5 + spacing + col 6) 와 같은 폭으로 정렬되도록 한다.
+    static func keyWidth(forBackspaceWideAt column: Int, centerKeyWidth: CGFloat) -> CGFloat {
+        let sideWidth = centerKeyWidth * symbolWidthRatio * 1.3
+        return centerKeyWidth + sideWidth + keySpacing
     }
 
     // Get number of columns for a row in the active layout.
@@ -143,11 +160,57 @@ enum KeyboardMetrics {
         }
     }
 
+    /// Layout-aware overload. Uses the user's LayoutCustomization for Korean
+    /// and Symbol modes (so the symbol keypad's backspace position mirrors
+    /// the Korean layout). English mode is unaffected.
+    static func activeLayout(for mode: KeyboardMode, layout: LayoutCustomization) -> [[KeyContent]] {
+        switch mode {
+        case .korean: return koreanLayout(layout)
+        case .english: return englishLayout
+        case .symbolFromKorean, .symbolFromEnglish: return symbolLayout(layout)
+        }
+    }
+
     // Calculate key size based on available width (legacy method for compatibility)
     static func keySize(for totalWidth: CGFloat, totalHeight: CGFloat) -> CGSize {
         let keyWidth = centerKeyWidth(for: totalWidth)
         let keyHeightValue = keyHeight(for: totalHeight)
         return CGSize(width: keyWidth, height: keyHeightValue)
+    }
+
+    /// Returns the Korean grid layout for the given LayoutCustomization.
+    /// A1 (vowel preset): reproduces v1.3 layout with col 0 from slotC and optional ㆍ↔⌫ swap.
+    /// A2 (classic11 preset): placeholder — implemented in Task 4.
+    static func koreanLayout(_ layout: LayoutCustomization) -> [[KeyContent]] {
+        let leftCol = layout.slotC.map { KeyContent.symbol($0) }
+        switch layout.slotA {
+        case .vowel:
+            let row1Right: KeyContent = layout.slotABackspaceSwap ? .vowelPrimitive(.dot) : .backspace
+            let row3Right: KeyContent = layout.slotABackspaceSwap ? .backspace : .vowelPrimitive(.dot)
+            return [
+                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol("#")],
+                [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), row1Right],
+                [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .vowelPrimitive(.bar)],
+                [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .vowelPrimitive(.dash), row3Right],
+            ]
+        case .classic11:
+            let rightCol = layout.slotARightColumn
+            return [
+                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol(rightCol[0])],
+                [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), .symbol(rightCol[1])],
+                [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .symbol(rightCol[2])],
+                [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .backspaceWide],
+            ]
+        case .fullPackage:
+            // Classic 베이스 + col 6 에 슬롯 B 임베디드 (모음/특수문자) + wide ⌫.
+            // Function row 의 슬롯 B 키는 비활성, 그 폭만큼 스페이스 확장.
+            return [
+                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol("#")],
+                [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), .slotBVowelKey],
+                [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .slotBPunctuation],
+                [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .backspaceWide],
+            ]
+        }
     }
 
     // Korean mode layout (7 columns × 4 rows, all rows uniform width)
@@ -159,16 +222,49 @@ enum KeyboardMetrics {
         [.symbol("*"), .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .vowelPrimitive(.dash), .vowelPrimitive(.dot)],
     ]
 
-    // Symbol mode layout.
-    // Same 7-col × 4-row geometry as Korean layout. Backspace at row 1 col 6
-    // (matching Korean mode), col 6 = 1.3x sideWidth for unified grid alignment.
-    // Digits are centered: row 0=1-3, row 1=4-6, row 2=7-9, row 3=*0#.
+    // Symbol mode layout (legacy, layout-agnostic).
+    // Backspace at row 1 col 6 — kept for older callers that pre-date
+    // LayoutCustomization. Mode-aware call sites should use
+    // `symbolLayout(_:)` so the symbol keypad's backspace position mirrors
+    // the user's Korean layout choice.
     static let symbolLayout: [[KeyContent]] = [
         [.symbol("~"), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("@"), .symbol("$")],
         [.symbol("%"), .symbol("^"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("&"), .backspace],
         [.symbol("="), .symbol("-"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol("+"), .symbol(")")],
         [.symbol("/"), .symbol("?"), .symbol("*"), .symbol("0"), .symbol("#"), .symbol(":"), .symbol("(")],
     ]
+
+    /// Layout-aware symbol grid. The symbol keypad's backspace position
+    /// follows the user's Korean layout so muscle memory transfers between
+    /// modes:
+    /// - A1 (.vowel, no swap): wide-cell ⌫ at row 1 col 6.
+    /// - A1 (.vowel, swap on): wide-cell ⌫ at row 3 col 6.
+    /// - A2 (.classic11) / A3 (.fullPackage): wide ⌫ spanning row 3 col 5+6.
+    static func symbolLayout(_ layout: LayoutCustomization) -> [[KeyContent]] {
+        switch layout.slotA {
+        case .vowel:
+            // A1 mirrors v1.3 symbol layout. Swap toggle moves ⌫ between
+            // row 1 and row 3 of col 6 — the displaced cell takes the
+            // backspace's old slot's symbol.
+            let row1Right: KeyContent = layout.slotABackspaceSwap ? .symbol("(") : .backspace
+            let row3Right: KeyContent = layout.slotABackspaceSwap ? .backspace : .symbol("(")
+            return [
+                [.symbol("~"), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("@"), .symbol("$")],
+                [.symbol("%"), .symbol("^"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("&"), row1Right],
+                [.symbol("="), .symbol("-"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol("+"), .symbol(")")],
+                [.symbol("/"), .symbol("?"), .symbol("*"), .symbol("0"), .symbol("#"), .symbol(":"), row3Right],
+            ]
+        case .classic11, .fullPackage:
+            // Wide ⌫ at row 3 col 5+6 matches Korean's classic/full-package
+            // backspace position. Row 3 has 6 cells (last cell is wide).
+            return [
+                [.symbol("~"), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("@"), .symbol("$")],
+                [.symbol("%"), .symbol("^"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("&"), .symbol("(")],
+                [.symbol("="), .symbol("-"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol("+"), .symbol(")")],
+                [.symbol("/"), .symbol("?"), .symbol("*"), .symbol("0"), .symbol("#"), .backspaceWide],
+            ]
+        }
+    }
 
     /// English QWERTY layout (4 rows: numbers + 3 letter rows).
     /// All keys are equal-width; sideKey ratio does not apply.
@@ -237,6 +333,21 @@ enum KeyboardMetrics {
             return nil
         }
         return longPressNumbers[row][column]
+    }
+
+    /// Layout-aware long-press number lookup.
+    /// A2 (classic11) places punctuation and a wide backspace in col 6,
+    /// so the digit hint table does not apply there — returns nil for col 6.
+    /// All other columns delegate to the layout-agnostic overload.
+    static func longPressNumber(at row: Int, column: Int, layout: LayoutCustomization) -> String? {
+        if column == 6 {
+            switch layout.slotA {
+            case .vowel:       return longPressNumber(at: row, column: column)
+            case .classic11:   return nil
+            case .fullPackage: return nil
+            }
+        }
+        return longPressNumber(at: row, column: column)
     }
 
     // MARK: - Bimanual Layout

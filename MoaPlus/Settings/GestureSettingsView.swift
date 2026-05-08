@@ -109,6 +109,12 @@ struct GestureSettingsView: View {
             } footer: {
                 Text("고급 설정: 끝열에서 바깥쪽 긋기가 잘 안 되는 경우 보정값을 조정할 수 있습니다.")
             }
+            // Gesture preview toggle
+            Section {
+                Toggle("제스처 미리보기", isOn: $settings.showGesturePreview)
+            } footer: {
+                Text("입력 시 긋기 방향과 예측 모음을 화면에 표시합니다.")
+            }
         }
         .navigationTitle("긋기 입력 설정")
     }

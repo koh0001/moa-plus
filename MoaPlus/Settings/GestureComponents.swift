@@ -1,75 +1,5 @@
 import SwiftUI
 
-struct InputSettingsView: View {
-    @ObservedObject private var settings = KeyboardSettings.shared
-
-    var body: some View {
-        List {
-            // Unified gesture settings entry
-            Section {
-                NavigationLink(destination: GestureSettingsView()) {
-                    HStack {
-                        Label("긋기 입력 설정", systemImage: "hand.draw")
-                        Spacer()
-                        Text(gestureSummary)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            } header: {
-                Text("제스처")
-            } footer: {
-                Text("긋기 각도/길이/방향 매핑/열별 보정과 실시간 테스트가 한 곳에 모여 있습니다.")
-            }
-
-            // Side key width
-            Section {
-                HStack {
-                    Text("좌우 특수키 크기")
-                    Spacer()
-                    Text("\(Int(settings.sideKeyWidthRatio * 100))%")
-                        .foregroundColor(.secondary)
-                }
-                Slider(value: $settings.sideKeyWidthRatio, in: 0.15...1.0, step: 0.05)
-            } header: {
-                Text("레이아웃")
-            } footer: {
-                Text("좌우 끝 기호키의 너비를 조절합니다. 기본값: 70% (정사각 키)")
-            }
-
-            // Cursor control
-            Section {
-                Toggle("스페이스 드래그로 커서 이동", isOn: $settings.cursorMoveBySpaceDragEnabled)
-            } header: {
-                Text("커서 제어")
-            } footer: {
-                Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로 이동합니다.")
-            }
-
-            // Debug
-            Section {
-                Toggle("제스처 미리보기", isOn: $settings.showGesturePreview)
-            } footer: {
-                Text("입력 시 긋기 방향과 예측 모음을 화면에 표시합니다.")
-            }
-        }
-        .navigationTitle("모아키 입력")
-    }
-
-    private var gestureSummary: String {
-        let p = settings.gestureSettings.swipeProfile
-        let mode: String = {
-            switch p.mode {
-            case .right: return "오른손"
-            case .left: return "왼손"
-            case .both: return "양손"
-            case .custom: return "커스텀"
-            }
-        }()
-        return "\(mode) · \(p.swipeLength.displayName)"
-    }
-}
-
 // MARK: - Column Correction Detail
 
 struct ColumnCorrectionDetailView: View {
@@ -162,7 +92,7 @@ struct ColumnCorrectionDetailView: View {
             } header: {
                 Text("보정값")
             } footer: {
-                Text("‘방향 전환 거리 보정’이 클수록 두 번째 방향 stroke 등록이 까다로워집니다. 정수직 ↑로 그었는데 끝부분이 살짝 휘어 ㅘ로 잡힐 때 +값으로 올리세요.")
+                Text("'방향 전환 거리 보정'이 클수록 두 번째 방향 stroke 등록이 까다로워집니다. 정수직 ↑로 그었는데 끝부분이 살짝 휘어 ㅘ로 잡힐 때 +값으로 올리세요.")
             }
 
             if columnId == 1 || columnId == 5 {
@@ -179,7 +109,6 @@ struct ColumnCorrectionDetailView: View {
                     Text("값이 낮을수록 바깥쪽 긋기를 더 쉽게 인식합니다.")
                 }
             }
-
 
             Section {
                 Button("이 열만 기본값으로 복원") {
@@ -540,10 +469,6 @@ struct DirectionMappingView: View {
     }
 }
 
-// MARK: - Direction Mapping Diagram
-
-// DirectionMappingDiagram removed — replaced by DirectionPieChart
-
 // MARK: - Sector Angle View
 
 struct SectorAngleView: View {
@@ -611,9 +536,3 @@ struct SectorAngleView: View {
         )
     }
 }
-
-// MARK: - Sector Angle Diagram
-
-// SectorAngleDiagram removed — replaced by DirectionPieChart
-
-// SectorShape removed — DirectionPieChart uses Canvas directly
