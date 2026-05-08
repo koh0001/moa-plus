@@ -4,6 +4,8 @@ struct ContentView: View {
     private let deepBlue = Color(red: 0.10, green: 0.10, blue: 0.18)
     private let accentBlue = Color(red: 0.26, green: 0.38, blue: 0.93)
 
+    @State private var showFirstLaunchModal = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -95,6 +97,16 @@ struct ContentView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .onAppear {
+            if !KeyboardSettings.shared.firstLaunchModalShown {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showFirstLaunchModal = true
+                }
+            }
+        }
+        .sheet(isPresented: $showFirstLaunchModal) {
+            FirstLaunchLayoutModalView()
         }
     }
 }
