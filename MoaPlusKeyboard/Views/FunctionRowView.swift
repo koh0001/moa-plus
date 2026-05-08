@@ -11,6 +11,8 @@ struct FunctionRowView: View {
     var onCursorMoveDelta: ((Int) -> Void)? = nil
     var onLanguageSwitchPressed: (() -> Void)? = nil
     var useBimanualLayout: Bool = false
+    var layoutCustomization: LayoutCustomization = LayoutCustomization()
+    var onSlotBVowelKey: ((GestureDirection?) -> Void)? = nil
 
     private let spacing: CGFloat = KeyboardMetrics.keySpacing
     private let height: CGFloat = KeyboardMetrics.functionRowHeight
@@ -72,12 +74,8 @@ struct FunctionRowView: View {
                 onCursorMove: onCursorMoveDelta ?? { _ in }
             )
 
-            // Swipe punctuation key (tap = ".", up = ",", left = "?", right = "!", down = ".")
-            PunctuationSwipeKey(
-                width: punctuationWidth,
-                height: height,
-                onPunctuation: onPunctuation
-            )
+            // Slot B — punctuation (B2) or vowel key (B1) per layout customization.
+            slotBKey(width: punctuationWidth)
 
             // Return button
             FunctionKeyView(
@@ -88,6 +86,27 @@ struct FunctionRowView: View {
                 width: returnWidth,
                 height: height,
                 action: onReturnPressed
+            )
+        }
+    }
+
+    /// Renders the slot B key based on layoutCustomization.slotB.
+    /// `.punctuation` → tap=. swipe ←=? →=! ↑=, ↓=.
+    /// `.vowelKey` → tap=ㆍ + 8-direction single-stroke vowels.
+    @ViewBuilder
+    private func slotBKey(width: CGFloat) -> some View {
+        switch layoutCustomization.slotB {
+        case .punctuation:
+            PunctuationSwipeKey(
+                width: width,
+                height: height,
+                onPunctuation: onPunctuation
+            )
+        case .vowelKey:
+            SlotBVowelKey(
+                width: width,
+                height: height,
+                onAction: onSlotBVowelKey ?? { _ in }
             )
         }
     }
@@ -138,12 +157,8 @@ struct FunctionRowView: View {
                 onCursorMove: onCursorMoveDelta ?? { _ in }
             )
 
-            // Swipe punctuation
-            PunctuationSwipeKey(
-                width: bimanualPunctuationWidth,
-                height: height,
-                onPunctuation: onPunctuation
-            )
+            // Slot B — punctuation (B2) or vowel key (B1) per layout customization.
+            slotBKey(width: bimanualPunctuationWidth)
 
             // Return key
             FunctionKeyView(
@@ -271,6 +286,75 @@ struct PunctuationSwipeKey: View {
                     didDrag = false
                 }
         )
+    }
+}
+
+// MARK: - Slot B vowel key (B1 preset)
+
+/// 슬롯 B `.vowelKey` 프리셋. tap = ㆍ; 8방향 드래그 = 단일 스트로크 모음.
+/// 자음 드래그의 첫 스트로크와 동일한 매핑을 사용 (멀티 스트로크 합성 X).
+struct SlotBVowelKey: View {
+    let width: CGFloat
+    let height: CGFloat
+    let onAction: (GestureDirection?) -> Void
+
+    @State private var isPressed = false
+    @State private var didDrag = false
+
+    private static let dragThreshold: CGFloat = 12
+
+    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text("ㆍ").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
+            Text("모음").font(.system(size: 8)).foregroundColor(fg.opacity(0.5))
+        }
+        .frame(width: width, height: height)
+        .background(
+            RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
+                .fill(isPressed ? bg.opacity(0.7) : bg)
+        )
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if !isPressed { isPressed = true }
+                    if !didDrag {
+                        let dx = value.translation.width
+                        let dy = value.translation.height
+                        if abs(dx) >= Self.dragThreshold || abs(dy) >= Self.dragThreshold {
+                            didDrag = true
+                            onAction(Self.directionFor(dx: dx, dy: dy))
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                    if !didDrag {
+                        onAction(nil)   // tap = ㆍ
+                    }
+                    didDrag = false
+                }
+        )
+    }
+
+    /// Map an (dx, dy) translation into one of 8 GestureDirections.
+    /// Diagonal sectors require both axes to contribute substantially
+    /// (≥ 40% of total magnitude), matching the visual sector model.
+    private static func directionFor(dx: CGFloat, dy: CGFloat) -> GestureDirection {
+        let absX = abs(dx)
+        let absY = abs(dy)
+        let total = absX + absY
+        let isDiagonal = total > 0 && absX > 0.4 * total && absY > 0.4 * total
+        if isDiagonal {
+            if dx > 0 && dy < 0 { return .upRight }
+            if dx < 0 && dy < 0 { return .upLeft }
+            if dx > 0 && dy > 0 { return .downRight }
+            return .downLeft
+        }
+        if absX > absY { return dx > 0 ? .right : .left }
+        return dy > 0 ? .down : .up
     }
 }
 

@@ -219,6 +219,23 @@ class KeyboardViewModel: ObservableObject {
         triggerHapticFeedback()
     }
 
+    /// Slot B `.vowelKey` 프리셋 입력 처리.
+    /// `direction == nil` → tap → ㆍ.
+    /// 그 외 → VowelResolver 의 단일 스트로크 매핑 (자음 드래그 첫 스트로크와 동일).
+    /// 멀티 스트로크 합성은 하지 않는다 — 한 번의 호출 = 한 번의 모음 입력.
+    func handleSlotBVowelKey(direction: GestureDirection?) {
+        guard let direction = direction else {
+            inputVowel(.ㆍ)
+            return
+        }
+        // Sync the resolver's swipe profile with current settings so diagonal
+        // mappings reflect the user's gesture configuration.
+        vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        if let vowel = vowelResolver.resolveSingleStroke(direction: direction) {
+            inputVowel(vowel)
+        }
+    }
+
     /// Input a vowel primitive (천지인 ㅣ/ㅡ/ㆍ).
     /// All three feed the Hangul composer as `Jungseong` values; ㆍ is held
     /// as a transient pending vowel that combines with subsequent input

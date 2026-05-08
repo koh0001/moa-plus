@@ -114,6 +114,10 @@ struct KeyboardView: View {
                             },
                             onCursorMoveDelta: { offset in
                                 viewModel.moveCursor(by: offset)
+                            },
+                            layoutCustomization: settings.layoutCustomization,
+                            onSlotBVowelKey: { direction in
+                                viewModel.handleSlotBVowelKey(direction: direction)
                             }
                         )
                     }

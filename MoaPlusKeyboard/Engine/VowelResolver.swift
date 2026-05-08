@@ -26,6 +26,33 @@ class VowelResolver {
         return Resolution(vowel: match.vowel, hasMoreMatches: match.hasLongerMatch)
     }
 
+    /// Single-stroke direction → Jungseong, mirroring the first-stroke
+    /// branch of `resolve(directions:)`. Cardinals map directly
+    /// (←ㅓ →ㅏ ↑ㅗ ↓ㅜ); diagonals follow the active SwipeProfile's
+    /// DiagonalMapping. Used by slot-B vowel key (no multi-stroke compound).
+    /// Returns nil for `.disabled` mappings.
+    func resolveSingleStroke(direction: GestureDirection) -> Jungseong? {
+        if let directVowel = resolveDirectDiagonal(direction) {
+            return directVowel
+        }
+        switch direction {
+        case .left:  return .ㅓ
+        case .right: return .ㅏ
+        case .up:    return .ㅗ
+        case .down:  return .ㅜ
+        case .upLeft, .upRight, .downLeft, .downRight:
+            // Diagonal had no direct vowel mapping (e.g. .normalize* or
+            // .disabled). Fall back to the normalized cardinal.
+            switch normalizedDirection(for: direction) {
+            case .left:  return .ㅓ
+            case .right: return .ㅏ
+            case .up:    return .ㅗ
+            case .down:  return .ㅜ
+            default:     return nil
+            }
+        }
+    }
+
     // For real-time feedback during gesture
     func peekVowel(directions: [GestureDirection]) -> Jungseong? {
         guard !directions.isEmpty else { return nil }

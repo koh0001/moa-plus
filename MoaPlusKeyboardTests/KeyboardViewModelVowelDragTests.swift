@@ -131,4 +131,54 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         // ㅗ + ↑ has no compound; should remain ㅗ.
         XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.up, .up]), .ㅗ)
     }
+
+    // MARK: - Slot B vowel key (B1 preset, Task 10)
+
+    func test_slotBVowelKey_tapInsertsDot() {
+        vm.handleSlotBVowelKey(direction: nil)
+        // ㆍ alone enters dotPending(nil, 1) → composingDisplay == "ㆍ".
+        XCTAssertEqual(vm.composingText, "ㆍ")
+    }
+
+    func test_slotBVowelKey_rightDragInsertsA() {
+        vm.handleSlotBVowelKey(direction: .right)
+        XCTAssertEqual(vm.composingText, "ㅏ")
+    }
+
+    func test_slotBVowelKey_leftDragInsertsEo() {
+        vm.handleSlotBVowelKey(direction: .left)
+        XCTAssertEqual(vm.composingText, "ㅓ")
+    }
+
+    func test_slotBVowelKey_upDragInsertsO() {
+        vm.handleSlotBVowelKey(direction: .up)
+        XCTAssertEqual(vm.composingText, "ㅗ")
+    }
+
+    func test_slotBVowelKey_downDragInsertsU() {
+        vm.handleSlotBVowelKey(direction: .down)
+        XCTAssertEqual(vm.composingText, "ㅜ")
+    }
+
+    func test_slotBVowelKey_diagonalUpRightInsertsI_perDefaultProfile() {
+        // Default SwipeProfile.bothHands maps ↗ → ㅣ (vowelI).
+        vm.handleSlotBVowelKey(direction: .upRight)
+        XCTAssertEqual(vm.composingText, "ㅣ")
+    }
+
+    func test_slotBVowelKey_diagonalDownRightInsertsEu_perDefaultProfile() {
+        // Default SwipeProfile.bothHands maps ↘ → ㅡ (vowelEu).
+        vm.handleSlotBVowelKey(direction: .downRight)
+        XCTAssertEqual(vm.composingText, "ㅡ")
+    }
+
+    func test_slotBVowelKey_singleStrokeOnly_noMultiCompose() {
+        // Two right drags should NOT compose — second call combines via the
+        // composer, not via primitive multi-stroke logic. ㅏ then ㅏ → ㅏ
+        // commits and a fresh ㅏ becomes the new composing vowel.
+        vm.handleSlotBVowelKey(direction: .right)
+        vm.handleSlotBVowelKey(direction: .right)
+        // After two separate ㅏ inputs, displayText is committed "ㅏ" + composing "ㅏ".
+        XCTAssertEqual(vm.composingText, "ㅏㅏ")
+    }
 }
