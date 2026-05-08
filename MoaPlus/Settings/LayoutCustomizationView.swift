@@ -72,6 +72,20 @@ struct LayoutCustomizationView: View {
             } footer: {
                 Text("각 셀에 1~4 자 문자 매핑. 빈 입력은 거부됩니다.")
             }
+
+            // Key size (moved from InputSettingsView)
+            Section {
+                HStack {
+                    Text("좌우 특수키")
+                    Spacer()
+                    Text("\(Int(settings.sideKeyWidthRatio * 100))%").foregroundColor(.secondary)
+                }
+                Slider(value: $settings.sideKeyWidthRatio, in: 0.15...1.0, step: 0.05)
+            } header: {
+                Text("키 크기")
+            } footer: {
+                Text("좌우 끝 키의 너비. 기본 70% (정사각).")
+            }
         }
         .navigationTitle("레이아웃 커스터마이즈")
         .alert("셀 편집", isPresented: $showingCellEdit) {
