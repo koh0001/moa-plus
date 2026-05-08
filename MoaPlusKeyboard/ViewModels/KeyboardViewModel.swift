@@ -51,8 +51,15 @@ class KeyboardViewModel: ObservableObject {
 
     /// Phase markers for `onPreviewConsonantGesture` so callers (the gesture
     /// test screen) can distinguish in-flight previews from the final result
-    /// without reverse-engineering the directions array.
-    enum PreviewGesturePhase { case began, moved, ended }
+    /// without reverse-engineering the directions array. Carries the raw
+    /// touch trail (`points`) and the production column id (`columnId`) so
+    /// the abstract sector canvas can mirror what the user is doing on the
+    /// real keyboard above without running its own gesture pipeline.
+    enum PreviewGesturePhase {
+        case began(startPoint: CGPoint, columnId: Int)
+        case moved(currentPoint: CGPoint, points: [CGPoint], columnId: Int)
+        case ended(points: [CGPoint], columnId: Int)
+    }
 
     /// Fires from the consonant-key gesture pipeline while `previewMode` is
     /// on. Lets the gesture test screen visualise the same analyzer +
@@ -60,6 +67,16 @@ class KeyboardViewModel: ObservableObject {
     /// host text field. `vowel` is the live/peek vowel during `.began`/`.moved`
     /// and the resolved final vowel on `.ended`.
     var onPreviewConsonantGesture: ((PreviewGesturePhase, [GestureDirection], Jungseong?) -> Void)? = nil
+
+    /// Raw touch trail captured during a preview-mode consonant gesture so
+    /// callers receive the full point list with each `.moved` / `.ended`
+    /// phase. Reset on every `.began`.
+    private var previewGesturePoints: [CGPoint] = []
+    /// Last column id fed to the gesture analyzer during a preview-mode
+    /// gesture. Forwarded in every preview phase so the abstract canvas
+    /// can mirror the column-specific sector geometry of whichever key
+    /// the user is touching on the real keyboard.
+    private var previewGestureColumnId: Int = 0
 
     /// When `true`, the gesture overlay is always shown in Korean mode regardless
     /// of the global `showGesturePreview` setting. Set by `KeyboardPreviewView`
@@ -598,7 +615,13 @@ class KeyboardViewModel: ObservableObject {
         gestureDirections = []
         previewVowel = nil
         if previewMode {
-            onPreviewConsonantGesture?(.began, [], nil)
+            previewGesturePoints = [point]
+            previewGestureColumnId = gestureAnalyzer.columnId
+            onPreviewConsonantGesture?(
+                .began(startPoint: point, columnId: previewGestureColumnId),
+                [],
+                nil
+            )
         }
     }
 
@@ -624,7 +647,14 @@ class KeyboardViewModel: ObservableObject {
             previewVowel = vowelResolver.peekVowel(directions: directions)
         }
         if previewMode {
-            onPreviewConsonantGesture?(.moved, directions, previewVowel)
+            previewGesturePoints.append(point)
+            onPreviewConsonantGesture?(
+                .moved(currentPoint: point,
+                       points: previewGesturePoints,
+                       columnId: previewGestureColumnId),
+                directions,
+                previewVowel
+            )
         }
     }
 
@@ -651,8 +681,14 @@ class KeyboardViewModel: ObservableObject {
             // shows what the production keyboard would have committed.
             if onPreviewConsonantGesture != nil {
                 let resolved = vowelResolver.resolve(directions: directions).vowel
-                onPreviewConsonantGesture?(.ended, directions, resolved)
+                onPreviewConsonantGesture?(
+                    .ended(points: previewGesturePoints,
+                           columnId: previewGestureColumnId),
+                    directions,
+                    resolved
+                )
             }
+            previewGesturePoints.removeAll()
             resetGestureState()
             return
         }

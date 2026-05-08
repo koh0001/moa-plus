@@ -44,14 +44,15 @@ final class GestureTestModel: ObservableObject {
             .sink { [weak self] _ in self?.configureEngine() }
             .store(in: &cancellables)
 
-        // Re-configure when the selected column changes.
+        // Re-configure when the selected column changes. The column is now
+        // driven by the live keyboard preview (whichever consonant key the
+        // user is touching), so we only refresh engine settings — clearing
+        // the trail would race against the very same gesture that updated
+        // the column.
         $selectedColumn
-            .dropFirst()                // skip initial value (already handled in init)
+            .dropFirst()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.reset()
-                self?.configureEngine()
-            }
+            .sink { [weak self] _ in self?.configureEngine() }
             .store(in: &cancellables)
     }
 
@@ -101,58 +102,70 @@ final class GestureTestModel: ObservableObject {
         settings.gestureSettings.swipeProfile
     }
 
-    // MARK: Drag handling (abstract canvas)
-
-    func onDragChanged(_ value: DragGesture.Value) {
-        if startPoint == nil {
-            startPoint = value.startLocation
-            points = [value.startLocation]
-            analyzer.reset()
-            analyzer.addPoint(value.startLocation)
-            finalDirections = []
-            finalVowel = nil
-        }
-        analyzer.addPoint(value.location)
-        points.append(value.location)
-
-        liveDirections = analyzer.getDirections()
-        liveVowel = resolver.peekVowel(directions: liveDirections)
-        liveDirectionIndex = liveDirections.last.flatMap { Self.sectorIndex[$0] }
-    }
-
-    func onDragEnded() {
-        let normalized = analyzer.finalizeGesture()
-        finalDirections = normalized
-        let resolution = resolver.resolve(directions: normalized)
-        finalVowel = resolution.vowel ?? liveVowel
-    }
-
     // MARK: Real-keyboard preview ingestion
 
     /// Receive a `(phase, directions, vowel)` snapshot from the real keyboard
     /// preview's consonant gesture pipeline. Mirrors the abstract canvas's
-    /// `liveDirections / finalDirections` fields so the same status panel
-    /// can render results from either source.
+    /// `liveDirections / finalDirections` fields plus the touch trail so the
+    /// canvas can redraw the user's path live without running its own
+    /// gesture analyzer.
     func ingestKeyboardPreview(phase: KeyboardViewModel.PreviewGesturePhase,
                                directions: [GestureDirection],
                                vowel: Jungseong?) {
         switch phase {
-        case .began:
+        case .began(let startPoint, let columnId):
             liveDirections = []
             liveVowel = nil
             liveDirectionIndex = nil
             finalDirections = []
             finalVowel = nil
-        case .moved:
+            // Adopt the column the user just touched so sector geometry and
+            // per-column overrides reflect the real key under their finger.
+            applyColumn(columnId)
+            keyboardOriginPoint = startPoint
+            self.startPoint = canvasCenter
+            points = [canvasCenter]
+        case .moved(_, let trail, let columnId):
+            applyColumn(columnId)
             liveDirections = directions
             liveVowel = vowel
             liveDirectionIndex = directions.last.flatMap { Self.sectorIndex[$0] }
-        case .ended:
+            points = mappedPoints(trail)
+        case .ended(let trail, let columnId):
+            applyColumn(columnId)
             finalDirections = directions
             finalVowel = vowel ?? liveVowel
             liveDirections = directions
             liveDirectionIndex = directions.last.flatMap { Self.sectorIndex[$0] }
+            points = mappedPoints(trail)
         }
+    }
+
+    /// Origin of the live keyboard gesture in the keyboard's own coordinate
+    /// space. We translate every subsequent point relative to this origin
+    /// and re-anchor it on the canvas centre so the trail mirrors the user's
+    /// actual stroke geometry without depending on screen-space alignment.
+    private var keyboardOriginPoint: CGPoint = .zero
+
+    private var canvasCenter: CGPoint {
+        CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+    }
+
+    private func mappedPoints(_ trail: [CGPoint]) -> [CGPoint] {
+        guard !trail.isEmpty else { return [canvasCenter] }
+        let origin = keyboardOriginPoint
+        let centre = canvasCenter
+        return trail.map { CGPoint(x: centre.x + ($0.x - origin.x),
+                                   y: centre.y + ($0.y - origin.y)) }
+    }
+
+    /// Adopt a column id from the live keyboard so sector visualisation and
+    /// per-column corrections track whichever key the user just pressed.
+    /// Avoids the Combine sink in `init` that would `reset()` the trail.
+    private func applyColumn(_ columnId: Int) {
+        guard columnId != selectedColumn else { return }
+        selectedColumn = columnId
+        configureEngine()
     }
 
     func reset() {
@@ -321,7 +334,7 @@ struct GestureTestView: View {
             DisclosureGroup(isExpanded: $showAbstractCanvas) {
                 VStack(spacing: 12) {
                     visualization
-                    Text("가상의 가운데 키 주변에서 직접 긋기 동작을 그려 8방향 섹터 구조를 확인할 수 있습니다.")
+                    Text("위 키보드에서 자음 키를 끌면 같은 동작이 이 캔버스에 그대로 그려져 8방향 섹터와 어떻게 만나는지 확인할 수 있습니다.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -343,6 +356,9 @@ struct GestureTestView: View {
         )
     }
 
+    /// Read-only mirror of the live keyboard gesture. The canvas no longer
+    /// captures its own touches — it draws sector geometry plus the trail
+    /// fed by `model.ingestKeyboardPreview`.
     private var visualization: some View {
         ZStack {
             SectorOverlay(
@@ -354,7 +370,7 @@ struct GestureTestView: View {
                 detectedIndex: model.liveDirectionIndex
             )
 
-            // Stroke path
+            // Stroke path mirrored from the keyboard above.
             if model.points.count > 1 {
                 Path { path in
                     path.move(to: model.points[0])
@@ -370,15 +386,6 @@ struct GestureTestView: View {
                 .stroke(Color.gray.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 .frame(width: model.effectiveThreshold * 2, height: model.effectiveThreshold * 2)
                 .position(x: model.canvasSize.width / 2, y: model.canvasSize.height / 2)
-
-            // Virtual key in center
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray5))
-                .frame(width: 56, height: 44)
-                .overlay(
-                    Text(centerKeyLabel)
-                        .font(.headline)
-                )
 
             // Start point marker
             if let sp = model.startPoint {
@@ -398,26 +405,11 @@ struct GestureTestView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3), lineWidth: 1)
         )
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in model.onDragChanged(value) }
-                .onEnded { _ in model.onDragEnded() }
-        )
+        .allowsHitTesting(false)
         .frame(maxWidth: .infinity)
     }
 
     // MARK: - Computed labels
-
-    private var centerKeyLabel: String {
-        switch model.selectedColumn {
-        case 1: return "ㅂ"
-        case 2: return "ㄴ"
-        case 3: return "ㅇ"
-        case 4: return "ㄱ"
-        case 5: return "ㅅ"
-        default: return ""
-        }
-    }
 
     private var liveStrokeSequence: String {
         guard !model.liveDirections.isEmpty else { return "—" }
