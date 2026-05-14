@@ -95,8 +95,25 @@ struct LayoutCustomizationView: View {
 
             // Slot A right column (classic11: 3 rows / fullPackage: row 0 only)
             if settings.layoutCustomization.slotA == .classic11 || settings.layoutCustomization.slotA == .fullPackage {
+                let isFullPackage = settings.layoutCustomization.slotA == .fullPackage
+                let row0AsPunct = settings.layoutCustomization.slotARightColumnTopAsPunctuation
                 Section {
-                    let editableCount = settings.layoutCustomization.slotA == .fullPackage ? 1 : 3
+                    if isFullPackage {
+                        Toggle("1번 셀을 긋기 펑크 키로 사용", isOn: Binding(
+                            get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
+                            set: { newValue in
+                                var lc = settings.layoutCustomization
+                                lc.slotARightColumnTopAsPunctuation = newValue
+                                settings.layoutCustomization = lc
+                            }
+                        ))
+                        if row0AsPunct {
+                            Text("ON 시 row 0 자리에 한글 펑크 슬롯(아래 한글 자판 슬롯) 적용. 1번 셀 텍스트는 무시됨.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    let editableCount = isFullPackage ? 1 : 3
                     ForEach(0..<editableCount, id: \.self) { i in
                         HStack {
                             Text("\(i + 1)번 셀 (row \(i))")
@@ -106,13 +123,15 @@ struct LayoutCustomizationView: View {
                             }
                             .font(.system(size: 16, weight: .medium))
                         }
+                        .disabled(isFullPackage && i == 0 && row0AsPunct)
+                        .opacity(isFullPackage && i == 0 && row0AsPunct ? 0.4 : 1.0)
                     }
                     Button("기본값으로 초기화 (! ? .)", action: resetSlotARightColumn)
                         .foregroundColor(.red)
                 } header: {
-                    Text(settings.layoutCustomization.slotA == .fullPackage ? "우측 컬럼 셀 (확장형)" : "우측 컬럼 셀 (1.1 클래식)")
+                    Text(isFullPackage ? "우측 컬럼 셀 (확장형)" : "우측 컬럼 셀 (1.1 클래식)")
                 } footer: {
-                    if settings.layoutCustomization.slotA == .fullPackage {
+                    if isFullPackage {
                         Text("col 6 row 0 에 들어갈 문자. row 1·2 는 모음 키 / 특수문자 키로 고정. 1~4 자.")
                     } else {
                         Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
@@ -173,15 +192,6 @@ struct LayoutCustomizationView: View {
             // MARK: - 긋기 펑크 키 (v1.5)
 
             Section("긋기 펑크 키 — 한글 자판") {
-                Toggle("사용 (function row 우측)", isOn: Binding(
-                    get: { settings.layoutCustomization.koreanPunctuationEnabled },
-                    set: { newValue in
-                        var lc = settings.layoutCustomization
-                        lc.koreanPunctuationEnabled = newValue
-                        settings.layoutCustomization = lc
-                    }
-                ))
-
                 if settings.layoutCustomization.slotA == .vowel {
                     Toggle("A1 # 자리에도 표시", isOn: Binding(
                         get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
@@ -203,7 +213,7 @@ struct LayoutCustomizationView: View {
                         }
                     ),
                     defaults: .defaultKorean,
-                    isEnabled: settings.layoutCustomization.koreanPunctuationEnabled
+                    isEnabled: true
                 )
             }
 
