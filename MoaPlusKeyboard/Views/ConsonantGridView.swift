@@ -135,10 +135,9 @@ struct KeyGridView: View {
                             )
                         } else if row == 0 && column == 6
                                     && mode == .korean
-                                    && layoutCustomization.slotA == .vowel
                                     && layoutCustomization.slotARightColumnTopAsPunctuation
-                                    && content == .symbol("#") {
-                            // A1 프리셋 + 옵션 ON: # 자리를 긋기 펑크 키로 교체. spec §4 bypass 적용
+                                    && (layoutCustomization.slotA == .vowel || layoutCustomization.slotA == .fullPackage) {
+                            // A1 # 자리 또는 A3 slotARightColumn[0] 자리를 긋기 펑크 키로 교체. spec §4 bypass 적용
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
