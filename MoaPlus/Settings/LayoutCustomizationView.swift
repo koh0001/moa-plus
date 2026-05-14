@@ -93,10 +93,11 @@ struct LayoutCustomizationView: View {
                 Text("우측 끝 컬럼의 키 매핑.")
             }
 
-            // Slot A right column (only for classic11)
-            if settings.layoutCustomization.slotA == .classic11 {
+            // Slot A right column (classic11: 3 rows / fullPackage: row 0 only)
+            if settings.layoutCustomization.slotA == .classic11 || settings.layoutCustomization.slotA == .fullPackage {
                 Section {
-                    ForEach(0..<3, id: \.self) { i in
+                    let editableCount = settings.layoutCustomization.slotA == .fullPackage ? 1 : 3
+                    ForEach(0..<editableCount, id: \.self) { i in
                         HStack {
                             Text("\(i + 1)번 셀 (row \(i))")
                             Spacer()
@@ -109,9 +110,13 @@ struct LayoutCustomizationView: View {
                     Button("기본값으로 초기화 (! ? .)", action: resetSlotARightColumn)
                         .foregroundColor(.red)
                 } header: {
-                    Text("우측 컬럼 셀 (1.1 클래식)")
+                    Text(settings.layoutCustomization.slotA == .fullPackage ? "우측 컬럼 셀 (확장형)" : "우측 컬럼 셀 (1.1 클래식)")
                 } footer: {
-                    Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
+                    if settings.layoutCustomization.slotA == .fullPackage {
+                        Text("col 6 row 0 에 들어갈 문자. row 1·2 는 모음 키 / 특수문자 키로 고정. 1~4 자.")
+                    } else {
+                        Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
+                    }
                 }
             }
 
@@ -163,6 +168,67 @@ struct LayoutCustomizationView: View {
                 Text("키 크기")
             } footer: {
                 Text("좌우 끝 키의 너비. 기본 70% (정사각).")
+            }
+
+            // MARK: - 긋기 펑크 키 (v1.5)
+
+            Section("긋기 펑크 키 — 한글 자판") {
+                Toggle("사용 (function row 우측)", isOn: Binding(
+                    get: { settings.layoutCustomization.koreanPunctuationEnabled },
+                    set: { newValue in
+                        var lc = settings.layoutCustomization
+                        lc.koreanPunctuationEnabled = newValue
+                        settings.layoutCustomization = lc
+                    }
+                ))
+
+                if settings.layoutCustomization.slotA == .vowel {
+                    Toggle("A1 # 자리에도 표시", isOn: Binding(
+                        get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.slotARightColumnTopAsPunctuation = newValue
+                            settings.layoutCustomization = lc
+                        }
+                    ))
+                }
+
+                PunctuationSlotsEditor(
+                    slots: Binding(
+                        get: { settings.layoutCustomization.koreanPunctuationSlots },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.koreanPunctuationSlots = newValue
+                            settings.layoutCustomization = lc
+                        }
+                    ),
+                    defaults: .defaultKorean,
+                    isEnabled: settings.layoutCustomization.koreanPunctuationEnabled
+                )
+            }
+
+            Section("긋기 펑크 키 — 영문 자판") {
+                Toggle("사용 (스페이스 폭이 줄어듭니다)", isOn: Binding(
+                    get: { settings.layoutCustomization.englishPunctuationEnabled },
+                    set: { newValue in
+                        var lc = settings.layoutCustomization
+                        lc.englishPunctuationEnabled = newValue
+                        settings.layoutCustomization = lc
+                    }
+                ))
+
+                PunctuationSlotsEditor(
+                    slots: Binding(
+                        get: { settings.layoutCustomization.englishPunctuationSlots },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.englishPunctuationSlots = newValue
+                            settings.layoutCustomization = lc
+                        }
+                    ),
+                    defaults: .defaultEnglish,
+                    isEnabled: settings.layoutCustomization.englishPunctuationEnabled
+                )
             }
         }
         .navigationTitle("레이아웃 커스터마이즈")
@@ -356,6 +422,88 @@ private struct VowelResultBubble: View {
                 .fill(Color(.tertiarySystemBackground))
         )
         .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+    }
+}
+
+private struct PunctuationSlotsEditor: View {
+    @Binding var slots: PunctuationSlots
+    let defaults: PunctuationSlots
+    let isEnabled: Bool
+
+    var body: some View {
+        Group {
+            // 라이브 미리보기
+            HStack {
+                Text("미리보기")
+                Spacer()
+                preview
+                    .frame(width: 56, height: 56)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.tertiarySystemFill))
+                    )
+            }
+
+            slotRow(label: "탭",     binding: $slots.tap,   placeholder: defaults.tap)
+            slotRow(label: "← 왼",   binding: $slots.left,  placeholder: defaults.left)
+            slotRow(label: "→ 오",   binding: $slots.right, placeholder: defaults.right)
+            slotRow(label: "↑ 위",   binding: $slots.up,    placeholder: defaults.up)
+            slotRow(label: "↓ 아래", binding: $slots.down,  placeholder: defaults.down)
+
+            Button("기본값으로 되돌리기") {
+                slots = defaults
+            }
+            .foregroundColor(.accentColor)
+        }
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1.0 : 0.4)
+    }
+
+    private var preview: some View {
+        VStack(spacing: 1) {
+            previewHint(slots.up)
+            HStack(spacing: 4) {
+                previewHint(slots.left)
+                Text(slots.tap.isEmpty ? " " : slots.tap)
+                    .font(.system(size: previewMainSize(slots.tap), weight: .medium))
+                previewHint(slots.right)
+            }
+            previewHint(slots.down)
+        }
+    }
+
+    @ViewBuilder
+    private func previewHint(_ text: String) -> some View {
+        if text.isEmpty {
+            Text(" ").font(.system(size: 9)).foregroundColor(.clear)
+        } else {
+            Text(text).font(.system(size: previewHintSize(text))).foregroundColor(.secondary)
+        }
+    }
+
+    private func previewMainSize(_ text: String) -> CGFloat {
+        switch text.count {
+        case 0, 1: return 16
+        case 2:    return 12
+        default:   return 10
+        }
+    }
+    private func previewHintSize(_ text: String) -> CGFloat {
+        switch text.count {
+        case 0, 1: return 9
+        case 2:    return 8
+        default:   return 7
+        }
+    }
+
+    private func slotRow(label: String, binding: Binding<String>, placeholder: String) -> some View {
+        HStack {
+            Text(label).frame(width: 56, alignment: .leading)
+            TextField(placeholder, text: binding)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+        }
     }
 }
 
