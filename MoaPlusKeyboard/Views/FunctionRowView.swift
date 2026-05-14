@@ -33,14 +33,19 @@ struct FunctionRowView: View {
         mode.letterMode == .korean ? "ABC" : "한"
     }
 
+    /// 현재 모드에서 긋기 펑크 키를 표시할지. 심볼 모드는 항상 OFF (스코프 밖).
+    private var punctuationEnabledForMode: Bool {
+        if mode.isSymbol { return false }
+        return mode == .korean
+            ? layoutCustomization.koreanPunctuationEnabled
+            : layoutCustomization.englishPunctuationEnabled
+    }
+
     var body: some View {
         if useBimanualLayout {
             bimanualLayoutBody
-        } else if mode != .korean || layoutCustomization.slotA == .fullPackage {
-            // Slot B is irrelevant in English/Symbol modes (no Korean vowel
-            // input), and it's embedded in the grid for A3 .fullPackage.
-            // In all three cases, drop the slot B function-row key and let
-            // the space bar absorb the freed width.
+        } else if !punctuationEnabledForMode || layoutCustomization.slotA == .fullPackage {
+            // 펑크 키 OFF이거나 A3(fullPackage)면 긴 스페이스 레이아웃.
             longSpaceLayoutBody
         } else {
             defaultLayoutBody
@@ -155,10 +160,13 @@ struct FunctionRowView: View {
     private func slotBKey(width: CGFloat) -> some View {
         switch layoutCustomization.slotB {
         case .punctuation:
+            let slots = mode == .korean
+                ? KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots
+                : KeyboardSettings.shared.layoutCustomization.englishPunctuationSlots
             PunctuationSwipeKey(
                 width: width,
                 height: height,
-                slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
+                slots: slots,
                 onPunctuation: onPunctuation
             )
         case .vowelKey:
