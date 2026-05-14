@@ -44,8 +44,9 @@ struct FunctionRowView: View {
     var body: some View {
         if useBimanualLayout {
             bimanualLayoutBody
-        } else if !punctuationEnabledForMode || layoutCustomization.slotA == .fullPackage {
-            // 펑크 키 OFF이거나 A3(fullPackage)면 긴 스페이스 레이아웃.
+        } else if !punctuationEnabledForMode || (layoutCustomization.slotA == .fullPackage && mode == .korean) {
+            // 펑크 키 OFF이거나 A3 한글 모드(그리드에 임베드 펑크 있음)면 긴 스페이스.
+            // 영문 모드는 A3여도 그리드 임베드 없으므로 기본 레이아웃 사용.
             longSpaceLayoutBody
         } else {
             defaultLayoutBody
@@ -156,9 +157,12 @@ struct FunctionRowView: View {
     /// Renders the slot B key based on layoutCustomization.slotB.
     /// `.punctuation` → tap=. swipe ←=? →=! ↑=, ↓=.
     /// `.vowelKey` → tap=ㆍ + 8-direction single-stroke vowels.
+    /// 영문 모드는 자음드래그 모음 입력 흐름이 없으므로 slotB == .vowelKey 무시하고
+    /// 강제로 punctuation 사용. 한글 모드는 사용자 설정 그대로.
     @ViewBuilder
     private func slotBKey(width: CGFloat) -> some View {
-        switch layoutCustomization.slotB {
+        let effectiveSlotB: SlotBPreset = mode == .korean ? layoutCustomization.slotB : .punctuation
+        switch effectiveSlotB {
         case .punctuation:
             let slots = mode == .korean
                 ? layoutCustomization.koreanPunctuationSlots
