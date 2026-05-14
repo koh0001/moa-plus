@@ -84,6 +84,7 @@ struct KeyGridView: View {
                         // Long-press trigger:
                         // - Korean mode: use longPressNumbers table
                         // - English mode: digit keys use their primaryLongPressOutput from secondaryAction
+                        // - Symbol mode: iOS-standard alt chars from KeyboardMetrics.symbolModeAlternates
                         let longPressNumber: String? = {
                             if mode == .korean {
                                 return KeyboardMetrics.longPressNumber(at: row, column: column, layout: layoutCustomization)
@@ -93,7 +94,21 @@ struct KeyGridView: View {
                                s.first?.isNumber == true {
                                 return KeyboardSettings.shared.secondaryAction(forKey: s)?.primaryLongPressOutput
                             }
+                            if mode.isSymbol, case .symbol(let s) = content {
+                                return KeyboardMetrics.symbolModeAlternates[s]?.first
+                            }
                             return nil
+                        }()
+
+                        // Secondary action for the popup candidate bar.
+                        // Symbol mode keys synthesize an inline action from
+                        // KeyboardMetrics.symbolModeAlternates since they
+                        // aren't part of the user-editable secondaryKeyActions.
+                        let resolvedSecondaryAction: SecondaryKeyAction? = {
+                            if mode.isSymbol, case .symbol(let s) = content {
+                                return KeyboardMetrics.symbolModeSecondaryAction(for: s)
+                            }
+                            return KeyboardSettings.shared.secondaryAction(forKey: secondaryKeyId)
                         }()
 
                         let width = cellWidth(content: content ?? .symbol(""), column: column, row: row)
@@ -113,6 +128,7 @@ struct KeyGridView: View {
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
+                                slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
                                 onPunctuation: { symbol in onSymbolTap(symbol) }
                             )
                         } else {
@@ -122,7 +138,7 @@ struct KeyGridView: View {
                             isPressed: isActive,
                             previewVowel: isActive ? previewVowel : nil,
                             longPressNumber: longPressNumber,
-                            secondaryAction: KeyboardSettings.shared.secondaryAction(forKey: secondaryKeyId),
+                            secondaryAction: resolvedSecondaryAction,
                             showSecondaryHints: KeyboardSettings.shared.showSecondaryHints,
                             hintSize: KeyboardSettings.shared.hintSize,
                             isGestureActive: isGestureActive,

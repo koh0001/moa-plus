@@ -158,6 +158,7 @@ struct FunctionRowView: View {
             PunctuationSwipeKey(
                 width: width,
                 height: height,
+                slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
                 onPunctuation: onPunctuation
             )
         case .vowelKey:
@@ -311,10 +312,12 @@ struct FunctionRowView: View {
 
 // MARK: - Punctuation swipe key
 
-/// Tap = ".", swipe up = ",", swipe left = "?", swipe right = "!", swipe down = ".".
+/// 5개 슬롯(tap/←/→/↑/↓)을 외부에서 주입받는 긋기 펑크 키.
+/// 빈 문자열("") 슬롯은 미리보기에서 숨김 + 드래그/탭 시 입력 무시.
 struct PunctuationSwipeKey: View {
     let width: CGFloat
     let height: CGFloat
+    let slots: PunctuationSlots
     let onPunctuation: (String) -> Void
 
     @State private var isPressed = false
@@ -325,15 +328,49 @@ struct PunctuationSwipeKey: View {
     private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
     private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
 
+    /// 글자 수에 따라 미리보기 폰트 축소. 1자=16/9, 2자=12/8, 3자+=10/7.
+    private func mainFontSize(for text: String) -> CGFloat {
+        switch text.count {
+        case 0, 1: return 16
+        case 2:    return 12
+        default:   return 10
+        }
+    }
+    private func hintFontSize(for text: String) -> CGFloat {
+        switch text.count {
+        case 0, 1: return 9
+        case 2:    return 8
+        default:   return 7
+        }
+    }
+
+    @ViewBuilder
+    private func hint(_ text: String) -> some View {
+        if text.isEmpty {
+            Text(" ").font(.system(size: 9)).foregroundColor(.clear)
+        } else {
+            Text(text).font(.system(size: hintFontSize(for: text))).foregroundColor(fg.opacity(0.5))
+        }
+    }
+
+    @ViewBuilder
+    private func main(_ text: String) -> some View {
+        if text.isEmpty {
+            Text(" ").font(.system(size: 16, weight: .medium)).foregroundColor(.clear)
+        } else {
+            Text(text).font(.system(size: mainFontSize(for: text), weight: .medium)).foregroundColor(fg)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 1) {
-            Text(",").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            hint(slots.up)
             HStack(spacing: 4) {
-                Text("?").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
-                Text(".").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
-                Text("!").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+                hint(slots.left)
+                main(slots.tap)
+                hint(slots.right)
             }
-            Text(".").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            hint(slots.down)
         }
         .frame(width: width, height: height)
         .background(
@@ -351,18 +388,23 @@ struct PunctuationSwipeKey: View {
                             didDrag = true
                             let symbol: String
                             if abs(dx) > abs(dy) {
-                                symbol = dx > 0 ? "!" : "?"
+                                symbol = dx > 0 ? slots.right : slots.left
                             } else {
-                                symbol = dy > 0 ? "." : ","
+                                symbol = dy > 0 ? slots.down : slots.up
                             }
-                            onPunctuation(symbol)
+                            // 빈 슬롯 가드 — 입력 안 함
+                            if !symbol.isEmpty {
+                                onPunctuation(symbol)
+                            }
                         }
                     }
                 }
                 .onEnded { _ in
                     isPressed = false
                     if !didDrag {
-                        onPunctuation(".")
+                        if !slots.tap.isEmpty {
+                            onPunctuation(slots.tap)
+                        }
                     }
                     didDrag = false
                 }
