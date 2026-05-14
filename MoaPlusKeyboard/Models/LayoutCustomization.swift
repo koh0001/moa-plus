@@ -1,5 +1,21 @@
 import Foundation
 
+/// 긋기 펑크 키의 5개 슬롯 (탭 + 4방향). 빈 문자열("")은 비활성을 의미.
+struct PunctuationSlots: Codable, Equatable {
+    var tap: String
+    var left: String
+    var right: String
+    var up: String
+    var down: String
+
+    static let defaultKorean = PunctuationSlots(
+        tap: ".", left: "?", right: "!", up: ",", down: "."
+    )
+    static let defaultEnglish = PunctuationSlots(
+        tap: ".", left: "?", right: "!", up: ",", down: "."
+    )
+}
+
 enum SlotAPreset: String, Codable, CaseIterable {
     case vowel        // A1 — 모음 (기본, 1.3)
     case classic11    // A2 — 1.1 특수문자

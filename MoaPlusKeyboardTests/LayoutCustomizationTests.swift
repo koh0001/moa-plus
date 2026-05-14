@@ -47,4 +47,39 @@ final class LayoutCustomizationTests: XCTestCase {
         let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
         XCTAssertEqual(decoded.slotARightColumn.count, 3)
     }
+
+    // MARK: - PunctuationSlots
+
+    func testPunctuationSlotsDefaultKorean() {
+        let slots = PunctuationSlots.defaultKorean
+        XCTAssertEqual(slots.tap, ".")
+        XCTAssertEqual(slots.left, "?")
+        XCTAssertEqual(slots.right, "!")
+        XCTAssertEqual(slots.up, ",")
+        XCTAssertEqual(slots.down, ".")
+    }
+
+    func testPunctuationSlotsDefaultEnglish() {
+        let slots = PunctuationSlots.defaultEnglish
+        XCTAssertEqual(slots.tap, ".")
+        XCTAssertEqual(slots.left, "?")
+        XCTAssertEqual(slots.right, "!")
+        XCTAssertEqual(slots.up, ",")
+        XCTAssertEqual(slots.down, ".")
+    }
+
+    func testPunctuationSlotsCodableRoundTrip() throws {
+        let original = PunctuationSlots(tap: "👍", left: "ㅎㅎ", right: "", up: "ok", down: ":)")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(PunctuationSlots.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testPunctuationSlotsEmptySlotPreserved() throws {
+        let original = PunctuationSlots(tap: ".", left: "", right: "!", up: "", down: ".")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(PunctuationSlots.self, from: data)
+        XCTAssertEqual(decoded.left, "")
+        XCTAssertEqual(decoded.up, "")
+    }
 }
