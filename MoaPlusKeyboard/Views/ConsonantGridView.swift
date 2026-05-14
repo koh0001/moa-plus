@@ -128,7 +128,7 @@ struct KeyGridView: View {
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
-                                slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
+                                slots: layoutCustomization.koreanPunctuationSlots,
                                 onPunctuation: { symbol in onSymbolTap(symbol) }
                             )
                         } else if row == 0 && column == 6
@@ -140,7 +140,7 @@ struct KeyGridView: View {
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
-                                slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
+                                slots: layoutCustomization.koreanPunctuationSlots,
                                 onPunctuation: { symbol in onSymbolTap(symbol) }
                             )
                         } else {

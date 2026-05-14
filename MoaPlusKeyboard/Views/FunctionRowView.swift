@@ -161,8 +161,8 @@ struct FunctionRowView: View {
         switch layoutCustomization.slotB {
         case .punctuation:
             let slots = mode == .korean
-                ? KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots
-                : KeyboardSettings.shared.layoutCustomization.englishPunctuationSlots
+                ? layoutCustomization.koreanPunctuationSlots
+                : layoutCustomization.englishPunctuationSlots
             PunctuationSwipeKey(
                 width: width,
                 height: height,
