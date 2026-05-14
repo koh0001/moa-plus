@@ -93,27 +93,66 @@ struct LayoutCustomizationView: View {
                 Text("우측 끝 컬럼의 키 매핑.")
             }
 
-            // Slot A right column (classic11: 3 rows / fullPackage: row 0 only)
-            if settings.layoutCustomization.slotA == .classic11 || settings.layoutCustomization.slotA == .fullPackage {
-                let isFullPackage = settings.layoutCustomization.slotA == .fullPackage
-                let row0AsPunct = settings.layoutCustomization.slotARightColumnTopAsPunctuation
-                Section {
-                    if isFullPackage {
-                        Toggle("1번 셀을 긋기 펑크 키로 사용", isOn: Binding(
-                            get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
-                            set: { newValue in
-                                var lc = settings.layoutCustomization
-                                lc.slotARightColumnTopAsPunctuation = newValue
-                                settings.layoutCustomization = lc
-                            }
-                        ))
-                        if row0AsPunct {
-                            Text("ON 시 row 0 자리에 한글 펑크 슬롯(아래 한글 자판 슬롯) 적용. 1번 셀 텍스트는 무시됨.")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+            // Slot A right column — always visible, preset-aware
+            let currentPreset = settings.layoutCustomization.slotA
+            let presetLabel: String = {
+                switch currentPreset {
+                case .vowel:       return "모던"
+                case .classic11:   return "클래식"
+                case .fullPackage: return "확장형"
+                }
+            }()
+            let isFullPackage = currentPreset == .fullPackage
+            let isVowelPreset = currentPreset == .vowel
+            let row0AsPunct = settings.layoutCustomization.slotARightColumnTopAsPunctuation
+            let editableCount: Int = {
+                switch currentPreset {
+                case .vowel:       return 0
+                case .fullPackage: return 1
+                case .classic11:   return 3
+                }
+            }()
+            Section {
+                // 확장형: row 0 펑크 토글
+                if isFullPackage {
+                    Toggle("1번 셀을 긋기 펑크 키로 사용", isOn: Binding(
+                        get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.slotARightColumnTopAsPunctuation = newValue
+                            settings.layoutCustomization = lc
                         }
+                    ))
+                    if row0AsPunct {
+                        Text("ON 시 row 0 자리에 한글 펑크 슬롯(아래 슬롯 편집) 적용. 1번 셀 텍스트는 무시됨.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
-                    let editableCount = isFullPackage ? 1 : 3
+                }
+
+                // 모던: row 0 (#) 고정 표시 + 펑크 적용 토글
+                if isVowelPreset {
+                    Toggle("# 자리에 펑크 키 적용", isOn: Binding(
+                        get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.slotARightColumnTopAsPunctuation = newValue
+                            settings.layoutCustomization = lc
+                        }
+                    ))
+                    Text("모던 프리셋의 우측 1행 마지막 셀(# 자리)을 긋기 펑크 키로 교체.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    HStack {
+                        Text("1번 셀 (row 0)")
+                        Spacer()
+                        Text("#")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                // 클래식/확장형: 편집 가능 셀 목록
+                if editableCount > 0 {
                     ForEach(0..<editableCount, id: \.self) { i in
                         HStack {
                             Text("\(i + 1)번 셀 (row \(i))")
@@ -128,14 +167,34 @@ struct LayoutCustomizationView: View {
                     }
                     Button("기본값으로 초기화 (! ? .)", action: resetSlotARightColumn)
                         .foregroundColor(.red)
-                } header: {
-                    Text(isFullPackage ? "우측 컬럼 셀 (확장형)" : "우측 컬럼 셀 (1.1 클래식)")
-                } footer: {
-                    if isFullPackage {
-                        Text("col 6 row 0 에 들어갈 문자. row 1·2 는 모음 키 / 특수문자 키로 고정. 1~4 자.")
-                    } else {
-                        Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
-                    }
+                }
+
+                // 긋기 펑크 슬롯 편집 — 모든 프리셋에서 노출
+                Divider()
+                Text("긋기 펑크 슬롯")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                PunctuationSlotsEditor(
+                    slots: Binding(
+                        get: { settings.layoutCustomization.koreanPunctuationSlots },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.koreanPunctuationSlots = newValue
+                            settings.layoutCustomization = lc
+                        }
+                    ),
+                    defaults: .defaultKorean,
+                    isEnabled: true
+                )
+            } header: {
+                Text("우측 컬럼 셀 (\(presetLabel))")
+            } footer: {
+                if isFullPackage {
+                    Text("col 6 row 0 에 들어갈 문자. row 1·2 는 모음 키 / 특수문자 키로 고정. 1~4 자.")
+                } else if isVowelPreset {
+                    Text("모던 프리셋의 우측 컬럼 셀. # 고정. 펑크 슬롯은 함수행 펑크 키 및 (옵션) # 자리에 적용됩니다.")
+                } else {
+                    Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
                 }
             }
 
@@ -187,34 +246,6 @@ struct LayoutCustomizationView: View {
                 Text("키 크기")
             } footer: {
                 Text("좌우 끝 키의 너비. 기본 70% (정사각).")
-            }
-
-            // MARK: - 긋기 펑크 키 (v1.5)
-
-            Section("긋기 펑크 키 — 한글 자판") {
-                if settings.layoutCustomization.slotA == .vowel {
-                    Toggle("A1 # 자리에도 표시", isOn: Binding(
-                        get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
-                        set: { newValue in
-                            var lc = settings.layoutCustomization
-                            lc.slotARightColumnTopAsPunctuation = newValue
-                            settings.layoutCustomization = lc
-                        }
-                    ))
-                }
-
-                PunctuationSlotsEditor(
-                    slots: Binding(
-                        get: { settings.layoutCustomization.koreanPunctuationSlots },
-                        set: { newValue in
-                            var lc = settings.layoutCustomization
-                            lc.koreanPunctuationSlots = newValue
-                            settings.layoutCustomization = lc
-                        }
-                    ),
-                    defaults: .defaultKorean,
-                    isEnabled: true
-                )
             }
 
             Section("긋기 펑크 키 — 영문 자판") {
