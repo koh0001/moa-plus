@@ -37,6 +37,19 @@ struct LayoutCustomization: Codable, Equatable {
     var slotB: SlotBPreset = .punctuation
     var slotC: [String] = LayoutCustomization.defaultSlotC
 
+    // MARK: - Punctuation key (v1.5)
+
+    /// 한글 자판 function row의 긋기 펑크 키 활성화. 기본 ON (기존 동작 유지).
+    var koreanPunctuationEnabled: Bool = true
+    /// 영문 자판 function row의 긋기 펑크 키 활성화. 기본 OFF — ON 시 스페이스 폭이 줄어듦.
+    var englishPunctuationEnabled: Bool = false
+    /// A1 (vowel) 프리셋 우측 col 6 row 0 (`#` 자리)을 긋기 펑크 키로 교체. 한글 슬롯 데이터 공유.
+    var slotARightColumnTopAsPunctuation: Bool = false
+    /// 한글 모드 펑크 키 슬롯.
+    var koreanPunctuationSlots: PunctuationSlots = .defaultKorean
+    /// 영문 모드 펑크 키 슬롯.
+    var englishPunctuationSlots: PunctuationSlots = .defaultEnglish
+
     static let defaultSlotC: [String] = ["~", "^", ";", "*"]
     static let defaultSlotARightColumn: [String] = ["!", "?", "."]
 
@@ -50,6 +63,11 @@ struct LayoutCustomization: Codable, Equatable {
         slotB = try c.decodeIfPresent(SlotBPreset.self, forKey: .slotB) ?? .punctuation
         let raw = try c.decodeIfPresent([String].self, forKey: .slotC) ?? Self.defaultSlotC
         slotC = Self.normalizeSlotC(raw)
+        koreanPunctuationEnabled = try c.decodeIfPresent(Bool.self, forKey: .koreanPunctuationEnabled) ?? true
+        englishPunctuationEnabled = try c.decodeIfPresent(Bool.self, forKey: .englishPunctuationEnabled) ?? false
+        slotARightColumnTopAsPunctuation = try c.decodeIfPresent(Bool.self, forKey: .slotARightColumnTopAsPunctuation) ?? false
+        koreanPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .koreanPunctuationSlots) ?? .defaultKorean
+        englishPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .englishPunctuationSlots) ?? .defaultEnglish
     }
 
     private static func normalizeSlotC(_ raw: [String]) -> [String] {
@@ -66,5 +84,7 @@ struct LayoutCustomization: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case slotA, slotABackspaceSwap, slotARightColumn, slotB, slotC
+        case koreanPunctuationEnabled, englishPunctuationEnabled, slotARightColumnTopAsPunctuation
+        case koreanPunctuationSlots, englishPunctuationSlots
     }
 }
