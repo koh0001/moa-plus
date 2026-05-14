@@ -24,6 +24,7 @@ struct KeyGridView: View {
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureEnd: (() -> Void)? = nil
+    let onPunctuationSlot: (String) -> Void
 
     /// Returns the rendered width for a single cell, accounting for .backspaceWide.
     private func cellWidth(content: KeyContent, column: Int, row: Int) -> CGFloat {
@@ -125,23 +126,24 @@ struct KeyGridView: View {
                                 onGestureEnd: { onSlotBVowelGestureEnd?() }
                             )
                         } else if case .slotBPunctuation = content {
+                            // A3(fullPackage) 슬롯 B 임베드 punct 키: spec §4 bypass 적용
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
                                 slots: layoutCustomization.koreanPunctuationSlots,
-                                onPunctuation: { symbol in onSymbolTap(symbol) }
+                                onPunctuation: { symbol in onPunctuationSlot(symbol) }
                             )
                         } else if row == 0 && column == 6
                                     && mode == .korean
                                     && layoutCustomization.slotA == .vowel
                                     && layoutCustomization.slotARightColumnTopAsPunctuation
                                     && content == .symbol("#") {
-                            // A1 프리셋 + 옵션 ON: # 자리를 긋기 펑크 키로 교체.
+                            // A1 프리셋 + 옵션 ON: # 자리를 긋기 펑크 키로 교체. spec §4 bypass 적용
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
                                 slots: layoutCustomization.koreanPunctuationSlots,
-                                onPunctuation: { symbol in onSymbolTap(symbol) }
+                                onPunctuation: { symbol in onPunctuationSlot(symbol) }
                             )
                         } else {
                         KeyView(

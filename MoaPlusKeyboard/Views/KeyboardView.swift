@@ -99,6 +99,9 @@ struct KeyboardView: View {
                             },
                             onSlotBVowelGestureEnd: {
                                 viewModel.slotBVowelGestureEnded()
+                            },
+                            onPunctuationSlot: { symbol in
+                                viewModel.inputSymbol(symbol, bypassAutoBracket: true)
                             }
                         )
 
