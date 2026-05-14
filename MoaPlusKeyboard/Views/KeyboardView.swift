@@ -116,7 +116,7 @@ struct KeyboardView: View {
                                 viewModel.inputSpace()
                             },
                             onPunctuation: { symbol in
-                                viewModel.inputSymbol(symbol)
+                                viewModel.inputSymbol(symbol, bypassAutoBracket: true)
                             },
                             onReturnPressed: {
                                 viewModel.inputReturn()
@@ -158,8 +158,12 @@ struct KeyboardView: View {
                         let rawCandidates = popupState.candidates
                         let selectedIdx = popupState.selectedIndex
                         let isRightEdge = activeCol >= 5
-                        // When auto-bracket is on, hide standalone closing brackets
-                        let candidates = KeyboardSettings.shared.autoBracketEnabled
+                        // Auto-bracket hides standalone closing brackets in
+                        // letter modes (where the keyboard auto-pairs). In
+                        // symbol mode the user is explicitly picking the
+                        // character, so the filter must not run.
+                        let shouldFilterClosers = KeyboardSettings.shared.autoBracketEnabled && !viewModel.keyboardMode.isSymbol
+                        let candidates = shouldFilterClosers
                             ? rawCandidates.filter { !Self.closingBrackets.contains($0) }
                             : rawCandidates
                         // Right-edge: reverse display so leftward drag matches visual order

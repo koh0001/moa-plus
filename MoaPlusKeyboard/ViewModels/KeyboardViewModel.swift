@@ -384,11 +384,11 @@ class KeyboardViewModel: ObservableObject {
 
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
 
-    func inputSymbol(_ symbol: String) {
+    func inputSymbol(_ symbol: String, bypassAutoBracket: Bool = false) {
         if previewMode { return }
         let resolved = shiftedSymbolIfNeeded(symbol)
         commitCurrent()
-        if insertWithAutoBracket(resolved) {
+        if !bypassAutoBracket && insertWithAutoBracket(resolved) {
             // Bracket pair inserted with cursor positioned
         } else {
             delegate?.insertText(resolved)
@@ -428,7 +428,7 @@ class KeyboardViewModel: ObservableObject {
 
         // Load popup candidates from secondary action
         if let activeRow = activeKey?.row, let activeCol = activeKey?.column {
-            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode)
+            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization)
 
             let keyId: String? = {
                 switch content {
@@ -436,13 +436,35 @@ class KeyboardViewModel: ObservableObject {
                     return String(choseong.compatibilityCharacter)
                 case .symbol(let s) where keyboardMode == .english && s.first?.isNumber == true:
                     return s
+                case .symbol(let s) where keyboardMode.isSymbol:
+                    return s
                 default:
                     return nil
                 }
             }()
 
-            if let keyId, let action = KeyboardSettings.shared.secondaryAction(forKey: keyId) {
-                let filtered = KeyboardSettings.shared.autoBracketEnabled
+            // Symbol-mode keys aren't in the user-editable secondaryKeyActions
+            // store — fall back to the static iOS-standard alt table so the
+            // popup pipeline still gets candidates.
+            let action: SecondaryKeyAction? = {
+                guard let keyId else { return nil }
+                if let stored = KeyboardSettings.shared.secondaryAction(forKey: keyId) {
+                    return stored
+                }
+                if keyboardMode.isSymbol {
+                    return KeyboardMetrics.symbolModeSecondaryAction(for: keyId)
+                }
+                return nil
+            }()
+
+            if let action {
+                // Auto-bracket filter applies only to letter-mode contexts
+                // where the user expects the keyboard to auto-pair brackets.
+                // Symbol mode is the explicit "give me this character"
+                // surface — filtering closing brackets there hides the
+                // long-press alts (e.g. ")" → "] } >").
+                let shouldFilter = KeyboardSettings.shared.autoBracketEnabled && !keyboardMode.isSymbol
+                let filtered = shouldFilter
                     ? action.popupOutputs.filter { !Self.closingBrackets.contains($0) }
                     : action.popupOutputs
                 longPressPopupCandidates = filtered
@@ -604,7 +626,7 @@ class KeyboardViewModel: ObservableObject {
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
         if keyboardMode == .korean,
-           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean),
+           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization),
            case .consonant(let consonant) = content {
             gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
         } else {
@@ -638,7 +660,7 @@ class KeyboardViewModel: ObservableObject {
         // Vowel primitive keys (ㅣ, ㅡ) use the same resolver as input commit;
         // consonant keys use the 8-direction VowelResolver pattern trie.
         if let key = activeKey,
-           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode) {
+           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization) {
             switch content {
             case .vowelPrimitive(let primitive):
                 previewVowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
@@ -727,7 +749,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func handleSymbolModeTap(row: Int, column: Int) {
-        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode) else { return }
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization) else { return }
 
         switch content {
         case .symbol(let symbol):
@@ -760,7 +782,7 @@ class KeyboardViewModel: ObservableObject {
     private func handleKoreanModeGesture(row: Int, column: Int) {
         let directions = gestureAnalyzer.finalizeGesture()
 
-        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean) else { return }
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization) else { return }
 
         switch content {
         case .consonant(let consonant):
