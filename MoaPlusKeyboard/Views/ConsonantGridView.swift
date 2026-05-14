@@ -131,6 +131,18 @@ struct KeyGridView: View {
                                 slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
                                 onPunctuation: { symbol in onSymbolTap(symbol) }
                             )
+                        } else if row == 0 && column == 6
+                                    && mode == .korean
+                                    && layoutCustomization.slotA == .vowel
+                                    && layoutCustomization.slotARightColumnTopAsPunctuation
+                                    && content == .symbol("#") {
+                            // A1 프리셋 + 옵션 ON: # 자리를 긋기 펑크 키로 교체.
+                            PunctuationSwipeKey(
+                                width: width,
+                                height: keyHeight,
+                                slots: KeyboardSettings.shared.layoutCustomization.koreanPunctuationSlots,
+                                onPunctuation: { symbol in onSymbolTap(symbol) }
+                            )
                         } else {
                         KeyView(
                             content: content ?? .symbol(""),
