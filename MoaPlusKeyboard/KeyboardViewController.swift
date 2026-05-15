@@ -43,7 +43,13 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             multiplier: 1.0,
             constant: KeyboardMetrics.keyboardHeight
         )
-        heightConstraint.priority = .required
+        // 999, not .required(1000): on globe-key keyboard switches iOS lays
+        // the input container out at its own provisional height first. A
+        // .required height constraint then "snaps" in a frame later — the
+        // visible jump-then-settle the user reported. 999 lets our height
+        // win steady-state while yielding to the system's transient layout,
+        // so it converges without the jump/flicker.
+        heightConstraint.priority = UILayoutPriority(rawValue: 999)
         rootView.addConstraint(heightConstraint)
         self.heightConstraint = heightConstraint
 
