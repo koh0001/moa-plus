@@ -1,6 +1,16 @@
 import SwiftUI
+import MessageUI
 
 struct AboutView: View {
+    // TODO: Replace with the real Google Forms / Tally URL once provisioned.
+    // Placeholder routes users to GitHub Issues in the meantime so the link
+    // never 404s. Tracked as the "버그 신고 폼" follow-up.
+    private static let feedbackFormURL = URL(string: "https://github.com/koh0001/moa-plus/issues")!
+    private static let supportEmail = "koh0001@outlook.kr"
+
+    @State private var showingMailComposer = false
+    @State private var showingMailUnavailableAlert = false
+
     var body: some View {
         List {
             // App header with icon gradient
@@ -97,17 +107,7 @@ struct AboutView: View {
 
             // Feedback
             Section {
-                Link(destination: URL(string: "mailto:koh0001@outlook.kr")!) {
-                    HStack {
-                        Label("이메일 문의", systemImage: "envelope")
-                        Spacer()
-                        Text("koh0001@outlook.kr")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Link(destination: URL(string: "https://github.com/koh0001/moa-plus/issues")!) {
+                Link(destination: Self.feedbackFormURL) {
                     HStack {
                         Label("버그 신고 / 기능 제안", systemImage: "ladybug")
                         Spacer()
@@ -116,10 +116,27 @@ struct AboutView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+
+                Button {
+                    if MFMailComposeViewController.canSendMail() {
+                        showingMailComposer = true
+                    } else {
+                        showingMailUnavailableAlert = true
+                    }
+                } label: {
+                    HStack {
+                        Label("이메일 문의", systemImage: "envelope")
+                        Spacer()
+                        Text(Self.supportEmail)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .foregroundColor(.primary)
             } header: {
                 Text("피드백")
             } footer: {
-                Text("버그, 개선 요청, 아이디어 등 무엇이든 환영합니다.")
+                Text("계정 없이 폼으로 신고하거나, 디바이스 정보가 자동 첨부되는 이메일로 보낼 수 있습니다.")
             }
 
             // Links
@@ -153,6 +170,20 @@ struct AboutView: View {
             }
         }
         .navigationTitle("앱 정보")
+        .sheet(isPresented: $showingMailComposer) {
+            MailComposeView(
+                recipient: Self.supportEmail,
+                subject: "[모아+] 문의/버그 신고",
+                body: FeedbackContext.defaultBody()
+            )
+            .ignoresSafeArea()
+        }
+        .alert("메일을 보낼 수 없습니다", isPresented: $showingMailUnavailableAlert) {
+            Button("확인", role: .cancel) {}
+            Button("폼으로 신고") { UIApplication.shared.open(Self.feedbackFormURL) }
+        } message: {
+            Text("이 기기에 메일 계정이 설정되어 있지 않습니다. 버그 신고 폼을 이용하거나 \(Self.supportEmail) 으로 직접 보내주세요.")
+        }
     }
 
     private func mitLicenseText(copyright: String) -> String {

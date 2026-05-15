@@ -24,6 +24,26 @@ struct FeedbackSettingsView: View {
                 }
             } header: {
                 Text("햅틱")
+            } footer: {
+                // iOS restricts UIImpactFeedbackGenerator inside keyboard
+                // extensions unless Full Access is granted. The toggles
+                // above stay user-controlled; this footer just explains
+                // why vibration may be silent.
+                if settings.themeSettings.hapticEnabled {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("진동이 느껴지지 않으면 '전체 접근 허용' 권한이 필요합니다.")
+                        Button {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Label("iOS 키보드 설정 열기", systemImage: "arrow.up.right.square")
+                                .font(.footnote)
+                        }
+                        Text("설정 → 일반 → 키보드 → 키보드 → 모아+ → '전체 접근 허용' 토글을 켜주세요. 키 입력은 외부로 전송되지 않으며, 햅틱 진동·사운드·앱 설정 동기화를 위해서만 사용됩니다.")
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
 
             if settings.themeSettings.hapticEnabled {
