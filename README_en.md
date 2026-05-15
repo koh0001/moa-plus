@@ -6,7 +6,9 @@
 
 Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 8-directional gesture combinations.
 
-**New in v1.4**: Three layout presets (Modern / Classic / Extended), Slot B vowel key beside the space bar, first-launch layout selection modal, flat 6-item settings structure, last-keyboard-mode persistence, Help section (tutorial replay + typing practice), redesigned gesture test screen.
+**New in v1.5**: In-app mail composer with auto-attached diagnostics (app/iOS/device), symbol-mode long-press alternates (₩ € [ { etc.), independent right-column punctuation slots, layout settings terminology cleanup, cold-start render flicker fix, swipe-length-linked reversal threshold.
+
+**v1.4**: Three layout presets (Modern / Classic / Extended), Slot B vowel key beside the space bar, first-launch layout selection modal, flat 6-item settings structure, last-keyboard-mode persistence, Help section (tutorial replay + typing practice), redesigned gesture test screen.
 
 **v1.3**: Caps Lock via long-press Shift, abbreviation master ON/OFF toggle, per-column gesture correction sliders, device-proportional swipe thresholds.
 
@@ -57,7 +59,7 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 
 ### Privacy
 - **Fully offline** — No network access, no data collection
-- **No Full Access required** (v1.2 onward) — Settings sync via App Group entitlements. iOS no longer shows the "Allow Full Access" warning.
+- **Full Access is optional** (v1.5) — Core input works without any permission. Haptic feedback requires iOS "Allow Full Access" (optional); even when enabled, keystrokes are never transmitted off-device — it is used only for haptics, sound, and settings sync.
 
 ## Gesture Guide
 
@@ -143,7 +145,7 @@ Select the `MoaPlus` scheme in Xcode → Choose device/simulator → `Cmd + R`
 1. **Settings** → **General** → **Keyboard** → **Add New Keyboard** → Select **Moa+**
 2. Switch to Moa+ using the 🌐 button when typing
 
-> Starting with v1.2, **Full Access is no longer required**. Settings sync between the host app and keyboard via App Group, and the keyboard never connects to the network.
+> Core input works **without Full Access**. Settings sync via App Group and the keyboard never connects to the network. **Haptic feedback requires** iOS "Allow Full Access" (optional, due to an iOS keyboard-extension restriction); keystrokes are never transmitted even when it is enabled.
 
 > For device installation, see [Build & Install Guide](docs/moakey_ios_custom_docs/03_빌드_및_설치_가이드.md)
 

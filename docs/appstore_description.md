@@ -74,7 +74,7 @@ https://github.com/koh0001/moa-plus/issues
 ### 프라이버시
 - 네트워크를 사용하지 않습니다
 - 입력 데이터를 수집하거나 저장하지 않습니다
-- 전체 접근(Full Access) 권한이 필요 없습니다 (v1.2부터)
+- 기본 입력은 전체 접근(Full Access) 없이 동작합니다. 햅틱 진동을 쓰려면 "전체 접근 허용"이 필요하지만(선택), 켜더라도 키 입력은 외부로 전송되지 않습니다
 
 ---
 
@@ -125,11 +125,24 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 ### Privacy First
 - No network access
 - No data collection whatsoever
-- No Full Access permission required (from v1.2)
+- Core input works without Full Access. Haptic feedback requires "Allow Full Access" (optional); keystrokes are never transmitted even when enabled
 
 ---
 
 ## 새로운 기능 (업데이트 노트)
+
+### v1.5
+
+[새로운 기능]
+- 앱 내 메일 문의 — 앱 정보에서 바로 메일 작성, 앱·iOS·기기 정보가 자동 첨부되어 버그 보고가 쉬워졌습니다
+- 심볼 키패드 롱프레스 대체 기호 — $ 길게 → ₩ € £ ¥, ( 길게 → [ { < 등
+- 우측 컬럼 특수키 슬롯을 스페이스 옆 특수키와 따로 편집
+
+[개선]
+- 레이아웃 설정 용어 정리 — "긋기 펑크" → "특수키", 내부 슬롯 명칭 제거
+- 햅틱 설정에 "전체 접근 허용" 안내와 iOS 설정 바로가기 추가
+- 키보드 첫 등장 시 깜빡임 제거, 표시 때마다 울리던 클릭음 제거
+- "긋기 길이 길게" 설정이 반전 동작(ㅚ/ㅞ 등)에도 일관 적용
 
 ### v1.3
 
