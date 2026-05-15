@@ -45,10 +45,13 @@ struct LayoutCustomization: Codable, Equatable {
     var englishPunctuationEnabled: Bool = false
     /// A1 (vowel) 프리셋 우측 col 6 row 0 (`#` 자리)을 긋기 펑크 키로 교체. 한글 슬롯 데이터 공유.
     var slotARightColumnTopAsPunctuation: Bool = false
-    /// 한글 모드 펑크 키 슬롯.
+    /// 한글 모드 슬롯 B(스페이스바 옆 / 확장형 col 6 임베드) 펑크 키 슬롯.
     var koreanPunctuationSlots: PunctuationSlots = .defaultKorean
     /// 영문 모드 펑크 키 슬롯.
     var englishPunctuationSlots: PunctuationSlots = .defaultEnglish
+    /// 한글 모드 우측 컬럼 row 0 펑크 옵션(모던 #자리 / 확장형 1번 셀) 전용 슬롯.
+    /// 슬롯 B 슬롯과 독립적으로 편집됨.
+    var slotARightColumnPunctuationSlots: PunctuationSlots = .defaultKorean
 
     static let defaultSlotC: [String] = ["~", "^", ";", "*"]
     static let defaultSlotARightColumn: [String] = ["!", "?", "."]
@@ -68,6 +71,7 @@ struct LayoutCustomization: Codable, Equatable {
         slotARightColumnTopAsPunctuation = try c.decodeIfPresent(Bool.self, forKey: .slotARightColumnTopAsPunctuation) ?? false
         koreanPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .koreanPunctuationSlots) ?? .defaultKorean
         englishPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .englishPunctuationSlots) ?? .defaultEnglish
+        slotARightColumnPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .slotARightColumnPunctuationSlots) ?? .defaultKorean
     }
 
     private static func normalizeSlotC(_ raw: [String]) -> [String] {
@@ -85,6 +89,6 @@ struct LayoutCustomization: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case slotA, slotABackspaceSwap, slotARightColumn, slotB, slotC
         case koreanPunctuationEnabled, englishPunctuationEnabled, slotARightColumnTopAsPunctuation
-        case koreanPunctuationSlots, englishPunctuationSlots
+        case koreanPunctuationSlots, englishPunctuationSlots, slotARightColumnPunctuationSlots
     }
 }

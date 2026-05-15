@@ -138,10 +138,11 @@ struct KeyGridView: View {
                                     && layoutCustomization.slotARightColumnTopAsPunctuation
                                     && (layoutCustomization.slotA == .vowel || layoutCustomization.slotA == .fullPackage) {
                             // A1 # 자리 또는 A3 slotARightColumn[0] 자리를 긋기 펑크 키로 교체. spec §4 bypass 적용
+                            // 슬롯 B(스페이스 옆/col 6 임베드)와 독립된 우측 컬럼 전용 슬롯 사용.
                             PunctuationSwipeKey(
                                 width: width,
                                 height: keyHeight,
-                                slots: layoutCustomization.koreanPunctuationSlots,
+                                slots: layoutCustomization.slotARightColumnPunctuationSlots,
                                 onPunctuation: { symbol in onPunctuationSlot(symbol) }
                             )
                         } else {

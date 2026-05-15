@@ -76,7 +76,7 @@ struct LayoutCustomizationView: View {
             Section {
                 slotARadioRow(.vowel, title: "모던", desc: "⌫ + ㅣ ㅡ ㆍ")
                 slotARadioRow(.classic11, title: "클래식", desc: "! ? . + 가로 ⌫")
-                slotARadioRow(.fullPackage, title: "확장형", desc: "Classic 베이스 + col 6 에 모음/특수문자 + 긴 스페이스. 슬롯 B 자동 비활성.")
+                slotARadioRow(.fullPackage, title: "확장형", desc: "클래식 + 우측 컬럼에 모음·특수문자 + 긴 스페이스")
                 if settings.layoutCustomization.slotA == .vowel {
                     Toggle("백스페이스 ↔ ㆍ 위치 swap", isOn: Binding(
                         get: { settings.layoutCustomization.slotABackspaceSwap },
@@ -88,7 +88,7 @@ struct LayoutCustomizationView: View {
                     ))
                 }
             } header: {
-                slotHeader(label: "우측 컬럼 (슬롯 A)", slot: .a, systemImage: "rectangle.righthalf.inset.filled")
+                slotHeader(label: "우측 컬럼", slot: .a, systemImage: "rectangle.righthalf.inset.filled")
             } footer: {
                 Text("우측 끝 컬럼의 키 매핑.")
             }
@@ -113,9 +113,9 @@ struct LayoutCustomizationView: View {
                 }
             }()
             Section {
-                // 확장형: row 0 펑크 토글
+                // 확장형: row 0 특수키 토글
                 if isFullPackage {
-                    Toggle("1번 셀을 긋기 펑크 키로 사용", isOn: Binding(
+                    Toggle("1번 셀을 특수키로 사용", isOn: Binding(
                         get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
                         set: { newValue in
                             var lc = settings.layoutCustomization
@@ -124,15 +124,15 @@ struct LayoutCustomizationView: View {
                         }
                     ))
                     if row0AsPunct {
-                        Text("ON 시 row 0 자리에 한글 펑크 슬롯(아래 슬롯 편집) 적용. 1번 셀 텍스트는 무시됨.")
+                        Text("1번 셀이 특수키로 교체됩니다.")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
                 }
 
-                // 모던: row 0 (#) 고정 표시 + 펑크 적용 토글
+                // 모던: row 0 (#) 고정 표시 + 특수키 적용 토글
                 if isVowelPreset {
-                    Toggle("# 자리에 펑크 키 적용", isOn: Binding(
+                    Toggle("# 자리에 특수키 적용", isOn: Binding(
                         get: { settings.layoutCustomization.slotARightColumnTopAsPunctuation },
                         set: { newValue in
                             var lc = settings.layoutCustomization
@@ -140,11 +140,11 @@ struct LayoutCustomizationView: View {
                             settings.layoutCustomization = lc
                         }
                     ))
-                    Text("모던 프리셋의 우측 1행 마지막 셀(# 자리)을 긋기 펑크 키로 교체.")
+                    Text("# 자리를 특수키로 교체합니다.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     HStack {
-                        Text("1번 셀 (row 0)")
+                        Text("1번 셀")
                         Spacer()
                         Text("#")
                             .foregroundColor(.secondary)
@@ -152,73 +152,109 @@ struct LayoutCustomizationView: View {
                 }
 
                 // 클래식/확장형: 편집 가능 셀 목록
-                if editableCount > 0 {
+                // 확장형 + 펑크 토글 ON 이면 1번 셀 텍스트가 무시되므로 행 자체를 숨김
+                let showEditableCells = editableCount > 0 && !(isFullPackage && row0AsPunct)
+                if showEditableCells {
                     ForEach(0..<editableCount, id: \.self) { i in
                         HStack {
-                            Text("\(i + 1)번 셀 (row \(i))")
+                            Text("\(i + 1)번 셀")
                             Spacer()
                             Button(settings.layoutCustomization.slotARightColumn[i]) {
                                 startSlotAEdit(index: i)
                             }
                             .font(.system(size: 16, weight: .medium))
                         }
-                        .disabled(isFullPackage && i == 0 && row0AsPunct)
-                        .opacity(isFullPackage && i == 0 && row0AsPunct ? 0.4 : 1.0)
                     }
-                    Button("기본값으로 초기화 (! ? .)", action: resetSlotARightColumn)
-                        .foregroundColor(.red)
+                    Button(isFullPackage ? "1번 셀 기본값으로 되돌리기" : "기본값으로 되돌리기 (! ? .)",
+                           action: resetSlotARightColumn)
+                        .foregroundColor(.accentColor)
                 }
 
-                // 긋기 펑크 슬롯 편집 — 모든 프리셋에서 노출
-                Divider()
-                Text("긋기 펑크 슬롯")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                PunctuationSlotsEditor(
-                    slots: Binding(
-                        get: { settings.layoutCustomization.koreanPunctuationSlots },
-                        set: { newValue in
-                            var lc = settings.layoutCustomization
-                            lc.koreanPunctuationSlots = newValue
-                            settings.layoutCustomization = lc
-                        }
-                    ),
-                    defaults: .defaultKorean,
-                    isEnabled: true
-                )
+                // 우측 컬럼 특수키 슬롯 편집 — 토글 ON 일 때만 노출 (slot B 슬롯과 독립)
+                if (isVowelPreset || isFullPackage) && row0AsPunct {
+                    PunctuationSlotsEditor(
+                        slots: Binding(
+                            get: { settings.layoutCustomization.slotARightColumnPunctuationSlots },
+                            set: { newValue in
+                                var lc = settings.layoutCustomization
+                                lc.slotARightColumnPunctuationSlots = newValue
+                                settings.layoutCustomization = lc
+                            }
+                        ),
+                        defaults: .defaultKorean,
+                        isEnabled: true
+                    )
+                }
             } header: {
-                Text("우측 컬럼 셀 (\(presetLabel))")
+                Text("우측 컬럼 (\(presetLabel))")
             } footer: {
                 if isFullPackage {
-                    Text("col 6 row 0 에 들어갈 문자. row 1·2 는 모음 키 / 특수문자 키로 고정. 1~4 자.")
+                    Text("1번 셀에 1~4자 입력. 스페이스 옆 특수키와 독립적으로 설정됩니다.")
                 } else if isVowelPreset {
-                    Text("모던 프리셋의 우측 컬럼 셀. # 고정. 펑크 슬롯은 함수행 펑크 키 및 (옵션) # 자리에 적용됩니다.")
+                    Text("# 자리에만 적용. 스페이스 옆 특수키와 독립적으로 설정됩니다.")
                 } else {
-                    Text("col 6 row 0/1/2 에 들어갈 문자. 모음(ㅣ ㅡ ㆍ ㅏ 등) / 특수문자 / 일반 글자 모두 가능. 1~4 자.")
+                    Text("각 셀에 1~4자 입력. 모음·특수문자·글자 모두 가능.")
                 }
             }
 
             // Slot B
             Section {
-                slotBRadioRow(.punctuation, title: "특수문자", desc: "tap=. ←=? →=! ↑=, ↓=.")
-                slotBRadioRow(.vowelKey, title: "모음 키", desc: "tap=ㆍ + 8방향 모음")
+                // 확장형은 슬롯 B 가 우측 컬럼으로 이동했으므로 토글/라디오 모두 숨김
+                let punctEnabled = settings.layoutCustomization.koreanPunctuationEnabled
+                if !isFullPackage {
+                    Toggle("스페이스 옆 특수키 사용", isOn: Binding(
+                        get: { settings.layoutCustomization.koreanPunctuationEnabled },
+                        set: { newValue in
+                            var lc = settings.layoutCustomization
+                            lc.koreanPunctuationEnabled = newValue
+                            settings.layoutCustomization = lc
+                        }
+                    ))
+                    if punctEnabled {
+                        slotBRadioRow(.punctuation, title: "특수문자", desc: "tap=. ←=? →=! ↑=, ↓=.")
+                        slotBRadioRow(.vowelKey, title: "모음 키", desc: "tap=ㆍ + 8방향 모음")
+                    }
+                }
+
+                // 특수키 슬롯 편집기 — 확장형(우측 컬럼 임베드) 또는 한글 + 토글 ON + .punctuation 일 때 노출
+                let slotBPunctActive = isFullPackage
+                    || (punctEnabled && settings.layoutCustomization.slotB == .punctuation)
+                if slotBPunctActive {
+                    PunctuationSlotsEditor(
+                        slots: Binding(
+                            get: { settings.layoutCustomization.koreanPunctuationSlots },
+                            set: { newValue in
+                                var lc = settings.layoutCustomization
+                                lc.koreanPunctuationSlots = newValue
+                                settings.layoutCustomization = lc
+                            }
+                        ),
+                        defaults: .defaultKorean,
+                        isEnabled: true
+                    )
+                }
             } header: {
-                slotHeader(label: "스페이스 옆 키 (슬롯 B)", slot: .b, systemImage: "rectangle.bottomthird.inset.filled")
+                if isFullPackage {
+                    // 확장형은 슬롯 B 가 col 6 으로 이동했으므로 위치 하이라이트도 우측 컬럼(.a)을 가리킴
+                    slotHeader(label: "우측 컬럼 임베드 특수키", slot: .a, systemImage: "rectangle.righthalf.inset.filled")
+                } else {
+                    slotHeader(label: "스페이스 옆 키", slot: .b, systemImage: "rectangle.bottomthird.inset.filled")
+                }
             } footer: {
-                if settings.layoutCustomization.slotA == .fullPackage {
-                    Text("확장형 모드에서는 슬롯 B 가 col 6 으로 이동했습니다.")
-                        .foregroundColor(.orange)
+                if isFullPackage {
+                    Text("우측 컬럼 3번째 행에 위치한 특수키 슬롯.")
+                } else if !settings.layoutCustomization.koreanPunctuationEnabled {
+                    Text("OFF 시 스페이스바·엔터가 확장되고 엔터가 백스페이스에 2셀 정렬됩니다.")
                 } else {
                     Text("스페이스바 옆 키 동작.")
                 }
             }
-            .disabled(settings.layoutCustomization.slotA == .fullPackage)
 
             // Slot C
             Section {
                 ForEach(0..<4, id: \.self) { i in
                     HStack {
-                        Text("\(i + 1)번 셀 (row \(i))")
+                        Text("\(i + 1)번 셀")
                         Spacer()
                         Button(settings.layoutCustomization.slotC[i]) {
                             startCellEdit(index: i)
@@ -226,12 +262,12 @@ struct LayoutCustomizationView: View {
                         .font(.system(size: 16, weight: .medium))
                     }
                 }
-                Button("기본값으로 초기화", action: resetSlotC)
-                    .foregroundColor(.red)
+                Button("기본값으로 되돌리기", action: resetSlotC)
+                    .foregroundColor(.accentColor)
             } header: {
-                slotHeader(label: "좌측 컬럼 (슬롯 C)", slot: .c, systemImage: "rectangle.lefthalf.inset.filled")
+                slotHeader(label: "좌측 컬럼", slot: .c, systemImage: "rectangle.lefthalf.inset.filled")
             } footer: {
-                Text("각 셀에 1~4 자 문자 매핑. 빈 입력은 거부됩니다.")
+                Text("각 셀에 1~4자 입력.")
             }
 
             // Key size (moved from InputSettingsView)
@@ -248,7 +284,7 @@ struct LayoutCustomizationView: View {
                 Text("좌우 끝 키의 너비. 기본 70% (정사각).")
             }
 
-            Section("긋기 펑크 키 — 영문 자판") {
+            Section("특수키 — 영문 자판") {
                 Toggle("사용 (스페이스 폭이 줄어듭니다)", isOn: Binding(
                     get: { settings.layoutCustomization.englishPunctuationEnabled },
                     set: { newValue in
@@ -490,6 +526,10 @@ private struct PunctuationSlotsEditor: View {
             slotRow(label: "→ 오",   binding: $slots.right, placeholder: defaults.right)
             slotRow(label: "↑ 위",   binding: $slots.up,    placeholder: defaults.up)
             slotRow(label: "↓ 아래", binding: $slots.down,  placeholder: defaults.down)
+
+            Text("비우면 해당 방향이 비활성화됩니다.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
 
             Button("기본값으로 되돌리기") {
                 slots = defaults
