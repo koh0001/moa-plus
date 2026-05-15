@@ -1,0 +1,183 @@
+==================================================
+모아+ App Store 제출 텍스트 (복사용 안전본)
+==================================================
+규칙: ASCII 구두점 + 한글 완성형 위주. 도형문자/화살표/em대시/
+중점/CJK괄호/통화기호/단독 자모를 배제해 "유효하지 않은 문자"
+에러를 회피. 각 블록을 해당 필드에 그대로 붙여넣으세요.
+
+--------------------------------------------------
+[앱 이름]  (최대 30자)
+--------------------------------------------------
+모아+
+
+--------------------------------------------------
+[부제목]  (최대 30자)
+--------------------------------------------------
+손끝으로 완성하는 한글 키보드
+
+--------------------------------------------------
+[키워드]  (최대 100자, 쉼표 구분, 공백 없이)
+--------------------------------------------------
+한글,키보드,제스처,스와이프,한국어,모아키,천지인,영문,QWERTY,단축어,테마
+
+--------------------------------------------------
+[프로모션 텍스트]  (최대 170자)
+--------------------------------------------------
+앱 내 메일 문의가 생겼습니다. 버그 신고 시 기기 정보가 자동 첨부되어 더 빠르게 해결됩니다. 키보드 첫 화면 깜빡임도 줄었고, 긋기 길이 설정이 복합 모음에도 일관되게 적용됩니다.
+
+--------------------------------------------------
+[한국어 설명]  (최대 4000자)
+--------------------------------------------------
+자음 키를 누르고 방향을 긋기만 하면 모음이 입력됩니다.
+모아+는 모아키 방식의 제스처 한글 입력을 iOS에서 구현한 키보드 앱입니다.
+
+[제스처 입력]
+- 자음 키 위에서 8방향으로 긋기만 하면 21개 모음을 모두 입력
+- 왕복 긋기로 야/여/요/유 계열 이중모음도 빠르게 입력
+- 방향을 꺾으면 와/워/애/에 계열 복합 모음도 간단하게
+
+[천지인 모음 입력]
+- 세로획, 점, 가로획 세 키만으로 모든 한글 모음 조합
+- 점 누적 입력 등 천지인 표준 합성 지원
+- 자음 키 제스처와 자유롭게 섞어 쓸 수 있습니다
+
+[영문 QWERTY 키보드]
+- 한영 키로 한글과 영문을 즉시 전환
+- Shift 더블탭 또는 길게 누르기로 Caps Lock
+- 숫자 키 길게 누르면 특수문자 입력
+
+[편집 도우미]
+- 스페이스바를 좌우로 드래그하면 커서가 그만큼 이동
+- 여는 괄호 입력 시 닫는 괄호 자동 삽입
+- 백스페이스 길게 누르면 단어 단위 빠른 삭제
+
+[롱프레스 보조 입력]
+- 길게 누르면 숫자와 기호를 바로 입력
+- 누른 채로 드래그하면 다른 후보를 선택
+- 키별 매핑을 자유롭게 편집 가능
+- 심볼 키패드에서 기호 키를 길게 누르면 통화 기호 등 대체 기호 입력
+
+[약어 확장]
+- 자음 몇 개만 입력하고 스페이스를 누르면 긴 문장으로 자동 치환
+- 짧은 자음 조합으로 자주 쓰는 문구를 등록하면 입력 속도가 크게 향상
+
+[나만의 키보드]
+- 모던, 클래식, 확장형 세 가지 레이아웃 프리셋 중 선택 (첫 실행 시 선택)
+- 스페이스 옆 키를 모음 입력 키로 전환 가능
+- 우측 컬럼과 스페이스 옆 특수키를 각각 독립적으로 매핑
+- 다섯 가지 색상 테마 프리셋 또는 직접 색상 선택
+- 배경 이미지를 선택하고 원하는 영역을 크롭
+- 키 배경 투명도를 조절하여 나만의 키보드 완성
+- 긋기 각도, 길이, 대각선 매핑, 열별 보정을 한 화면에서 통합 관리
+- 라이브 제스처 시각화 화면에서 실제 키보드와 똑같은 엔진으로 직접 시험
+
+[타이핑 연습]
+- 천지인, 영문 QWERTY, 커서 이동 등 33종 시나리오로 빠르게 익히기
+
+[문의]
+- 앱 정보 화면에서 바로 메일로 문의 (앱, iOS, 기기 정보가 자동 첨부)
+- 메일 계정이 없어도 신고 폼으로 의견을 보낼 수 있습니다
+
+[프라이버시]
+- 네트워크를 사용하지 않습니다
+- 입력 데이터를 수집하거나 저장하지 않습니다
+- 기본 입력은 전체 접근(Full Access) 없이 동작합니다. 햅틱 진동을 쓰려면 전체 접근 허용이 필요하지만(선택), 켜더라도 키 입력은 외부로 전송되지 않습니다
+
+--------------------------------------------------
+[English Description]  (max 4000 chars)
+--------------------------------------------------
+Swipe on consonant keys to input vowels. That is all it takes.
+Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
+
+[Gesture Input]
+- Swipe in 8 directions on consonant keys to input all 21 Korean vowels
+- Back-and-forth swipes for the y-vowel series
+- Combine directions for compound vowels
+
+[Cheonjiin Vowel Input]
+- Compose every Korean vowel from three keys: vertical stroke, dot, horizontal stroke
+- Standard cheonjiin dot accumulation
+- Mix freely with consonant-key gestures
+
+[English QWERTY Keyboard]
+- Switch instantly between Korean and English with the language key
+- Double-tap or long-press Shift for Caps Lock
+- Long-press number keys for symbols
+
+[Editing Helpers]
+- Drag the space bar left or right to move the cursor
+- Auto-close brackets when you type an opening bracket
+- Long-press backspace for fast word-by-word deletion
+
+[Long-Press Auxiliary Input]
+- Hold a key to instantly type numbers and symbols
+- Drag while holding to select from candidate options
+- Fully customizable per-key mappings
+- Long-press symbol keys for currency signs and other alternates
+
+[Abbreviation Expansion]
+- Type a few consonants then space to auto-expand into full phrases
+- Register frequently used phrases as short consonant triggers
+
+[Personalization]
+- Choose from Modern, Classic, or Extended layout presets (selectable on first launch)
+- Turn the key beside the space bar into a vowel-input key
+- Map the right-column and space-side punctuation keys independently
+- Five color theme presets or create your own with custom colors
+- Set a background image with crop and opacity control
+- Unified gesture settings in one screen
+- Live gesture visualization driven by the real keyboard engine
+
+[Typing Practice]
+- 33 scenarios covering cheonjiin, English QWERTY, and cursor movement
+
+[Support]
+- Send feedback by mail right from the About screen with app, iOS, and device info attached
+- No mail account? Submit through the report form instead
+
+[Privacy First]
+- No network access
+- No data collection whatsoever
+- Core input works without Full Access. Haptic feedback requires Full Access (optional); keystrokes are never transmitted even when enabled
+
+--------------------------------------------------
+[이번 버전 새 기능 - 한국어]  (v1.5)
+--------------------------------------------------
+이번 업데이트로 문의가 쉬워지고, 입력 첫 느낌이 더 매끄러워졌습니다.
+
+[새로운 기능]
+- 앱 내 메일 문의: 앱 정보 화면에서 바로 메일을 보낼 수 있습니다. 앱, iOS, 기기 정보가 자동으로 첨부되어 버그를 더 빠르게 해결할 수 있어요.
+- 심볼 키패드 길게 누르기: 기호 키를 길게 누르면 통화 기호 등 대체 기호가 나옵니다.
+- 우측 컬럼 특수키를 스페이스 옆 특수키와 따로 설정: 한쪽을 바꿔도 다른 쪽이 따라 바뀌지 않습니다.
+
+[개선]
+- 레이아웃 설정 용어를 알기 쉽게 정리했습니다.
+- 햅틱 설정에 전체 접근 허용 안내와 iOS 설정 바로가기를 추가했습니다.
+- 키보드가 처음 나타날 때의 깜빡임을 제거했습니다.
+- 사운드를 꺼도 들리던 클릭음을 수정했습니다.
+- 긋기 길이를 길게 설정해도 복합 모음 입력이 일관되게 동작합니다.
+- 글자 중간을 수정할 때 이전 글자가 잘못 끼어드는 문제를 수정했습니다.
+- 키보드 전환 시 높이가 튀는 현상을 줄였습니다.
+
+기본 입력은 전체 접근 권한 없이 동작합니다. 햅틱 진동을 쓰려면 iOS 제약상 전체 접근 허용이 필요하지만(선택), 켜더라도 입력하신 내용은 외부로 전송되지 않습니다.
+
+--------------------------------------------------
+[What's New - English]  (v1.5)
+--------------------------------------------------
+Reporting issues is now easier, and the keyboard feels smoother from the very first tap.
+
+[New]
+- In-app mail composer: Send feedback right from the About screen. App, iOS, and device info are attached automatically so bugs get fixed faster.
+- Long-press on the symbol keypad: Hold a symbol key for currency signs and other alternates.
+- The right-column punctuation key is now configured independently from the one beside the space bar.
+
+[Improvements]
+- Clearer wording in layout settings.
+- Added a Full Access guide with a shortcut to iOS Settings in the haptics section.
+- Removed the flicker when the keyboard first appears.
+- Fixed a click sound that played even when sound was turned off.
+- The longer-swipe setting now applies consistently to compound vowels.
+- Fixed a bug where editing mid-text could reinsert a previous character.
+- Reduced the keyboard height jump when switching keyboards.
+
+Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.
