@@ -57,11 +57,22 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         var layout = LayoutCustomization()
         layout.slotA = .fullPackage
         let grid = KeyboardMetrics.koreanLayout(layout)
-        XCTAssertEqual(grid[0][6], .symbol("#"))
+        // Row 0 col 6 reuses slotARightColumn[0] (shared with classic11),
+        // no longer a fixed "#" — see commit f48eac1 / CHANGELOG v1.5.
+        XCTAssertEqual(grid[0][6], .symbol(layout.slotARightColumn[0]))
         XCTAssertEqual(grid[1][6], .slotBVowelKey)
         XCTAssertEqual(grid[2][6], .slotBPunctuation)
         XCTAssertEqual(grid[3].count, 6)
         XCTAssertEqual(grid[3][5], .backspaceWide)
+    }
+
+    func testA3Layout_col6Row0ReflectsCustomSlotARightColumn() {
+        var layout = LayoutCustomization()
+        layout.slotA = .fullPackage
+        layout.slotARightColumn = ["@", "?", "."]
+        let grid = KeyboardMetrics.koreanLayout(layout)
+        XCTAssertEqual(grid[0][6], .symbol("@"),
+                       "user edits to slotARightColumn[0] must show in A3 col6 row0")
     }
 
     func testA3_longPressNumberCol6IsAllNil() {
