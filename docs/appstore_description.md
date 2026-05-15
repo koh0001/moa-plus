@@ -55,6 +55,7 @@ https://github.com/koh0001/moa-plus/issues
 - 길게 누르면 숫자와 기호를 바로 입력
 - 누른 채로 드래그하면 다른 후보를 선택할 수 있습니다
 - 키별 매핑을 자유롭게 편집 가능
+- 심볼 키패드에서 기호 키를 길게 누르면 대체 기호 ($ → ₩ € £ ¥, ( → [ { < 등)
 
 ### 약어 확장
 - 자음 몇 개만 입력하고 스페이스를 누르면 긴 문장으로 자동 치환
@@ -62,6 +63,9 @@ https://github.com/koh0001/moa-plus/issues
 - 자주 쓰는 문구를 등록하면 입력 속도가 크게 향상됩니다
 
 ### 나만의 키보드
+- 모던 / 클래식 / 확장형 3가지 레이아웃 프리셋 중 선택 (첫 실행 시 선택)
+- 스페이스 옆 키를 모음 입력 키로 전환 가능
+- 우측 컬럼·스페이스 옆 특수키를 각각 독립적으로 매핑
 - 5가지 색상 테마 프리셋 또는 직접 색상 선택
 - 배경 이미지를 선택하고 원하는 영역을 크롭
 - 키 배경 투명도를 조절하여 나만의 키보드 완성
@@ -70,6 +74,10 @@ https://github.com/koh0001/moa-plus/issues
 
 ### 타이핑 연습
 - 천지인, 영문 QWERTY, 커서 이동 등 33종 시나리오로 빠르게 익히기
+
+### 문의
+- 앱 정보 화면에서 바로 메일로 문의 — 앱·iOS·기기 정보가 자동 첨부되어 더 빠르게 해결합니다
+- 메일 계정이 없어도 신고 폼으로 의견을 보낼 수 있습니다
 
 ### 프라이버시
 - 네트워크를 사용하지 않습니다
@@ -107,6 +115,7 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 - Hold a key to instantly type numbers and symbols
 - Drag while holding to select from candidate options
 - Fully customizable per-key mappings
+- Long-press symbol keys for alternates ($ → ₩ € £ ¥, ( → [ { <, and more)
 
 ### Abbreviation Expansion
 - Type a few consonants + space to auto-expand into full phrases
@@ -114,6 +123,9 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 - Register your frequently used phrases for faster typing
 
 ### Personalization
+- Choose from Modern / Classic / Extended layout presets (selectable on first launch)
+- Turn the key beside the space bar into a vowel-input key
+- Map the right-column and space-side punctuation keys independently
 - 5 color theme presets or create your own with custom colors
 - Set a background image with crop and opacity control
 - Unified gesture settings: angle, length, diagonal mapping, per-column correction in one screen
@@ -121,6 +133,10 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
 ### Typing Practice
 - 33 scenarios covering cheonjiin, English QWERTY, and cursor movement
+
+### Support
+- Send feedback by mail right from the About screen — app/iOS/device info attached automatically for faster fixes
+- No mail account? Submit through the report form instead
 
 ### Privacy First
 - No network access
