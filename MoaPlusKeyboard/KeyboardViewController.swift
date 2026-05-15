@@ -11,9 +11,18 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     private let viewModel = KeyboardViewModel()
     private var feedbackGenerator: UIImpactFeedbackGenerator?
     private var heightConstraint: NSLayoutConstraint?
+    /// First viewDidAppear is the cold start — no prior lifecycle to recover
+    /// from, so we skip the isUserInteractionEnabled toggle that exists for
+    /// recovering touch delivery after background→foreground transitions.
+    private var hasAppearedOnce = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        // Match the SwiftUI keyboard background fallback color so the first
+        // frame doesn't flash the bare UIInputViewController background
+        // (system keyboard gray) before SwiftUI's Color(.systemGray6) lays in.
+        view.backgroundColor = UIColor.systemGray6
 
         // 키보드 높이 설정 (iOS 키보드 익스텐션은 명시적 높이 필요)
         guard let rootView = self.view else { return }
@@ -31,13 +40,18 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         self.heightConstraint = heightConstraint
 
         viewModel.delegate = self
+        // Settings must be loaded before SwiftUI hosts the keyboard so the
+        // first measure pass sees the user's layout/theme — otherwise the
+        // initial frame uses defaults and visibly re-renders once
+        // viewWillAppear's loadAll() lands.
+        KeyboardSettings.shared.loadAll()
         setupKeyboardView()
         setupHapticFeedback()
-        // Warm up audio session to prevent loud first click
-        // Play the actual click sound once at launch to initialize the audio route
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            AudioServicesPlaySystemSound(KeyboardMetrics.clickSoundID)
-        }
+        // Audio session warmup removed: it ignored clickSoundEnabled and
+        // played an unconditional click on every keyboard show, audible
+        // even to users who disabled sounds and inconsistent with normal
+        // typing volume. iOS routes the first real AudioServicesPlaySystemSound
+        // call fine without explicit warmup.
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -46,29 +60,24 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // app, so @Published mutations there don't notify our singleton.
         // Reload from App Group UserDefaults on every appearance to pick up
         // theme/gesture/etc. changes the user just made in the host app.
+        // No forced layoutIfNeeded — letting UIKit/SwiftUI run their normal
+        // layout pass once avoids a visible double-layout flicker on first
+        // appearance.
         KeyboardSettings.shared.loadAll()
         heightConstraint?.constant = KeyboardMetrics.keyboardHeight
-        heightConstraint?.isActive = true
-        view.setNeedsLayout()
-        view.layoutIfNeeded()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
 
-        // This runs on every keyboard appearance, not just after backgrounding.
-        // Keyboard extensions can't reliably observe UIApplication lifecycle
-        // notifications, so we apply these lightweight resets unconditionally.
-
-        // Force UIHostingController to re-enable touch delivery.
-        // After keyboard extension lifecycle transitions, the hosting view
-        // can lose touch responsiveness. Toggling isUserInteractionEnabled
-        // forces UIKit to re-attach the gesture recognizer hierarchy.
-        // Tested on iOS 17/18. Re-evaluate if touch issues recur on future versions.
-        if let hostingView = keyboardView?.view {
+        // Skip the touch-recovery toggle on the very first appearance. It
+        // exists to fix touch delivery after background→foreground cycles,
+        // and applying it on cold start causes a visible reattach flash.
+        if hasAppearedOnce, let hostingView = keyboardView?.view {
             hostingView.isUserInteractionEnabled = false
             hostingView.isUserInteractionEnabled = true
         }
+        hasAppearedOnce = true
 
         // Reset any stuck gesture state (e.g., user was mid-drag when backgrounding)
         viewModel.resetGestureState()
