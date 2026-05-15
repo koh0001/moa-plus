@@ -15,6 +15,14 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// from, so we skip the isUserInteractionEnabled toggle that exists for
     /// recovering touch delivery after background→foreground transitions.
     private var hasAppearedOnce = false
+    /// True while our own insert/delete is in flight. Our text edits always
+    /// fire textWillChange→textDidChange and incidentally move the selection;
+    /// a user tapping elsewhere in the field fires selectionDidChange WITHOUT
+    /// a text change. This flag lets selectionDidChange tell the two apart so
+    /// only a genuine external caret move clears the composer (the
+    /// "안욥하세욥" bug). Cleared on the next runloop tick after textDidChange
+    /// because selectionDidChange arrives synchronously within the same edit.
+    private var isProgrammaticTextChange = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -109,7 +117,10 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     }
 
     override func textWillChange(_ textInput: UITextInput?) {
-        // Called when the text is about to change
+        // A text edit is starting. Mark it so the selectionDidChange that
+        // rides along with our own insert/delete is not mistaken for the
+        // user tapping elsewhere.
+        isProgrammaticTextChange = true
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -120,6 +131,25 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
            textDocumentProxy.documentContextAfterInput == nil {
             viewModel.resetComposer()
         }
+        // Clear on the NEXT runloop tick: the selectionDidChange caused by
+        // this same edit fires synchronously before we return here, so the
+        // flag must stay set until the edit fully settles.
+        DispatchQueue.main.async { [weak self] in
+            self?.isProgrammaticTextChange = false
+        }
+    }
+
+    override func selectionWillChange(_ textInput: UITextInput?) {}
+
+    override func selectionDidChange(_ textInput: UITextInput?) {
+        // Selection moved without an accompanying text edit ⇒ the user
+        // tapped elsewhere in the host field; iOS already repositioned the
+        // caret. Freeze the composer so the next keystroke starts fresh at
+        // the new caret. Our programmatic caret moves (moveCursor /
+        // auto-bracket) also land here but already cleared the composer, so
+        // handleExternalCursorMove is a harmless no-op there.
+        if isProgrammaticTextChange { return }
+        viewModel.handleExternalCursorMove()
     }
 }
 

@@ -576,6 +576,23 @@ class KeyboardViewModel: ObservableObject {
         delegate?.moveCursor(by: offset)
     }
 
+    /// The user moved the caret by tapping directly in the host text field
+    /// (not via our space-drag / `moveCursor`). iOS has already repositioned
+    /// the caret, and the in-progress composing glyph is already rendered as
+    /// plain text at its OLD position. Freeze composer state so the next
+    /// keystroke starts a fresh composition at the new caret.
+    ///
+    /// Must NOT touch the proxy (no delete/insert/cursor move): the glyph is
+    /// already committed visually, and `updateComposingText`'s delete+insert
+    /// simulation is relative to the *current* caret — editing here would
+    /// corrupt text at the new position (the "안욥하세욥" bug). `commitCurrent`
+    /// is proxy-free and idempotent, so wiring this to `selectionDidChange`
+    /// (which also fires for our own programmatic moves) stays safe.
+    func handleExternalCursorMove() {
+        commitCurrent()
+        abbreviationEngine.resetBuffer()
+    }
+
     func toggleSpecialCharLayer() {
         isSpecialCharLayerVisible.toggle()
         if isSpecialCharLayerVisible {
