@@ -27,24 +27,12 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // self.view (the input container) is briefly stretched to full
-        // screen (~956pt) for a frame or two on every globe-key switch —
-        // a system layout transient we cannot fully prevent while a height
-        // constraint lives on self.view. A solid background painted that
-        // big is exactly the giant gray flash the user sees. Keep it clear
-        // and clip to bounds so only the hosting view (pinned to 260 via
-        // sizingOptions=[]) is ever visible; the SwiftUI KeyboardView paints
-        // its own Color(.systemGray6)/background within that 260.
-        view.backgroundColor = .clear
-        view.clipsToBounds = true
+        // Match the SwiftUI keyboard background fallback color so the first
+        // frame doesn't flash the bare UIInputViewController background
+        // (system keyboard gray) before SwiftUI's Color(.systemGray6) lays in.
+        view.backgroundColor = UIColor.systemGray6
 
-        // Keyboard height. The cumulative globe-switch growth is an iOS 26
-        // input-container transition defect (the system directly mutates
-        // self.view's frame; verified across 10 attempts, device + simulator,
-        // independent Codex + Apple-docs review). This required 260 height
-        // is the best-available baseline: it keeps the keyboard content at
-        // 260 (via the GeometryReader clamp + sizingOptions=[]) even though
-        // it cannot prevent the system's transient container inflation.
+        // 키보드 높이 설정 (iOS 키보드 익스텐션은 명시적 높이 필요)
         guard let rootView = self.view else { return }
         let heightConstraint = NSLayoutConstraint(
             item: rootView,
@@ -55,7 +43,13 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             multiplier: 1.0,
             constant: KeyboardMetrics.keyboardHeight
         )
-        heightConstraint.priority = .required
+        // 999, not .required(1000): on globe-key keyboard switches iOS lays
+        // the input container out at its own provisional height first. A
+        // .required height constraint then "snaps" in a frame later — the
+        // visible jump-then-settle the user reported. 999 lets our height
+        // win steady-state while yielding to the system's transient layout,
+        // so it converges without the jump/flicker.
+        heightConstraint.priority = UILayoutPriority(rawValue: 999)
         rootView.addConstraint(heightConstraint)
         self.heightConstraint = heightConstraint
 
@@ -84,21 +78,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // layout pass once avoids a visible double-layout flicker on first
         // appearance.
         KeyboardSettings.shared.loadAll()
-        // Strip stale self-referential height constraints and re-add a
-        // single fresh required 260 so our constraint never compounds with
-        // ones the system may add. (This does not stop the system's own
-        // direct frame mutation during the transition — that is an iOS 26
-        // defect outside extension control — but keeps our side clean.)
-        view.constraints
-            .filter { $0.firstAttribute == .height && $0.secondItem == nil && ($0.firstItem as? UIView) === view }
-            .forEach { view.removeConstraint($0) }
-        let h = NSLayoutConstraint(item: view!, attribute: .height,
-                                   relatedBy: .equal, toItem: nil,
-                                   attribute: .notAnAttribute,
-                                   multiplier: 1, constant: KeyboardMetrics.keyboardHeight)
-        h.priority = .required
-        view.addConstraint(h)
-        heightConstraint = h
+        heightConstraint?.constant = KeyboardMetrics.keyboardHeight
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -120,46 +100,21 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     private func setupKeyboardView() {
         let rootView = KeyboardView(viewModel: viewModel, gestureState: viewModel.gestureState, popupState: viewModel.popupState).ignoresSafeArea(.all)
         let hostingController = UIHostingController(rootView: rootView)
-        // Kill the self-sizing feedback loop behind the cumulative
-        // globe-switch growth: KeyboardView is a GeometryReader, so it fills
-        // whatever height the parent gives and scales keyHeight to it. With
-        // default sizingOptions (.intrinsicContentSize) the hosting view
-        // reports that grown size back as an Auto Layout constraint that
-        // outranks our 999 height — each switch pushed self.view ~+228pt
-        // (260→488→716→…→3908). Empty sizingOptions makes the hosting view
-        // obey the parent's height constraint instead of inflating it.
-        hostingController.sizingOptions = []
-        // Keyboard extensions have non-standard safe-area insets; left
-        // injected, SwiftUI measures at an unexpected height that feeds back
-        // into intrinsicContentSize. Zero them so the 260 stays clean.
-        hostingController.additionalSafeAreaInsets = .zero
         hostingController.view.backgroundColor = .clear
-        // Manual layout, NOT Auto Layout. During a globe-switch the system
-        // directly frame-manipulates self.view (→ ~956pt) and ignores the
-        // hosting view's Auto Layout constraints (verified: bottom-pin had
-        // zero effect on hostFrame.origin.y). So we position the hosting
-        // view by hand in viewDidLayoutSubviews every pass instead.
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = true
-        hostingController.view.autoresizingMask = []
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
 
         addChild(hostingController)
         view.addSubview(hostingController.view)
         hostingController.didMove(toParent: self)
 
-        keyboardView = hostingController
-        layoutKeyboardHostFrame()
-    }
+        NSLayoutConstraint.activate([
+            hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
 
-    /// Force the keyboard host to the bottom KeyboardMetrics.keyboardHeight
-    /// of self.view, whatever transient height the system imposed. Auto
-    /// Layout is bypassed (constraints are ignored mid globe-switch), so
-    /// this manual frame is the single source of truth and the keyboard's
-    /// on-screen position never moves.
-    private func layoutKeyboardHostFrame() {
-        guard let host = keyboardView?.view else { return }
-        let h = KeyboardMetrics.keyboardHeight
-        let w = view.bounds.width
-        host.frame = CGRect(x: 0, y: view.bounds.height - h, width: w, height: h)
+        keyboardView = hostingController
     }
 
     private func setupHapticFeedback() {
@@ -201,11 +156,6 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // handleExternalCursorMove is a harmless no-op there.
         if isProgrammaticTextChange { return }
         viewModel.handleExternalCursorMove()
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        layoutKeyboardHostFrame()
     }
 }
 
