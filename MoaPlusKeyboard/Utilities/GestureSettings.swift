@@ -10,10 +10,15 @@ struct GestureSettings: Codable, Equatable {
     /// direction-change point before a *non-opposite* direction switch
     /// is recorded. Larger values reject end-of-swipe lateral drift
     /// (the ㅗ → ㅘ misclassification reported in PR G15).
-    /// Opposite reversals (e.g. ↑ → ↓ for ㅚ) keep using the lower
-    /// `KeyboardMetrics.reversalThreshold` so multi-stroke vowels stay
-    /// fluid.
     var directionChangeThreshold: CGFloat = KeyboardMetrics.directionChangeThreshold
+
+    /// Fraction of the effective swipe threshold to use for opposite-
+    /// direction reversals (↑→↓, ←→→, etc.). Reversals get a smaller
+    /// threshold so multi-stroke vowels (ㅚ/ㅞ) stay fluid, but the value
+    /// now scales with the user's swipeLength preset — previously this
+    /// was a hardcoded 10pt and would not respond to "긋기 길이 길게".
+    /// Default 0.5 keeps the historical 20pt → 10pt ratio.
+    var reversalThresholdRatio: CGFloat = 0.5
 
     /// Get effective swipe threshold for a specific column. `keyWidth`
     /// must be the live center-key width measured by the view layer so
@@ -23,6 +28,20 @@ struct GestureSettings: Codable, Equatable {
         let baseThreshold = swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
         let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
         return baseThreshold * CGFloat(override.outwardDistanceMultiplier)
+    }
+
+    /// Effective reversal threshold = effective swipe threshold × ratio.
+    /// Inherits per-column outward-distance multipliers automatically so
+    /// columns the user has tuned to be more/less sensitive get matching
+    /// reversal sensitivity. `columnId == 0` returns the base.
+    func effectiveReversalThreshold(forColumn columnId: Int, keyWidth: CGFloat) -> CGFloat {
+        let base: CGFloat = {
+            if columnId > 0 {
+                return effectiveSwipeThreshold(forColumn: columnId, keyWidth: keyWidth)
+            }
+            return swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
+        }()
+        return base * reversalThresholdRatio
     }
 
     /// Effective direction-change threshold for a specific column. The

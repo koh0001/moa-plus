@@ -53,6 +53,18 @@ class GestureAnalyzer {
         return settings.directionChangeThreshold
     }
 
+    /// Effective reversal threshold. Scales with the user's swipeLength
+    /// preset and per-column outwardDistanceMultiplier so "긋기 길이 길게"
+    /// also relaxes opposite-direction registration. Falls back to the
+    /// constructor-supplied value when that path was used (tests).
+    var effectiveReversalThreshold: CGFloat {
+        // Legacy/test constructor path: respect the explicit value.
+        if reversalThreshold != KeyboardMetrics.reversalThreshold {
+            return reversalThreshold
+        }
+        return settings.effectiveReversalThreshold(forColumn: columnId, keyWidth: keyWidth)
+    }
+
     /// Sector ring with per-column rotation+delta adjustments folded in,
     /// ready to hand to `GestureDirection.from`.
     private var effectiveSectors: [DirectionSector] {
@@ -143,13 +155,15 @@ class GestureAnalyzer {
             threshold: effectiveThreshold
         )
 
+        let effReversal = effectiveReversalThreshold
+
         // If standard threshold fails, try lower reversal threshold for opposite directions
-        if newDirection == nil, let lastDirection = directions.last, magnitude >= reversalThreshold {
+        if newDirection == nil, let lastDirection = directions.last, magnitude >= effReversal {
             if let candidate = GestureDirection.from(
                 vector: vector,
                 sectors: sectors,
                 rotationOffset: rotation,
-                threshold: reversalThreshold
+                threshold: effReversal
             ),
                candidate.isOpposite(to: lastDirection) {
                 newDirection = candidate
@@ -165,7 +179,7 @@ class GestureAnalyzer {
             // Only add if direction changed
             if newDirection != lastDirection {
                 // Make sure we've moved enough from the last direction change
-                if magnitude >= changeThreshold || (newDirection.isOpposite(to: lastDirection) && magnitude >= reversalThreshold) {
+                if magnitude >= changeThreshold || (newDirection.isOpposite(to: lastDirection) && magnitude >= effReversal) {
                     directions.append(newDirection)
                     directionMagnitudes.append(magnitude)
                     lastDirectionChangePoint = currentPoint
@@ -219,7 +233,7 @@ class GestureAnalyzer {
         var result = segments
         var index = 1
 
-        let jitterMagnitudeCap = max(reversalThreshold, directionChangeThreshold * 0.8)
+        let jitterMagnitudeCap = max(effectiveReversalThreshold, directionChangeThreshold * 0.8)
         let jitterRatio: CGFloat = 0.75
 
         while index < result.count - 1 {
@@ -252,7 +266,7 @@ class GestureAnalyzer {
         guard segments.count > 1 else { return segments }
 
         var result = segments
-        let edgeNoiseCap = max(reversalThreshold, directionChangeThreshold * 0.8)
+        let edgeNoiseCap = max(effectiveReversalThreshold, directionChangeThreshold * 0.8)
 
         if let first = result.first, let second = result.dropFirst().first {
             if first.magnitude <= edgeNoiseCap && first.direction.isAdjacentTo(second.direction) {
