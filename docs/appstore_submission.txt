@@ -157,7 +157,9 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 - 사운드를 꺼도 들리던 클릭음을 수정했습니다.
 - 긋기 길이를 길게 설정해도 복합 모음 입력이 일관되게 동작합니다.
 - 글자 중간을 수정할 때 이전 글자가 잘못 끼어드는 문제를 수정했습니다.
-- 키보드 전환 시 높이가 튀는 현상을 줄였습니다.
+
+[알려진 이슈]
+- 지구본 키로 다른 키보드와 연속해서 여러 번 전환하면 화면 깜빡임이 점점 커질 수 있습니다. iOS 26 의 키보드 전환 관련 시스템 제약으로, 키보드 입력과 정상 위치 복귀는 문제없이 동작하며 Apple 에 개선을 요청했습니다. 지구본 대신 키보드 내 한영 전환을 사용하면 거의 발생하지 않습니다.
 
 기본 입력은 전체 접근 권한 없이 동작합니다. 햅틱 진동을 쓰려면 iOS 제약상 전체 접근 허용이 필요하지만(선택), 켜더라도 입력하신 내용은 외부로 전송되지 않습니다.
 
@@ -178,6 +180,8 @@ Reporting issues is now easier, and the keyboard feels smoother from the very fi
 - Fixed a click sound that played even when sound was turned off.
 - The longer-swipe setting now applies consistently to compound vowels.
 - Fixed a bug where editing mid-text could reinsert a previous character.
-- Reduced the keyboard height jump when switching keyboards.
+
+[Known issue]
+- Switching keyboards repeatedly with the globe key may progressively enlarge a screen flicker. This is an iOS 26 system limitation in keyboard switching; typing and return-to-normal-position work fine, and it has been reported to Apple. Using the in-keyboard Korean/English toggle instead avoids it.
 
 Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.
