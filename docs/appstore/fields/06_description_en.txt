@@ -1,0 +1,53 @@
+Swipe on consonant keys to input vowels. That is all it takes.
+Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
+
+[Gesture Input]
+- Swipe in 8 directions on consonant keys to input all 21 Korean vowels
+- Back-and-forth swipes for the y-vowel series
+- Combine directions for compound vowels
+
+[Cheonjiin Vowel Input]
+- Compose every Korean vowel from three keys: vertical stroke, dot, horizontal stroke
+- Standard cheonjiin dot accumulation
+- Mix freely with consonant-key gestures
+
+[English QWERTY Keyboard]
+- Switch instantly between Korean and English with the language key
+- Double-tap or long-press Shift for Caps Lock
+- Long-press number keys for symbols
+
+[Editing Helpers]
+- Drag the space bar left or right to move the cursor
+- Auto-close brackets when you type an opening bracket
+- Long-press backspace for fast word-by-word deletion
+
+[Long-Press Auxiliary Input]
+- Hold a key to instantly type numbers and symbols
+- Drag while holding to select from candidate options
+- Fully customizable per-key mappings
+- Long-press symbol keys for currency signs and other alternates
+
+[Abbreviation Expansion]
+- Type a few consonants then space to auto-expand into full phrases
+- Register frequently used phrases as short consonant triggers
+
+[Personalization]
+- Choose from Modern, Classic, or Extended layout presets (selectable on first launch)
+- Turn the key beside the space bar into a vowel-input key
+- Map the right-column and space-side punctuation keys independently
+- Five color theme presets or create your own with custom colors
+- Set a background image with crop and opacity control
+- Unified gesture settings in one screen
+- Live gesture visualization driven by the real keyboard engine
+
+[Typing Practice]
+- 33 scenarios covering cheonjiin, English QWERTY, and cursor movement
+
+[Support]
+- Send feedback by mail right from the About screen with app, iOS, and device info attached
+- No mail account? Submit through the report form instead
+
+[Privacy First]
+- No network access
+- No data collection whatsoever
+- Core input works without Full Access. Haptic feedback requires Full Access (optional); keystrokes are never transmitted even when enabled
