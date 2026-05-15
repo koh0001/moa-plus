@@ -218,6 +218,14 @@ struct KeyboardView: View {
                     viewModel.setCenterKeyWidth(newValue)
                 }
         }
+        // Hard clamp the GeometryReader to the fixed keyboard height. The
+        // GeometryReader otherwise fills whatever the parent proposes, and
+        // during a globe-switch the parent (self.view) momentarily balloons
+        // to ~956pt. Without this clamp, geometry.size.height feeds keyHeight
+        // and the whole layout scales up — the cumulative growth the user
+        // saw. Pinned to 260, the SwiftUI content is size-invariant no
+        // matter what the host container does.
+        .frame(height: KeyboardMetrics.keyboardHeight)
         // Named coordinate space lets the slot-B vowel key report its
         // gesture start point in the keyboard's frame (instead of the key's
         // local frame), so the settings preview can position UI based on
