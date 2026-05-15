@@ -262,8 +262,9 @@ struct FunctionRowView: View {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         let usesWideBackspace = layoutCustomization.slotA == .fullPackage
             || (mode.isSymbol && layoutCustomization.slotA != .vowel)
+            || (mode == .korean && !layoutCustomization.koreanPunctuationEnabled)
         if usesWideBackspace {
-            // 확장형(A3) / classic11 symbol: match wide backspace width (*1.3) so right edges align with row 3.
+            // 확장형(A3) / classic11 symbol / 한글 펑크OFF: 2셀 너비로 백스페이스와 정렬.
             return KeyboardMetrics.keyWidth(forBackspaceWideAt: 0, centerKeyWidth: centerKeyWidth)
         }
         // Default (Korean and English): use the Korean 7-col formula so the

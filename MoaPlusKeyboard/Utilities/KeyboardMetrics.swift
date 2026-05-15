@@ -204,8 +204,10 @@ enum KeyboardMetrics {
         case .fullPackage:
             // Classic 베이스 + col 6 에 슬롯 B 임베디드 (모음/특수문자) + wide ⌫.
             // Function row 의 슬롯 B 키는 비활성, 그 폭만큼 스페이스 확장.
+            // Row 0 col 6 은 slotARightColumn[0] 을 재사용 (classic11 과 공유).
+            let topRight = layout.slotARightColumn.first ?? LayoutCustomization.defaultSlotARightColumn[0]
             return [
-                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol("#")],
+                [leftCol[0], .consonant(.ㅃ), .consonant(.ㅉ), .consonant(.ㄸ), .consonant(.ㄲ), .consonant(.ㅆ), .symbol(topRight)],
                 [leftCol[1], .consonant(.ㅂ), .consonant(.ㅈ), .consonant(.ㄷ), .consonant(.ㄱ), .consonant(.ㅅ), .slotBVowelKey],
                 [leftCol[2], .consonant(.ㅁ), .consonant(.ㄴ), .consonant(.ㅇ), .consonant(.ㄹ), .consonant(.ㅎ), .slotBPunctuation],
                 [leftCol[3], .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .backspaceWide],
@@ -315,6 +317,18 @@ enum KeyboardMetrics {
         return layout[row][column]
     }
 
+    /// Layout-aware key lookup. Mirrors the rendering path (`ConsonantGridView`)
+    /// so input handlers resolve the same key content the user sees — required
+    /// for slotC / slotARightColumn customizations to actually take effect.
+    static func keyContent(at row: Int, column: Int, mode: KeyboardMode, layout: LayoutCustomization) -> KeyContent? {
+        let grid = activeLayout(for: mode, layout: layout)
+        guard row >= 0 && row < grid.count,
+              column >= 0 && column < grid[row].count else {
+            return nil
+        }
+        return grid[row][column]
+    }
+
     // Get consonant at grid position (for Korean mode only)
     static func consonant(at row: Int, column: Int) -> Choseong? {
         guard let content = keyContent(at: row, column: column, isSymbolMode: false) else {
@@ -333,6 +347,34 @@ enum KeyboardMetrics {
             return nil
         }
         return longPressNumbers[row][column]
+    }
+
+    /// Alternate characters surfaced via long-press in symbol mode. Curated
+    /// for actual Korean keyboard use — rarely used Latin punctuation
+    /// (`¡ ¿ ‰ §` etc.) is omitted. Order matters — the first item is
+    /// inserted if the user releases without dragging.
+    static let symbolModeAlternates: [String: [String]] = [
+        "$": ["₩", "€", "£", "¥"],
+        "*": ["※", "★", "☆"],
+        "(": ["[", "{", "<"],
+        ")": ["]", "}", ">"],
+        "-": ["–", "—", "•"],
+        "/": ["\\"],
+        ":": [";"],
+    ]
+
+    /// Build a transient SecondaryKeyAction for a symbol-mode key so the
+    /// existing long-press popup pipeline (KeyView + KeyboardViewModel)
+    /// renders alt characters without needing per-key storage in
+    /// `KeyboardSettings.secondaryKeyActions`.
+    static func symbolModeSecondaryAction(for symbol: String) -> SecondaryKeyAction? {
+        guard let alts = symbolModeAlternates[symbol], let first = alts.first else { return nil }
+        return SecondaryKeyAction(
+            keyId: symbol,
+            visibleHint: first,
+            primaryLongPressOutput: first,
+            popupOutputs: alts
+        )
     }
 
     /// Layout-aware long-press number lookup.
