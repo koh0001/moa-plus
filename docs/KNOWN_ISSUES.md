@@ -1,8 +1,9 @@
 # 알려진 이슈 (Known Issues)
 
-## KI-1. 지구본 키 연속 전환 시 깜빡임 누적 (iOS 26 시스템 결함)
+## KI-1. 지구본 키 연속 전환 시 깜빡임 누적 (iOS 시스템 동작)
 
-- **상태**: 미해결 (iOS 26 OS 결함, 익스텐션 코드 해결 불가 — 다각도 검증 완료)
+- **상태**: 미해결 (iOS 시스템 동작, 익스텐션 코드 해결 불가 — 다각도 검증 완료)
+- **확인 환경**: iOS 26.4 (실기기 + 시뮬레이터). **iOS 26 이전 버전(iOS 18 등) 미검증** — 현 Xcode가 iOS 18 SDK/런타임을 제공하지 않아 확인 불가. iOS 26 특정인지 이전부터 있던 동작인지는 미상.
 - **영향 버전**: v1.5 (build 9) 시점 확인. 원본 [ios-moaki](https://github.com/vkehfdl1/ios-moaki) 동일 구조·동일 증상.
 - **심각도**: 낮음~중간. 일반 사용(1~2회 전환)에서 거의 체감 안 됨. 연속 다회 전환 시 가시적.
 - **추적**: Apple Feedback 제출 예정 (v1.5 출시 후).
@@ -18,7 +19,7 @@
 실기기·시뮬레이터(iOS 26.4) 동일 재현.
 
 ### 근본 원인 (확정)
-iOS 26 이 키보드 전환(`advanceToNextInputMode`) 시 `UIInputViewController` 의 시스템 입력 컨테이너(private input host) frame 을 익스텐션 Auto Layout/제약과 무관하게 직접 누적 조작한다. 익스텐션 인스턴스 수명을 초월한 시스템 keyboard host 레벨 누적이라 익스텐션 코드에서 접근·리셋할 지점이 존재하지 않는다.
+iOS(확인 환경 26.4)가 키보드 전환(`advanceToNextInputMode`) 시 `UIInputViewController` 의 시스템 입력 컨테이너(private input host) frame 을 익스텐션 Auto Layout/제약과 무관하게 직접 누적 조작한다. 익스텐션 인스턴스 수명을 초월한 시스템 keyboard host 레벨 누적이라 익스텐션 코드에서 접근·리셋할 지점이 존재하지 않는다. (iOS 26 이전 버전에서도 동일한지는 미검증.)
 
 **결정적 증거**:
 - `hcCount=1`(우리 height constraint 1개·정상)인데 `view.bounds.height`만 누적 → constraint 메커니즘 아님
