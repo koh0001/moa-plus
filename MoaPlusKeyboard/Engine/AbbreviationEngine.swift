@@ -23,9 +23,10 @@ protocol AbbreviationEngineDelegate: AnyObject {
 
     /// Called when backspace restoration occurs
     /// - Parameters:
-    ///   - replacement: The expansion text to be removed
     ///   - original: The original trigger text to be restored
-    func abbreviationEngine(_ engine: AbbreviationEngine, shouldRestore original: String, removing replacement: String)
+    ///   - replacement: The expansion text to be removed
+    ///   - delimiter: The delimiter that was inserted alongside the replacement
+    func abbreviationEngine(_ engine: AbbreviationEngine, shouldRestore original: String, removing replacement: String, delimiter: Character)
 }
 
 /// Trie-based abbreviation expansion engine
@@ -153,7 +154,7 @@ final class AbbreviationEngine {
 
         // Check if we should restore the original trigger
         if canRestoreLastExpansion, let last = lastExpansion {
-            delegate?.abbreviationEngine(self, shouldRestore: last.trigger, removing: last.replacement)
+            delegate?.abbreviationEngine(self, shouldRestore: last.trigger, removing: last.replacement, delimiter: last.delimiter)
             buffer = last.trigger
             canRestoreLastExpansion = false
             lastExpansion = nil
@@ -250,7 +251,7 @@ final class AbbreviationEngine {
         delegate?.abbreviationEngine(self, shouldReplace: trigger, with: expansion.replacement, delimiter: delimiter)
 
         // Store for backspace restoration
-        lastExpansion = AppliedExpansion(trigger: trigger, replacement: expansion.replacement)
+        lastExpansion = AppliedExpansion(trigger: trigger, replacement: expansion.replacement, delimiter: delimiter)
         canRestoreLastExpansion = true
         buffer = ""
     }
@@ -286,5 +287,6 @@ private extension AbbreviationEngine {
     struct AppliedExpansion {
         let trigger: String
         let replacement: String
+        let delimiter: Character
     }
 }

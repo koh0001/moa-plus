@@ -1186,9 +1186,12 @@ extension KeyboardViewModel: AbbreviationEngineDelegate {
         abbreviationCandidates = []
     }
 
-    func abbreviationEngine(_ engine: AbbreviationEngine, shouldRestore original: String, removing replacement: String) {
-        // Delete the replacement text
-        for _ in 0..<replacement.count {
+    func abbreviationEngine(_ engine: AbbreviationEngine, shouldRestore original: String, removing replacement: String, delimiter: Character) {
+        // The expansion inserted `replacement + delimiter` on screen. Restore
+        // must remove the delimiter too — deleting only `replacement` leaves
+        // the delimiter behind and appends the trigger after it ("♥ㅎㅌ" bug).
+        let footprint = replacement.count + String(delimiter).count
+        for _ in 0..<footprint {
             delegate?.deleteBackward()
         }
         // Re-insert the original trigger
