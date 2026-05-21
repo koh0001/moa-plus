@@ -199,4 +199,8 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
     func moveCursor(by offset: Int) {
         textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
     }
+
+    func textBeforeCursor() -> String? {
+        textDocumentProxy.documentContextBeforeInput
+    }
 }

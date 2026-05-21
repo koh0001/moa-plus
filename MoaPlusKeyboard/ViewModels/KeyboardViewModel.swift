@@ -540,11 +540,31 @@ class KeyboardViewModel: ObservableObject {
         // Process delimiter - if abbreviation matches, delegate handles replacement
         // The engine's delegate callback will insert replacement + delimiter
         abbreviationEngine.processCharacter(" ")
-        // If no abbreviation matched, insert space normally
+        // If no abbreviation matched, either apply the double-space → period
+        // shortcut or insert a plain space.
         if !abbreviationEngine.canRestoreLastExpansion {
-            delegate?.insertText(" ")
+            if !applyPeriodShortcut() {
+                delegate?.insertText(" ")
+            }
         }
         triggerHapticFeedback()
+    }
+
+    /// Double-space → period. When the user presses space and the text already
+    /// ends with `<letter-or-digit><space>`, replace that trailing space with
+    /// ". " — mirrors the iOS system keyboard shortcut. Returns true when the
+    /// shortcut fired so the caller skips the plain space insertion.
+    private func applyPeriodShortcut() -> Bool {
+        guard KeyboardSettings.shared.periodOnDoubleSpaceEnabled else { return false }
+        guard let before = delegate?.textBeforeCursor(), before.hasSuffix(" ") else { return false }
+        // The character before the trailing space must be a letter or digit:
+        // skips line starts, runs of spaces, and existing punctuation (so
+        // "안녕. " + space doesn't become "안녕.. ").
+        guard let preceding = before.dropLast().last,
+              preceding.isLetter || preceding.isNumber else { return false }
+        delegate?.deleteBackward()      // remove the existing trailing space
+        delegate?.insertText(". ")
+        return true
     }
 
     func inputReturn() {
@@ -1119,6 +1139,14 @@ protocol KeyboardViewModelDelegate: AnyObject {
     func switchToNextKeyboard()
     func triggerHapticFeedback()
     func moveCursor(by offset: Int)
+    /// Text immediately before the caret, used for context-aware input
+    /// automation (double-space → period). Returns nil when the host
+    /// context is unavailable.
+    func textBeforeCursor() -> String?
+}
+
+extension KeyboardViewModelDelegate {
+    func textBeforeCursor() -> String? { nil }
 }
 
 // MARK: - AbbreviationEngineDelegate

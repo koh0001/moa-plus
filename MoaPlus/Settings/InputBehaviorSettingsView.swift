@@ -15,6 +15,12 @@ struct InputBehaviorSettingsView: View {
             }
 
             Section {
+                Toggle("더블 스페이스로 마침표 입력", isOn: $settings.periodOnDoubleSpaceEnabled)
+            } footer: {
+                Text("글자 뒤에서 스페이스를 두 번 누르면 마침표와 공백(. )으로 바꿉니다.")
+            }
+
+            Section {
                 Toggle("스페이스 드래그로 커서 이동", isOn: $settings.cursorMoveBySpaceDragEnabled)
             } footer: {
                 Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로 이동합니다.")

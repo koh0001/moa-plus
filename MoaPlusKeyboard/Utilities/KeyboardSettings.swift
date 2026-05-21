@@ -26,6 +26,7 @@ final class KeyboardSettings: ObservableObject {
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
+        static let periodOnDoubleSpace = "periodOnDoubleSpace"
         static let abbreviationEnabled = "abbreviationEnabled"
         static let layoutCustomization = "layoutCustomization"
         static let firstLaunchModalShown = "firstLaunchModalShown"
@@ -132,6 +133,11 @@ final class KeyboardSettings: ObservableObject {
     /// Space-bar drag moves the cursor (default ON)
     @Published var cursorMoveBySpaceDragEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(cursorMoveBySpaceDragEnabled, forKey: Keys.cursorMoveBySpaceDragEnabled) }
+    }
+
+    /// Double-space inserts a period (iOS-style ". " shortcut, default ON)
+    @Published var periodOnDoubleSpaceEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; writePrimitive(periodOnDoubleSpaceEnabled, forKey: Keys.periodOnDoubleSpace) }
     }
 
     // MARK: - Layout Customization (v1.4)
@@ -291,6 +297,7 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
         wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5
         cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
+        periodOnDoubleSpaceEnabled = defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true
         layoutCustomization = load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization()
         firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
         rememberLastKeyboardMode = defaults.bool(forKey: Keys.rememberLastKeyboardMode)
@@ -342,6 +349,7 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true
+        periodOnDoubleSpaceEnabled = true
         layoutCustomization = LayoutCustomization()
         firstLaunchModalShown = false
         rememberLastKeyboardMode = false
