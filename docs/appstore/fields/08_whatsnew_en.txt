@@ -1,17 +1,10 @@
-Reporting issues is now easier, and the keyboard feels smoother from the very first tap.
+This update makes sentences faster to type and fixes a shortcut-expansion bug.
 
 [New]
-- In-app mail composer: Send feedback right from the About screen. App, iOS, and device info are attached automatically so bugs get fixed faster.
-- Long-press on the symbol keypad: Hold a symbol key for currency signs and other alternates.
-- The right-column punctuation key is now configured independently from the one beside the space bar.
+- Period on double space: Tap the space bar twice after a letter to insert a period and space (. ) automatically. It matches the iOS system keyboard and can be turned off in Settings → Input Behavior.
 
-[Improvements]
-- Clearer wording in layout settings.
-- Added a Full Access guide with a shortcut to iOS Settings in the haptics section.
-- Removed the flicker when the keyboard first appears.
-- Fixed a click sound that played even when sound was turned off.
-- The longer-swipe setting now applies consistently to compound vowels.
-- Fixed a bug where editing mid-text could reinsert a previous character.
+[Bug fix]
+- Fixed a shortcut backspace bug: Pressing backspace right after a shortcut expanded left the result in place and reinserted the original trigger. Backspace now cleanly reverts the expansion in a single tap.
 
 [Known issue]
 - Switching keyboards repeatedly with the globe key may progressively enlarge a screen flicker. This is a system limitation in iOS keyboard switching (observed on iOS 26; earlier versions not verified); typing and return-to-normal-position work fine, and it has been reported to Apple. Using the in-keyboard Korean/English toggle instead avoids it.
