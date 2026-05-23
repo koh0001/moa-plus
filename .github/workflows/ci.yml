@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: List schemes
+        run: xcodebuild -list -project MoaPlus.xcodeproj
+
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -project MoaPlus.xcodeproj \
+            -scheme MoaPlus \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -quiet
+
+      - name: Test
+        run: |
+          xcodebuild test-without-building \
+            -project MoaPlus.xcodeproj \
+            -scheme MoaPlus \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult

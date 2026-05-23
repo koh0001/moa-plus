@@ -102,12 +102,18 @@ moa-plus/
 open MoaPlus.xcodeproj
 
 # 빌드 (시뮬레이터)
-xcodebuild -scheme MoaPlus -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild -scheme MoaPlus -destination 'platform=iOS Simulator,name=iPhone 17'
 
-# 단위 테스트는 Xcode에서 Cmd+U 실행 (CLI test scheme TEST_HOST 미수리)
+# CLI 테스트 실행 (MoaPlusKeyboardTests + MoaPlusUITests)
+xcodebuild test \
+  -project MoaPlus.xcodeproj \
+  -scheme MoaPlus \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
 실기기: `Cmd + R` → 아이폰에서 설정 → 키보드 → 새 키보드 추가 → 모아+
+
+CI: `.github/workflows/ci.yml`이 main 브랜치 push와 PR 시 self-hosted macOS runner에서 위 명령을 자동 실행한다.
 
 ## 주의사항
 
