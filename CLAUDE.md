@@ -113,7 +113,7 @@ xcodebuild test \
 
 실기기: `Cmd + R` → 아이폰에서 설정 → 키보드 → 새 키보드 추가 → 모아+
 
-CI: `.github/workflows/ci.yml`이 main 브랜치 push와 PR 시 self-hosted macOS runner에서 위 명령을 자동 실행한다.
+CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 GitHub Hosted Runner(`macos-15`)에서 위 명령을 자동 실행한다. 시뮬레이터는 iPhone 17 Pro → 17 → 16 Pro → 16 순서로 폴백 선택한다.
 
 ## 주의사항
 

@@ -5,36 +5,84 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
     name: Build and Test
-    runs-on: [self-hosted, macOS]
-    timeout-minutes: 30
+    runs-on: macos-15
+    timeout-minutes: 45
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode and Swift versions
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: List schemes
         run: xcodebuild -list -project MoaPlus.xcodeproj
+
+      - name: List available simulators
+        run: xcrun simctl list devices available | grep -E 'iPhone' || true
+
+      - name: Select simulator
+        id: simulator
+        run: |
+          PREFERRED_DEVICES=(
+            "iPhone 17 Pro"
+            "iPhone 17"
+            "iPhone 16 Pro"
+            "iPhone 16"
+          )
+
+          SELECTED=""
+          for device in "${PREFERRED_DEVICES[@]}"; do
+            if xcrun simctl list devices available | grep -q "$device ("; then
+              SELECTED="$device"
+              break
+            fi
+          done
+
+          if [ -z "$SELECTED" ]; then
+            SELECTED=$(xcrun simctl list devices available \
+              | grep -oE 'iPhone [0-9]+( Pro( Max)?)?( \()' \
+              | sed 's/ ($//' \
+              | sort -V \
+              | tail -n 1)
+          fi
+
+          if [ -z "$SELECTED" ]; then
+            echo "::error::사용 가능한 iPhone 시뮬레이터를 찾지 못했습니다."
+            exit 1
+          fi
+
+          echo "선택된 디바이스: $SELECTED"
+          echo "device=$SELECTED" >> $GITHUB_OUTPUT
 
       - name: Build for testing
         run: |
           xcodebuild build-for-testing \
             -project MoaPlus.xcodeproj \
             -scheme MoaPlus \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.device }}" \
+            -derivedDataPath build \
             -quiet
 
-      - name: Test
+      - name: Run tests
         run: |
           xcodebuild test-without-building \
             -project MoaPlus.xcodeproj \
             -scheme MoaPlus \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.device }}" \
+            -derivedDataPath build \
             -resultBundlePath TestResults.xcresult
 
       - name: Upload test results
@@ -43,3 +91,4 @@ jobs:
         with:
           name: test-results
           path: TestResults.xcresult
+          retention-days: 7
