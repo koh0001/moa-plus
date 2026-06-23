@@ -296,6 +296,20 @@ struct LayoutCustomizationView: View {
                 Text("좌우 끝 키의 너비. 기본 70% (정사각).")
             }
 
+            // iPad 가로 숫자패드 위치
+            Section {
+                Picker("iPad 가로 숫자패드 위치", selection: numberPadSideBinding) {
+                    Text("왼쪽").tag(NumberPadSide.left)
+                    Text("오른쪽").tag(NumberPadSide.right)
+                }
+                .pickerStyle(.segmented)
+                Text("아이패드를 가로로 쓸 때 숫자패드를 어느 쪽에 둘지 선택합니다.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            } header: {
+                Text("iPad 레이아웃")
+            }
+
             Section("특수키 — 영문 자판") {
                 Toggle("사용 (스페이스 폭이 줄어듭니다)", isOn: Binding(
                     get: { settings.layoutCustomization.englishPunctuationEnabled },
@@ -347,6 +361,13 @@ struct LayoutCustomizationView: View {
                 gs.swipeProfile.fourWayMode = newValue
                 settings.gestureSettings = gs
             }
+        )
+    }
+
+    private var numberPadSideBinding: Binding<NumberPadSide> {
+        Binding(
+            get: { KeyboardSettings.shared.layoutCustomization.numberPadSide },
+            set: { KeyboardSettings.shared.layoutCustomization.numberPadSide = $0 }
         )
     }
 
