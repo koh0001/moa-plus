@@ -670,8 +670,12 @@ private struct SectorOverlay: View {
                         default: break
                         }
                     }
-                    let startDeg = s.startAngle + rotationOffset
-                    let endDeg = s.endAngle + rotationOffset
+                    // Per-side wedge: CW edge = centre − rightHalfWidth (start),
+                    // CCW edge = centre + leftHalfWidth (end). `halfWidth`
+                    // assignments above mirror into both sides via didSet, so
+                    // four-way (45) and column deltas are already reflected.
+                    let startDeg = s.centerAngle - s.rightHalfWidth + rotationOffset
+                    let endDeg = s.centerAngle + s.leftHalfWidth + rotationOffset
 
                     // Convert math coords (0°=right, CCW) to screen (CW, y down)
                     let startRad = -startDeg * .pi / 180
