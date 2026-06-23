@@ -58,6 +58,27 @@ enum KeyboardMetrics {
     // Keyboard height
     static let keyboardHeight: CGFloat = 260
 
+    // MARK: - iPad dynamic height (T6)
+    // 런타임 UIScreen 실측에서 계산 → 모델 하드코딩 없이 모든 아이패드에 정확.
+    static let iPadPortraitHeightRatio: CGFloat = 0.30
+    static let iPadLandscapeHeightRatio: CGFloat = 0.44
+    static let iPadPortraitHeightRange: ClosedRange<CGFloat> = 310...400
+    static let iPadLandscapeHeightRange: ClosedRange<CGFloat> = 320...420
+
+    /// 키보드 컨테이너 높이. 아이폰은 항상 260(현행 유지), 아이패드만 화면 실측 기반.
+    /// `screenShort`/`screenLong` = `UIScreen.main.bounds` 의 min/max (방향 불변).
+    static func keyboardHeight(isPad: Bool, isLandscape: Bool,
+                               screenShort: CGFloat, screenLong: CGFloat) -> CGFloat {
+        guard isPad else { return keyboardHeight }   // iPhone: 260, 무손상
+        if isLandscape {
+            let raw = screenShort * iPadLandscapeHeightRatio
+            return min(max(raw, iPadLandscapeHeightRange.lowerBound), iPadLandscapeHeightRange.upperBound)
+        } else {
+            let raw = screenLong * iPadPortraitHeightRatio
+            return min(max(raw, iPadPortraitHeightRange.lowerBound), iPadPortraitHeightRange.upperBound)
+        }
+    }
+
     // Audio
     static let clickSoundID: UInt32 = 1104
 

@@ -181,4 +181,36 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertEqual(KeyboardMetrics.keyWidth(for: 1, row: 3, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
         XCTAssertEqual(KeyboardMetrics.keyWidth(for: 7, row: 3, centerKeyWidth: center, mode: .english), center, accuracy: 0.01)
     }
+
+    // MARK: - iPad dynamic height (T6)
+
+    func testKeyboardHeight_iPhoneAlways260() {
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844), 260, accuracy: 0.01)
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: true, screenShort: 390, screenLong: 844), 260, accuracy: 0.01)
+    }
+
+    func testKeyboardHeight_iPadPortraitMini_isLongTimes030() {
+        // mini6 744×1133 portrait: 1133*0.30 = 339.9 (clamp 안 걸림)
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: false, screenShort: 744, screenLong: 1133), 1133 * 0.30, accuracy: 0.01)
+    }
+
+    func testKeyboardHeight_iPadLandscapeMini_isShortTimes044() {
+        // mini6 landscape: 744*0.44 = 327.36 (clamp 안 걸림)
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 744, screenLong: 1133), 744 * 0.44, accuracy: 0.01)
+    }
+
+    func testKeyboardHeight_iPad13Portrait_clampedToMax400() {
+        // 13" 1024×1366 portrait: 1366*0.30 = 409.8 → clamp 400
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: false, screenShort: 1024, screenLong: 1366), 400, accuracy: 0.01)
+    }
+
+    func testKeyboardHeight_iPad13Landscape_clampedToMax420() {
+        // 13" landscape: 1024*0.44 = 450.56 → clamp 420
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 1024, screenLong: 1366), 420, accuracy: 0.01)
+    }
+
+    func testKeyboardHeight_iPadLandscapeLowerClamp320() {
+        // 가상 소형: short 600 → 600*0.44 = 264 → clamp 하한 320
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 600, screenLong: 900), 320, accuracy: 0.01)
+    }
 }
