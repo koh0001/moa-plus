@@ -69,7 +69,11 @@ final class GestureTestModel: ObservableObject {
     // MARK: Computed values from settings
 
     var rotationOffset: Double {
-        settings.gestureSettings.effectiveRotationOffset(forColumn: selectedColumn)
+        // Mirror GestureAnalyzer.effectiveRotationOffset: global axis rotation
+        // applies to every column, with per-column rotation summed on top, so
+        // the drawn sectors match what the live recognizer actually uses.
+        settings.gestureSettings.swipeProfile.axisRotation
+            + settings.gestureSettings.effectiveRotationOffset(forColumn: selectedColumn)
     }
 
     var iDelta: Double {

@@ -538,7 +538,7 @@ struct SectorAngleHybridView: View {
         } header: {
             Text("인식 범위")
         } footer: {
-            Text("방향을 탭해 선택한 뒤, 선택된 방향의 좌/우 경계 손잡이를 끌거나 아래 슬라이더로 폭을 조절합니다. 점선은 기본값(±22.5°)입니다.")
+            Text("방향을 탭해 선택한 뒤, 선택된 방향의 좌/우 경계 손잡이를 끌거나 아래 슬라이더로 폭을 조절합니다. 점선은 기본값(±22.5°)입니다. (미리보기는 폭만 보여주며 전체 회전은 제외됩니다.)")
         }
     }
 
@@ -897,6 +897,6 @@ private struct PerSidePieChart: View {
     }
 }
 
-/// Top-level alias so the private `PerSidePieChart` can reference the handle
-/// side enum nested in `SectorAngleHybridView` without exposing it.
-enum SectorAngleHybridView_HandleSide { case left, right }
+/// File-scoped so both `SectorAngleHybridView` and the private `PerSidePieChart`
+/// (same file) can reference it, without leaking a symbol into the app module.
+fileprivate enum SectorAngleHybridView_HandleSide { case left, right }

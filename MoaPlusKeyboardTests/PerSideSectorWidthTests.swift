@@ -53,6 +53,22 @@ final class PerSideSectorWidthTests: XCTestCase {
         XCTAssertEqual(dir(60), .upRight, "60° 은 기본에서 ↗")
     }
 
+    // MARK: - STEP1 tie-break: equal widened distance → earlier cardinal index
+
+    func testWidenedCardinalTieBreakFavorsEarlierCardinalIndex() {
+        // → (index 0, center 0) widened on its CCW(left) side; ↑ (index 2,
+        // center 90) widened on its CW(right) side. At 45° both are exactly 45°
+        // from center and both claim via STEP1 (22.5 < 45 <= 50). The strict-`<`
+        // tie-break keeps the first in cardinalSectorIndices order [0,2,4,6] → →.
+        var sectors = DirectionSector.defaultSectors
+        sectors[0].leftHalfWidth = 50
+        sectors[2].rightHalfWidth = 50
+        let result = GestureDirection.from(vector: vector(atDegrees: 45),
+                                           sectors: sectors, rotationOffset: 0, threshold: 20)
+        XCTAssertEqual(result, .right,
+                       "동률(45°)이면 cardinalSectorIndices 순서로 → 가 우선")
+    }
+
     // MARK: - (c) new ability: widened cardinal beats adjacent diagonal
 
     func testWidenedCardinalUpRightSideBeatsDiagonalAt60() {

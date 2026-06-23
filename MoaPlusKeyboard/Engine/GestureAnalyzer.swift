@@ -93,16 +93,17 @@ class GestureAnalyzer {
         // shrunk implicitly by the diagonal-first priority in
         // `GestureDirection.from`.
         //
-        // Assigning `halfWidth` mirrors into both per-side widths (see
-        // `DirectionSector.halfWidth`'s `didSet`), so the symmetric per-column
-        // diagonal widening that `GestureDirection.from`'s per-side claim reads
-        // — and `testColumn5SteepDiagonalStaysAsUpRight` depends on — is kept
-        // in sync automatically.
+        // Widen both per-side widths directly (not via `halfWidth`, whose
+        // `didSet` would reset any user-set asymmetry on these diagonals).
+        // `GestureDirection.from`'s per-side claim reads these — and
+        // `testColumn5SteepDiagonalStaysAsUpRight` depends on the result.
         for index in [1, 3] where index < sectors.count {
-            sectors[index].halfWidth += iDelta
+            sectors[index].leftHalfWidth += iDelta
+            sectors[index].rightHalfWidth += iDelta
         }
         for index in [5, 7] where index < sectors.count {
-            sectors[index].halfWidth += euDelta
+            sectors[index].leftHalfWidth += euDelta
+            sectors[index].rightHalfWidth += euDelta
         }
         return sectors
     }
