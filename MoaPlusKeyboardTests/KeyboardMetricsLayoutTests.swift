@@ -232,4 +232,16 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: true))
         XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: false))
     }
+
+    // MARK: - number pad model (T6)
+
+    func testNumberPadKeys_shape() {
+        XCTAssertEqual(KeyboardMetrics.numberPadKeys.count, 4)
+        for row in KeyboardMetrics.numberPadKeys { XCTAssertEqual(row.count, 3) }
+    }
+
+    func testNumberPadKeys_contents() {
+        XCTAssertEqual(KeyboardMetrics.numberPadKeys[0], ["1", "2", "3"])
+        XCTAssertEqual(KeyboardMetrics.numberPadKeys[3], [".", "0", KeyboardMetrics.numberPadBackspaceLabel])
+    }
 }

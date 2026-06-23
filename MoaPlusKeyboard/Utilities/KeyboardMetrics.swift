@@ -91,6 +91,15 @@ enum KeyboardMetrics {
         isPad && isLandscape
     }
 
+    /// 아이패드 분리 레이아웃 좌(또는 우) 숫자패드. 계산기식 3×4.
+    static let numberPadBackspaceLabel = "⌫"
+    static let numberPadKeys: [[String]] = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        [".", "0", numberPadBackspaceLabel]
+    ]
+
     // Audio
     static let clickSoundID: UInt32 = 1104
 
