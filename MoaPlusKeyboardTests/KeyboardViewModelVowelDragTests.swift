@@ -441,4 +441,46 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
     func test_dashKey_singleRight_stillYu() {
         XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.right]), .ㅠ)
     }
+
+    // MARK: - 확장형 레이아웃 자음 키 대각선 = ㅡ/ㅣ (사용자 보고 재현)
+    //
+    // 확장형(.fullPackage)에서 자음 키 ↙↘=ㅡ, ↖↗=ㅣ 가 안 된다는 보고.
+    // 실제 파이프라인으로 자음 키 대각선이 자음+ㅡ/ㅣ 로 합성되는지 검증.
+    // (대각선 매핑 기본 .vowelEu/.vowelI, 4방향 off 보장)
+
+    private func withFullPackageDiagonals(_ body: () -> Void) {
+        let origLc = KeyboardSettings.shared.layoutCustomization
+        let origGs = KeyboardSettings.shared.gestureSettings
+        defer {
+            KeyboardSettings.shared.layoutCustomization = origLc
+            KeyboardSettings.shared.gestureSettings = origGs
+        }
+        var lc = origLc
+        lc.slotA = .fullPackage
+        KeyboardSettings.shared.layoutCustomization = lc
+        var gs = origGs
+        gs.swipeProfile.fourWayMode = false
+        gs.swipeProfile.downLeftMapping = .vowelEu
+        gs.swipeProfile.downRightMapping = .vowelEu
+        gs.swipeProfile.upLeftMapping = .vowelI
+        gs.swipeProfile.upRightMapping = .vowelI
+        KeyboardSettings.shared.gestureSettings = gs
+        body()
+    }
+
+    func test_fullPackage_consonant_downLeft_yieldsConsonantEu() {
+        // 확장형 자음 ㄱ(row1 col4) ↙ 긋기 → ㄱ+ㅡ = 그
+        withFullPackageDiagonals {
+            driveKeyGesture(row: 1, column: 4, dx: -57, dy: 57)
+        }
+        XCTAssertEqual(vm.composingText, "그", "확장형 자음 ㄱ ↙ = 그(ㄱ+ㅡ)")
+    }
+
+    func test_fullPackage_consonant_upRight_yieldsConsonantI() {
+        // 확장형 자음 ㄱ ↗ 긋기 → ㄱ+ㅣ = 기
+        withFullPackageDiagonals {
+            driveKeyGesture(row: 1, column: 4, dx: 57, dy: -57)
+        }
+        XCTAssertEqual(vm.composingText, "기", "확장형 자음 ㄱ ↗ = 기(ㄱ+ㅣ)")
+    }
 }
