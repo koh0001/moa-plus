@@ -286,15 +286,19 @@ extension DirectionPieChart {
 
         return (0..<min(sectors.count, 8)).map { i in
             var s = sectors[i]
-            // Apply ㅣ/ㅡ delta to diagonal sectors
+            // Apply ㅣ/ㅡ delta to diagonal sectors. Assigning `halfWidth`
+            // mirrors the delta into both sides via its didSet, so the per-side
+            // reads below already include it.
             switch i {
             case 1, 3: s.halfWidth += iDelta   // ↗, ↖
             case 5, 7: s.halfWidth += euDelta   // ↙, ↘
             default: break
             }
+            // Per-side wedge: CW edge = centre − rightHalfWidth (start),
+            // CCW edge = centre + leftHalfWidth (end). Matches recognition.
             return (
-                start: s.startAngle + rotationOffset,
-                end: s.endAngle + rotationOffset,
+                start: s.centerAngle - s.rightHalfWidth + rotationOffset,
+                end: s.centerAngle + s.leftHalfWidth + rotationOffset,
                 mapping: mappings[i],
                 symbol: symbols[i]
             )
@@ -343,25 +347,6 @@ extension DirectionPieChart {
         }
     }
 
-    /// Sector angle editor — shows direction symbols
-    static func sectorAngleSlices(sectors: [DirectionSector], profile: SwipeProfile) -> [PieSlice] {
-        let mappings: [DiagonalMapping] = [
-            .vowelA, profile.upRightMapping, .vowelO, profile.upLeftMapping,
-            .vowelEo, profile.downLeftMapping, .vowelU, profile.downRightMapping
-        ]
-        let symbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
-        let fixedLabels = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
-
-        return (0..<min(sectors.count, 8)).map { i in
-            let label = fixedLabels[i] ?? labelForMapping(mappings[i], symbol: symbols[i])
-            return PieSlice(
-                mathStart: sectors[i].startAngle,
-                mathEnd: sectors[i].endAngle,
-                label: label,
-                color: directionColors[i]
-            )
-        }
-    }
 }
 
 // MARK: - Direction Mapping View
@@ -469,70 +454,449 @@ struct DirectionMappingView: View {
     }
 }
 
-// MARK: - Sector Angle View
+// MARK: - Sector Angle Hybrid View (per-side widths)
 
-struct SectorAngleView: View {
+/// Direction selection + per-side width editor. Replaces `SectorAngleView`.
+///
+/// Interaction model (plan §3): tap a direction in the pie to select it, then
+/// adjust its **left/right** recognition widths independently via two drag
+/// handles on the selected sector's boundaries *and* two precise sliders.
+///
+/// - Angle/sign convention matches `GestureDirection.from`: a positive signed
+///   angular distance from the sector centre (CCW, increasing angle) is the
+///   **left** side → `leftHalfWidth`; negative (CW) is the **right** side →
+///   `rightHalfWidth`. Boundaries draw at `centre + leftHalfWidth` (CCW edge)
+///   and `centre − rightHalfWidth` (CW edge).
+/// - **Phase 1 invariant:** the UI only ever assigns `leftHalfWidth` /
+///   `rightHalfWidth` directly. Assigning `halfWidth` would reset both sides to
+///   the symmetric base via its `didSet`, so it is never touched here.
+struct SectorAngleHybridView: View {
     @ObservedObject private var settings = KeyboardSettings.shared
+    @State private var selectedIndex: Int = 0
+    @State private var draggingHandle: HandleSide?
+    @State private var lastHapticAtLimit = false
+
+    private typealias HandleSide = SectorAngleHybridView_HandleSide
+
+    private static let widthRange: ClosedRange<Double> = 10...40
+    private static let defaultHalfWidth: Double = 22.5
+    private let selectionHaptic = UISelectionFeedbackGenerator()
+
+    /// → ㅏ blue, ↗ ㅣ cyan, ↑ ㅗ orange, ↖ ㅣ cyan, ← ㅓ red, ↙ ㅡ purple,
+    /// ↓ ㅜ green, ↘ ㅡ purple — same order/palette as the other pie charts.
+    private static let directionColors: [Color] = [
+        DirectionPieChart.vowelColors["ㅏ"]!, DirectionPieChart.vowelColors["ㅣ"]!,
+        DirectionPieChart.vowelColors["ㅗ"]!, DirectionPieChart.vowelColors["ㅣ"]!,
+        DirectionPieChart.vowelColors["ㅓ"]!, DirectionPieChart.vowelColors["ㅡ"]!,
+        DirectionPieChart.vowelColors["ㅜ"]!, DirectionPieChart.vowelColors["ㅡ"]!,
+    ]
+
+    private var profile: SwipeProfile { settings.gestureSettings.swipeProfile }
+    private var sectors: [DirectionSector] { profile.sectors }
+    private var isFourWay: Bool { profile.fourWayMode }
+    private var selectedSector: DirectionSector { sectors[selectedIndex] }
 
     var body: some View {
         List {
-            // Visualization
-            Section {
-                DirectionPieChart(slices: DirectionPieChart.sectorAngleSlices(sectors: settings.gestureSettings.swipeProfile.sectors, profile: settings.gestureSettings.swipeProfile))
-                    .frame(height: 200)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color(.systemBackground))
-            } header: {
-                Text("인식 범위 미리보기")
+            pieSection
+            if isFourWay {
+                fourWayNoticeSection
             }
-
-            // Per-direction angle width
-            Section {
-                ForEach(0..<8, id: \.self) { i in
-                    let label = DirectionSector.directionLabels[i]
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(label)
-                                .font(.headline)
-                            Spacer()
-                            Text("±\(settings.gestureSettings.swipeProfile.sectors[i].halfWidth, specifier: "%.1f")°")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Slider(
-                            value: sectorBinding(i),
-                            in: 10...40,
-                            step: 0.5
-                        )
-                    }
-                    .padding(.vertical, 2)
-                }
-            } header: {
-                Text("방향별 인식 폭")
-            } footer: {
-                Text("각 방향의 인식 범위 폭을 조정합니다. 기본값: ±22.5° (총 45°). 넓힐수록 해당 방향을 더 쉽게 인식합니다.")
-            }
-
-            Section {
-                Button("기본값으로 복원 (45° 균등)") {
-                    var gs = settings.gestureSettings
-                    gs.swipeProfile.sectors = DirectionSector.defaultSectors
-                    settings.gestureSettings = gs
-                }
-                .foregroundColor(.red)
-            }
+            selectedDirectionSection
+            globalRotationSection
+            resetSection
         }
-        .navigationTitle("방향별 각도 범위")
+        .navigationTitle("방향별 좌/우 각도")
     }
 
-    private func sectorBinding(_ index: Int) -> Binding<Double> {
+    // MARK: Pie (selection + drag)
+
+    private var pieSection: some View {
+        Section {
+            PerSidePieChart(
+                sectors: sectors,
+                profile: profile,
+                colors: Self.directionColors,
+                selectedIndex: selectedIndex,
+                draggingHandle: draggingHandle,
+                onSelect: { i in
+                    guard !isFourWay, i != selectedIndex else { return }
+                    selectedIndex = i
+                    selectionHaptic.selectionChanged()
+                },
+                onDrag: { side, angle in handleDrag(side: side, touchAngle: angle) },
+                onDragEnded: {
+                    draggingHandle = nil
+                    lastHapticAtLimit = false
+                }
+            )
+            .frame(height: 240)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color(.systemBackground))
+            .opacity(isFourWay ? 0.4 : 1)
+            .disabled(isFourWay)
+        } header: {
+            Text("인식 범위")
+        } footer: {
+            Text("방향을 탭해 선택한 뒤, 선택된 방향의 좌/우 경계 손잡이를 끌거나 아래 슬라이더로 폭을 조절합니다. 점선은 기본값(±22.5°)입니다.")
+        }
+    }
+
+    private var fourWayNoticeSection: some View {
+        Section {
+            Text("4방향 전용 모드가 켜져 있어 각도 설정은 적용되지 않습니다. (레이아웃 설정 ‘모던’에서 변경)")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    // MARK: Selected direction (left/right sliders)
+
+    private var selectedDirectionSection: some View {
+        Section {
+            HStack {
+                Text(directionLabel(selectedIndex))
+                    .font(.headline)
+                Spacer()
+                Text("선택됨")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            widthRow(title: "왼쪽 폭", side: .left)
+            widthRow(title: "오른쪽 폭", side: .right)
+        } header: {
+            Text("선택한 방향")
+        } footer: {
+            Text("‘왼쪽/오른쪽’은 화면 기준 반시계/시계 방향 경계입니다. 한쪽을 넓히면 그 방향으로 비스듬히 그어도 같은 모음으로 인식됩니다.")
+        }
+        .disabled(isFourWay)
+        .opacity(isFourWay ? 0.4 : 1)
+    }
+
+    private func widthRow(title: String, side: HandleSide) -> some View {
+        let binding = sideBinding(side)
+        let value = binding.wrappedValue
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(value, specifier: "%.1f")°")
+                    .font(.caption)
+                    .foregroundColor(atLimit(value) ? .orange : .secondary)
+            }
+            Slider(value: binding, in: Self.widthRange, step: 0.5)
+                .accessibilityLabel("\(directionLabel(selectedIndex)) \(title)")
+                .accessibilityValue("\(value, specifier: "%.1f")도")
+        }
+        .padding(.vertical, 2)
+    }
+
+    // MARK: Global rotation
+
+    private var globalRotationSection: some View {
+        Section {
+            HStack {
+                Text("전체 회전")
+                Spacer()
+                Text("\(profile.axisRotation, specifier: "%+.1f")°")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Slider(value: axisRotationBinding, in: -20...20, step: 0.5)
+                .accessibilityLabel("전체 인식 축 회전")
+                .accessibilityValue("\(profile.axisRotation, specifier: "%.1f")도")
+        } header: {
+            Text("전체 회전")
+        } footer: {
+            Text("키별 회전 보정과 별개로 전체 인식 축을 돌립니다.")
+        }
+        .disabled(isFourWay)
+        .opacity(isFourWay ? 0.4 : 1)
+    }
+
+    // MARK: Reset
+
+    private var resetSection: some View {
+        Section {
+            Button("이 방향 초기화") {
+                var gs = settings.gestureSettings
+                gs.swipeProfile.sectors[selectedIndex].halfWidth = Self.defaultHalfWidth
+                settings.gestureSettings = gs
+            }
+            .disabled(isFourWay)
+
+            Button("전체 초기화") {
+                var gs = settings.gestureSettings
+                gs.swipeProfile.sectors = DirectionSector.defaultSectors
+                gs.swipeProfile.axisRotation = 0
+                settings.gestureSettings = gs
+            }
+            .foregroundColor(.red)
+            .disabled(isFourWay)
+        }
+    }
+
+    // MARK: - Drag handling
+
+    /// Convert a touch angle (math degrees) into a per-side width for the
+    /// selected sector and write it back, clamped to 10…40°.
+    private func handleDrag(side: HandleSide, touchAngle: Double) {
+        guard !isFourWay else { return }
+        draggingHandle = side
+        let centre = selectedSector.centerAngle
+        let signed = signedDelta(from: centre, to: touchAngle)
+        // Left handle lives on the CCW (+) edge, right handle on the CW (−) edge.
+        let raw = side == .left ? signed : -signed
+        let clamped = min(max(raw, Self.widthRange.lowerBound), Self.widthRange.upperBound)
+
+        let atEdge = clamped <= Self.widthRange.lowerBound || clamped >= Self.widthRange.upperBound
+        if atEdge {
+            if !lastHapticAtLimit { selectionHaptic.selectionChanged() }
+            lastHapticAtLimit = true
+        } else {
+            lastHapticAtLimit = false
+        }
+
+        sideBinding(side).wrappedValue = clamped
+    }
+
+    /// Smallest signed angular distance from `a` to `b` in (−180, 180],
+    /// mirroring `GestureDirection.signedAngularDistance`.
+    private func signedDelta(from a: Double, to b: Double) -> Double {
+        let diff = (b - a).truncatingRemainder(dividingBy: 360)
+        if diff > 180 { return diff - 360 }
+        if diff <= -180 { return diff + 360 }
+        return diff
+    }
+
+    // MARK: - Bindings
+
+    private func sideBinding(_ side: HandleSide) -> Binding<Double> {
         Binding(
-            get: { settings.gestureSettings.swipeProfile.sectors[index].halfWidth },
+            get: {
+                let s = settings.gestureSettings.swipeProfile.sectors[selectedIndex]
+                return side == .left ? s.leftHalfWidth : s.rightHalfWidth
+            },
             set: { newValue in
                 var gs = settings.gestureSettings
-                gs.swipeProfile.sectors[index].halfWidth = newValue
+                // Phase 1 invariant: assign the side directly; never halfWidth.
+                if side == .left {
+                    gs.swipeProfile.sectors[selectedIndex].leftHalfWidth = newValue
+                } else {
+                    gs.swipeProfile.sectors[selectedIndex].rightHalfWidth = newValue
+                }
                 settings.gestureSettings = gs
             }
         )
     }
+
+    private var axisRotationBinding: Binding<Double> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile.axisRotation },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile.axisRotation = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
+    // MARK: - Helpers
+
+    private func atLimit(_ value: Double) -> Bool {
+        value <= Self.widthRange.lowerBound || value >= Self.widthRange.upperBound
+    }
+
+    private func directionLabel(_ i: Int) -> String {
+        let fixed = ["→ ㅏ", nil, "↑ ㅗ", nil, "← ㅓ", nil, "↓ ㅜ", nil]
+        if let f = fixed[i] { return f }
+        let symbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
+        let mapping: DiagonalMapping
+        switch i {
+        case 1: mapping = profile.upRightMapping
+        case 3: mapping = profile.upLeftMapping
+        case 5: mapping = profile.downLeftMapping
+        default: mapping = profile.downRightMapping
+        }
+        return "\(symbols[i]) \(DirectionPieChart.labelForMapping(mapping, symbol: symbols[i]))"
+    }
 }
+
+// MARK: - Per-side pie chart (selectable + draggable handles)
+
+/// Renders the 8 direction sectors using **per-side** half-widths and exposes
+/// tap selection plus two drag handles on the selected sector. Kept private to
+/// `SectorAngleHybridView`; the read-only `DirectionPieChart` is unchanged.
+private struct PerSidePieChart: View {
+    let sectors: [DirectionSector]
+    let profile: SwipeProfile
+    let colors: [Color]
+    let selectedIndex: Int
+    let draggingHandle: SectorAngleHybridView_HandleSide?
+    let onSelect: (Int) -> Void
+    let onDrag: (SectorAngleHybridView_HandleSide, Double) -> Void
+    let onDragEnded: () -> Void
+
+    private var count: Int { min(sectors.count, 8) }
+
+    var body: some View {
+        GeometryReader { geo in
+            let cx = geo.size.width / 2
+            let cy = geo.size.height / 2
+            let radius = min(geo.size.width, geo.size.height) / 2 - 28
+            let centre = CGPoint(x: cx, y: cy)
+
+            ZStack {
+                Canvas { ctx, _ in
+                    for i in 0..<count {
+                        let s = sectors[i]
+                        // CCW edge = centre + leftHalfWidth; CW edge = centre − rightHalfWidth.
+                        let startDeg = s.centerAngle - s.rightHalfWidth
+                        let endDeg = s.centerAngle + s.leftHalfWidth
+                        let path = wedgePath(cx: cx, cy: cy, radius: radius,
+                                             fromDeg: startDeg, toDeg: endDeg)
+                        let isSel = i == selectedIndex
+                        ctx.fill(path, with: .color(colors[i].opacity(isSel ? 0.85 : 0.28)))
+                        ctx.stroke(path, with: .color(colors[i].opacity(isSel ? 0.9 : 0.45)),
+                                   lineWidth: isSel ? 2 : 0.5)
+                    }
+
+                    // Default ±22.5° dotted reference on the selected sector.
+                    if selectedIndex < count {
+                        let c = sectors[selectedIndex].centerAngle
+                        for edge in [c - 22.5, c + 22.5] {
+                            var line = Path()
+                            line.move(to: centre)
+                            line.addLine(to: point(cx: cx, cy: cy, radius: radius, deg: edge))
+                            ctx.stroke(line, with: .color(Color(.label).opacity(0.45)),
+                                       style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        }
+                    }
+
+                    let dot = CGRect(x: cx - 3, y: cy - 3, width: 6, height: 6)
+                    ctx.fill(Ellipse().path(in: dot), with: .color(Color(.label)))
+                }
+
+                // Tap-selectable labels per direction.
+                ForEach(0..<count, id: \.self) { i in
+                    let mid = sectors[i].centerAngle
+                    let lp = point(cx: cx, cy: cy, radius: radius * 0.66, deg: mid)
+                    Text(label(at: i))
+                        .font(.system(size: 13, weight: .heavy))
+                        .foregroundColor(Color(.label))
+                        .padding(6)
+                        .contentShape(Rectangle())
+                        .position(x: lp.x, y: lp.y)
+                        .onTapGesture { onSelect(i) }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(accessibilityLabel(i))
+                        .accessibilityValue(accessibilityValue(i))
+                        .accessibilityAddTraits(i == selectedIndex ? [.isSelected, .isButton] : .isButton)
+                }
+
+                // Drag handles on the selected sector's two boundaries.
+                if selectedIndex < count {
+                    let s = sectors[selectedIndex]
+                    handle(side: .left,
+                           deg: s.centerAngle + s.leftHalfWidth,
+                           cx: cx, cy: cy, radius: radius, centre: centre)
+                    handle(side: .right,
+                           deg: s.centerAngle - s.rightHalfWidth,
+                           cx: cx, cy: cy, radius: radius, centre: centre)
+                }
+            }
+        }
+    }
+
+    // MARK: Handles
+
+    @ViewBuilder
+    private func handle(side: SectorAngleHybridView_HandleSide,
+                        deg: Double, cx: CGFloat, cy: CGFloat,
+                        radius: CGFloat, centre: CGPoint) -> some View {
+        let p = point(cx: cx, cy: cy, radius: radius, deg: deg)
+        let active = draggingHandle == side
+        Circle()
+            .fill(Color.accentColor)
+            .frame(width: active ? 26 : 18, height: active ? 26 : 18)
+            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            .shadow(radius: active ? 4 : 1)
+            // 44pt minimum touch target regardless of visual size.
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+            .position(x: p.x, y: p.y)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let angle = mathAngle(of: value.location, centre: centre)
+                        onDrag(side, angle)
+                    }
+                    .onEnded { _ in onDragEnded() }
+            )
+            .accessibilityHidden(true)  // sliders carry the adjustable path
+    }
+
+    /// Math angle (0°=right, CCW positive) of a screen point about the centre.
+    private func mathAngle(of pt: CGPoint, centre: CGPoint) -> Double {
+        let dx = Double(pt.x - centre.x)
+        let dy = Double(pt.y - centre.y)
+        // Screen y is down; negate to convert to math convention.
+        return atan2(-dy, dx) * 180 / .pi
+    }
+
+    // MARK: Geometry helpers
+
+    private func point(cx: CGFloat, cy: CGFloat, radius: CGFloat, deg: Double) -> CGPoint {
+        CGPoint(x: cx + radius * cos(deg * .pi / 180),
+                y: cy - radius * sin(deg * .pi / 180))
+    }
+
+    private func wedgePath(cx: CGFloat, cy: CGFloat, radius: CGFloat,
+                           fromDeg: Double, toDeg: Double) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: cx, y: cy))
+        let steps = 28
+        for step in 0...steps {
+            let t = Double(step) / Double(steps)
+            let a = (fromDeg + (toDeg - fromDeg) * t) * .pi / 180
+            path.addLine(to: CGPoint(x: cx + radius * cos(a), y: cy - radius * sin(a)))
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    // MARK: Labels
+
+    private func label(at i: Int) -> String {
+        let fixed = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
+        if let f = fixed[i] { return f }
+        return diagonalLabel(at: i)
+    }
+
+    private func diagonalLabel(at i: Int) -> String {
+        let symbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
+        let mapping: DiagonalMapping
+        switch i {
+        case 1: mapping = profile.upRightMapping
+        case 3: mapping = profile.upLeftMapping
+        case 5: mapping = profile.downLeftMapping
+        default: mapping = profile.downRightMapping
+        }
+        return DirectionPieChart.labelForMapping(mapping, symbol: symbols[i])
+    }
+
+    private func accessibilityLabel(_ i: Int) -> String {
+        let symbols = ["오른쪽", "오른쪽 위", "위", "왼쪽 위", "왼쪽", "왼쪽 아래", "아래", "오른쪽 아래"]
+        return "\(symbols[i]) 방향, \(label(at: i))"
+    }
+
+    private func accessibilityValue(_ i: Int) -> String {
+        let s = sectors[i]
+        return "왼쪽 폭 \(String(format: "%.1f", s.leftHalfWidth))도, 오른쪽 폭 \(String(format: "%.1f", s.rightHalfWidth))도"
+    }
+}
+
+/// Top-level alias so the private `PerSidePieChart` can reference the handle
+/// side enum nested in `SectorAngleHybridView` without exposing it.
+enum SectorAngleHybridView_HandleSide { case left, right }

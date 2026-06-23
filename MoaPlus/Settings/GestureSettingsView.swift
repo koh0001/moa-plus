@@ -111,9 +111,9 @@ struct GestureSettingsView: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                NavigationLink(destination: SectorAngleView()) {
+                NavigationLink(destination: SectorAngleHybridView()) {
                     HStack {
-                        Text("방향별 각도 범위")
+                        Text("방향별 좌/우 각도")
                         Spacer()
                         Text(settings.gestureSettings.swipeProfile.mode == .custom ? "커스텀" : "프리셋")
                             .font(.caption)
