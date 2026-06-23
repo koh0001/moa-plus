@@ -27,6 +27,11 @@ enum SlotBPreset: String, Codable, CaseIterable {
     case vowelKey     // B1 — 자음드래그 패턴 모음 키
 }
 
+enum NumberPadSide: String, Codable, CaseIterable {
+    case left   // 좌=숫자패드 (기본)
+    case right  // 우=숫자패드
+}
+
 struct LayoutCustomization: Codable, Equatable {
     var slotA: SlotAPreset = .vowel
     /// A1 일 때 백스페이스 ↔ ㆍ 위치 swap. A2 일 때 무시.
@@ -52,6 +57,8 @@ struct LayoutCustomization: Codable, Equatable {
     /// 한글 모드 우측 컬럼 row 0 펑크 옵션(모던 #자리 / 확장형 1번 셀) 전용 슬롯.
     /// 슬롯 B 슬롯과 독립적으로 편집됨.
     var slotARightColumnPunctuationSlots: PunctuationSlots = .defaultKorean
+    /// iPad 가로 분리 레이아웃에서 숫자패드 위치. 아이폰/세로에선 무시.
+    var numberPadSide: NumberPadSide = .left
 
     static let defaultSlotC: [String] = ["~", "^", ";", "*"]
     static let defaultSlotARightColumn: [String] = ["!", "?", "."]
@@ -72,6 +79,7 @@ struct LayoutCustomization: Codable, Equatable {
         koreanPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .koreanPunctuationSlots) ?? .defaultKorean
         englishPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .englishPunctuationSlots) ?? .defaultEnglish
         slotARightColumnPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .slotARightColumnPunctuationSlots) ?? .defaultKorean
+        numberPadSide = try c.decodeIfPresent(NumberPadSide.self, forKey: .numberPadSide) ?? .left
     }
 
     private static func normalizeSlotC(_ raw: [String]) -> [String] {
@@ -90,5 +98,6 @@ struct LayoutCustomization: Codable, Equatable {
         case slotA, slotABackspaceSwap, slotARightColumn, slotB, slotC
         case koreanPunctuationEnabled, englishPunctuationEnabled, slotARightColumnTopAsPunctuation
         case koreanPunctuationSlots, englishPunctuationSlots, slotARightColumnPunctuationSlots
+        case numberPadSide
     }
 }

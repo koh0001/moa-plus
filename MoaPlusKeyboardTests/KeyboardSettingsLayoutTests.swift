@@ -28,4 +28,25 @@ final class KeyboardSettingsLayoutTests: XCTestCase {
         // Cleanup
         s.layoutCustomization = LayoutCustomization()
     }
+
+    // MARK: - numberPadSide (T6)
+
+    func testNumberPadSide_defaultIsLeft() {
+        XCTAssertEqual(LayoutCustomization().numberPadSide, .left)
+    }
+
+    func testNumberPadSide_roundTripsRight() throws {
+        var lc = LayoutCustomization()
+        lc.numberPadSide = .right
+        let data = try JSONEncoder().encode(lc)
+        let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
+        XCTAssertEqual(decoded.numberPadSide, .right)
+    }
+
+    func testNumberPadSide_absentKeyDecodesToLeft() throws {
+        // 구버전 JSON(키 없음) → 기본 .left (전체 설정 리셋 방지)
+        let json = "{}".data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: json)
+        XCTAssertEqual(decoded.numberPadSide, .left)
+    }
 }
