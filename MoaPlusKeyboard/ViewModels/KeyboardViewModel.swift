@@ -757,7 +757,7 @@ class KeyboardViewModel: ObservableObject {
             // Surface the final resolved vowel so the gesture test screen
             // shows what the production keyboard would have committed.
             if onPreviewConsonantGesture != nil {
-                let resolved = vowelResolver.resolve(directions: directions).vowel
+                let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions)
                 onPreviewConsonantGesture?(
                     .ended(points: previewGesturePoints,
                            columnId: previewGestureColumnId),
@@ -777,7 +777,7 @@ class KeyboardViewModel: ObservableObject {
         // mode-specific handlers below call `finalizeGesture()` themselves.
         if onPreviewConsonantGesture != nil {
             let directions = gestureAnalyzer.getDirections()
-            let resolved = vowelResolver.resolve(directions: directions).vowel
+            let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions)
             onPreviewConsonantGesture?(
                 .ended(points: previewGesturePoints,
                        columnId: previewGestureColumnId),
@@ -905,6 +905,18 @@ class KeyboardViewModel: ObservableObject {
     /// First stroke produces the base vowel (PR G6); subsequent strokes fold
     /// into compound vowels (PR G14 — ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅔ ㅐ ㅖ ㅒ).
     /// Returns nil if the primitive has no mapping (e.g. .dot).
+    /// 긋기 테스트 캔버스 미리보기용 vowel — 키 타입에 맞게 계산.
+    /// vowelPrimitive(ㅣ/ㅡ) 키는 실제 입력과 같은 resolveVowelFromPrimitiveDrag,
+    /// 자음 키는 8방향 VowelResolver. 통일 안 하면 캔버스가 ㅡ키 ← 를 ㅛ 가 아닌
+    /// ㅓ(자음 매핑)로 잘못 표시한다(실제 입력은 ㅛ 인데 미리보기만 ㅓ).
+    private func resolvedPreviewVowel(row: Int, column: Int, directions: [GestureDirection]) -> Jungseong? {
+        if let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization),
+           case .vowelPrimitive(let primitive) = content {
+            return resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
+        }
+        return vowelResolver.resolve(directions: directions).vowel
+    }
+
     func resolveVowelFromPrimitiveDrag(primitive: VowelPrimitiveType, directions: [GestureDirection]) -> Jungseong? {
         guard let first = directions.first else { return nil }
 
