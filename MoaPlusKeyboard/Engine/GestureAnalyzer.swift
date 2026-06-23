@@ -38,11 +38,21 @@ class GestureAnalyzer {
     /// Effective swipe threshold considering column overrides + the
     /// device's center-key width.
     var effectiveThreshold: CGFloat {
+        let base: CGFloat
         if columnId > 0 {
-            return settings.effectiveSwipeThreshold(forColumn: columnId, keyWidth: keyWidth)
+            base = settings.effectiveSwipeThreshold(forColumn: columnId, keyWidth: keyWidth)
+        } else {
+            base = settings.swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
         }
-        return settings.swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
+        // ㅣ/ㅡ 전용 키(우측 끝 좁은 키)는 임계가 넓은 centerKeyWidth 기준이라
+        // 수평(←→) 긋기 거리가 부족해 첫 방향 등록에 실패하고 탭(ㅡ/ㅣ)으로
+        // 폴백되곤 한다 — ㅛㅠㅕㅑ 가 안 되던 핵심 원인. 좁은 키에서는 임계를
+        // 낮춰 짧은 긋기도 방향으로 인식되게 한다.
+        return forceCardinalOnly ? base * Self.narrowKeyThresholdRatio : base
     }
+
+    /// vowel-primitive(ㅣ/ㅡ) 좁은 키용 첫-방향 임계 배율.
+    private static let narrowKeyThresholdRatio: CGFloat = 0.6
 
     /// Effective direction-change threshold considering column overrides.
     /// If the analyzer was constructed with a custom `directionChangeThreshold`
@@ -249,6 +259,10 @@ class GestureAnalyzer {
     /// 떨림 컷용 진폭 비율: 새 turn 스트로크가 직전 스트로크 진폭의 이 비율
     /// 이상일 때만 등록. sensitivity 0 = 0(가드 비활성, 기존 동작 보존).
     private var minTurnAmplitudeRatio: CGFloat {
+        // ㅣ/ㅡ 키(forceCardinalOnly)는 단일 방향 파생모음(ㅕㅑㅛㅠ)이 주 용도라,
+        // 실기기 촘촘 터치로 잘게 쪼개진 작은 후속 stroke 가 base 모음을 복합으로
+        // 바꾸는 과인식을 강하게 차단한다. 의도적 ㅔㅐ(큰 ←→)는 0.6 을 넘어 보존.
+        if forceCardinalOnly { return 0.6 }
         switch settings.multiStrokeTurnSensitivity {
         case ...0: return 0
         case 1:    return 0.3

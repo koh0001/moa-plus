@@ -380,4 +380,31 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         driveKeyGesture(row: Self.barKey.row, column: Self.barKey.column, dx: 50, dy: -80)
         XCTAssertEqual(vm.composingText, "ㅕ", "ㅣ키 살짝 기운 ↑ 긋기도 ㅕ")
     }
+
+    // MARK: - ㅣ/ㅡ 좁은 키 짧은 긋기 (실기기 ㅛㅠ → 탭 폴백 ㅡ 재현)
+    //
+    // ㅣ/ㅡ 키는 우측 끝 좁은 키라 수평 긋기 거리가 기본 임계(centerKeyWidth*0.40
+    // ≈ 20pt)에 못 미쳐, 첫 방향 등록 실패 → directions=[] → 탭 폴백으로 ㅡ/ㅣ 가
+    // 그대로 나온다. 좁은 키 임계(×0.6 ≈ 12pt)로 짧은 긋기도 인식되어야 한다.
+
+    func test_dashKey_shortLeftDrag_yieldsYo() {
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: -15, dy: 0)
+        XCTAssertEqual(vm.composingText, "ㅛ", "좁은 ㅡ키 짧은 ← 긋기(15pt)도 ㅛ (탭 ㅡ 폴백 방지)")
+    }
+
+    func test_dashKey_shortRightDrag_yieldsYu() {
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: 15, dy: 0)
+        XCTAssertEqual(vm.composingText, "ㅠ", "좁은 ㅡ키 짧은 → 긋기(15pt)도 ㅠ")
+    }
+
+    func test_barKey_shortUpDrag_yieldsYeo() {
+        driveKeyGesture(row: Self.barKey.row, column: Self.barKey.column, dx: 0, dy: -15)
+        XCTAssertEqual(vm.composingText, "ㅕ", "좁은 ㅣ키 짧은 ↑ 긋기(15pt)도 ㅕ")
+    }
+
+    func test_dashKey_pureTap_stillInsertsDash() {
+        // 거의 안 움직인 탭(5pt)은 여전히 ㅡ — 임계를 낮춰도 탭은 탭으로.
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: -5, dy: 0)
+        XCTAssertEqual(vm.composingText, "ㅡ", "거의 안 움직인 탭(5pt)은 여전히 ㅡ (긋기 오인 방지)")
+    }
 }
