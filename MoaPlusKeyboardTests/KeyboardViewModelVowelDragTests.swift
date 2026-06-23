@@ -330,4 +330,30 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         XCTAssertNotEqual(vm.composingText, "ㅡ",
             "4방향: slot B ↘ 가 카디널로 스냅되어 ㅡ 입력 불가")
     }
+
+    // MARK: - ㅣ/ㅡ 전용 키 단일 방향 긋기 → 파생 모음 (사용자 보고 재현)
+    //
+    // ㅑㅕㅛㅠ 는 ㅣ/ㅡ 키를 한 방향으로 그어 입력한다고 안내했는데 실기기에서
+    // 안 된다는 보고. 기본 설정(sensitivity 0, 4방향 off)의 실제 파이프라인으로
+    // 동작을 검증한다.
+
+    func test_barKeyUpDrag_insertsYeo() {
+        driveKeyGesture(row: Self.barKey.row, column: Self.barKey.column, dx: 0, dy: -80)
+        XCTAssertEqual(vm.composingText, "ㅕ", "ㅣ키 ↑ 긋기 = ㅕ")
+    }
+
+    func test_barKeyDownDrag_insertsYa() {
+        driveKeyGesture(row: Self.barKey.row, column: Self.barKey.column, dx: 0, dy: 80)
+        XCTAssertEqual(vm.composingText, "ㅑ", "ㅣ키 ↓ 긋기 = ㅑ")
+    }
+
+    func test_dashKeyLeftDrag_insertsYo() {
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: -80, dy: 0)
+        XCTAssertEqual(vm.composingText, "ㅛ", "ㅡ키 ← 긋기 = ㅛ")
+    }
+
+    func test_dashKeyRightDrag_insertsYu() {
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: 80, dy: 0)
+        XCTAssertEqual(vm.composingText, "ㅠ", "ㅡ키 → 긋기 = ㅠ")
+    }
 }

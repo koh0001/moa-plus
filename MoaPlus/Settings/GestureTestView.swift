@@ -94,6 +94,22 @@ final class GestureTestModel: ObservableObject {
         )
     }
 
+    /// 현재 민감도에서 직각(90°) 방향 전환이 새 획으로 인식되는 변위 임계.
+    /// 캔버스에 "방향 전환 인식 범위" 원으로 표시 — 민감도를 올릴수록 작아진다
+    /// (= 더 짧게 꺾어도 인식). `GestureAnalyzer.turnRegistrationThreshold`(gap 90°)와
+    /// 동일한 식.
+    var turnThreshold: CGFloat {
+        let s = settings.gestureSettings
+        let reversal = s.effectiveReversalThreshold(forColumn: selectedColumn, keyWidth: deviceCenterKeyWidth)
+        let change = s.effectiveDirectionChangeThreshold(forColumn: selectedColumn)
+        let mid = (reversal + change) / 2
+        switch s.multiStrokeTurnSensitivity {
+        case 0:  return change
+        case 1:  return mid
+        default: return reversal
+        }
+    }
+
     var sectors: [DirectionSector] {
         settings.gestureSettings.swipeProfile.sectors
     }
@@ -354,7 +370,12 @@ struct GestureTestView: View {
 
             visualization
 
-            Text("아래 키보드에서 자음 키를 끌면 같은 동작이 이 캔버스에 그대로 그려져 8방향 섹터와 어떻게 만나는지 확인할 수 있습니다. 입력한 글자는 섹터 그래프 가운데에 표시됩니다.")
+            HStack(spacing: 14) {
+                legendItem(color: .gray, label: "필요 길이 (첫 획)")
+                legendItem(color: .orange, label: "방향 전환 인식")
+            }
+
+            Text("아래 키보드에서 ㅛ(위·아래·위)처럼 방향을 꺾어 그어 보세요. 주황 원보다 크게 꺾으면 새 획으로 인식됩니다. 민감도를 올리면 주황 원이 작아져 더 짧게 꺾어도 인식됩니다.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -471,6 +492,17 @@ struct GestureTestView: View {
         }
     }
 
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .stroke(color.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                .frame(width: 11, height: 11)
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+
     private var metricsCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             metricRow("멀티스트로크 민감도", sensitivityLabel)
@@ -526,10 +558,16 @@ struct GestureTestView: View {
                 .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
             }
 
-            // Threshold ring (effective swipe length)
+            // Threshold ring (effective swipe length — 첫 획 인식 거리)
             Circle()
                 .stroke(Color.gray.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                 .frame(width: model.effectiveThreshold * 2, height: model.effectiveThreshold * 2)
+                .position(x: model.canvasSize.width / 2, y: model.canvasSize.height / 2)
+
+            // Turn-registration ring (방향 전환 인식 범위 — 민감도에 따라 변함)
+            Circle()
+                .stroke(Color.orange.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                .frame(width: model.turnThreshold * 2, height: model.turnThreshold * 2)
                 .position(x: model.canvasSize.width / 2, y: model.canvasSize.height / 2)
 
             // Start point marker
