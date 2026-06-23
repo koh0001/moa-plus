@@ -470,14 +470,18 @@ struct GestureTestView: View {
                     .font(.body)
                     .foregroundColor(.secondary)
             } else {
-                HStack(spacing: 4) {
-                    ForEach(Array(directions.enumerated()), id: \.offset) { item in
-                        Text(item.element.symbol)
-                            .font(.headline)
-                            .foregroundColor(accent)
-                            .frame(width: 26, height: 26)
-                            .background(Circle().fill(accent.opacity(0.18)))
+                // 화살표가 많아도 카드 폭을 넘기지 않도록 가로 스크롤.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(directions.enumerated()), id: \.offset) { item in
+                            Text(item.element.symbol)
+                                .font(.headline)
+                                .foregroundColor(accent)
+                                .frame(width: 26, height: 26)
+                                .background(Circle().fill(accent.opacity(0.18)))
+                        }
                     }
+                    .padding(.horizontal, 2)
                 }
             }
         }

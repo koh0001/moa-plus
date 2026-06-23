@@ -11,9 +11,13 @@ struct GestureOverlayView: View {
                 ZStack {
                     // Direction indicator text
                     VStack(spacing: 4) {
-                        Text(directions.map { $0.symbol }.joined())
+                        // 화살표가 많아도 한 줄·고정 폭으로 — 길어져서 미리보기
+                        // 박스가 화면을 침범하지 않게 최근 8개만, 축소 허용.
+                        Text(directions.suffix(8).map { $0.symbol }.joined())
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.blue)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
 
                         if let vowel = currentVowel {
                             Text(String(vowel.compatibilityCharacter))
@@ -22,6 +26,7 @@ struct GestureOverlayView: View {
                         }
                     }
                     .padding(8)
+                    .frame(maxWidth: 240)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.white.opacity(0.9))
