@@ -43,6 +43,7 @@ struct GestureSettingsView: View {
                     Text("직접 설정").tag(SwipeMode.custom)
                 }
                 .pickerStyle(.inline)
+                .disabled(isFourWay)
             } header: {
                 Text("긋기 각도")
             } footer: {
@@ -88,6 +89,7 @@ struct GestureSettingsView: View {
             } footer: {
                 Text("각 방향이 어떤 모음을 입력하는지, 인식 범위를 얼마나 넓힐지 조정합니다.")
             }
+            .disabled(isFourWay)
 
             // Column correction (advanced)
             Section {
@@ -119,12 +121,19 @@ struct GestureSettingsView: View {
         .navigationTitle("긋기 입력 설정")
     }
 
+    private var isFourWay: Bool {
+        settings.gestureSettings.swipeProfile.fourWayMode
+    }
+
     private var mappingSummary: String {
         let p = settings.gestureSettings.swipeProfile
         return "↖\(p.upLeftMapping.displayName) ↗\(p.upRightMapping.displayName)"
     }
 
     private var swipeModeDescription: String {
+        if isFourWay {
+            return "4방향 전용 모드가 켜져 있어 각도·방향 설정은 적용되지 않습니다. (레이아웃 설정 ‘모던’에서 변경)"
+        }
         switch settings.gestureSettings.swipeProfile.mode {
         case .right: return "오른손 위주 사용 습관에 맞는 프리셋"
         case .left: return "왼손 위주 사용 습관에 맞는 프리셋"

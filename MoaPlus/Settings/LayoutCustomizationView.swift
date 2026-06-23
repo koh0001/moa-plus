@@ -16,14 +16,6 @@ struct LayoutCustomizationView: View {
 
     enum HighlightedSlot { case a, b, c }
 
-    /// Whether the live preview should accept gestures on the slot B vowel key.
-    /// True when the user has selected a layout that exposes a vowel key —
-    /// either slot B `.vowelKey` (function row) or slot A `.fullPackage` (col 6 row 3).
-    private var isVowelKeyAvailable: Bool {
-        let cust = settings.layoutCustomization
-        return cust.slotA == .fullPackage || cust.slotB == .vowelKey
-    }
-
     var body: some View {
         List {
             // Live preview
@@ -34,20 +26,38 @@ struct LayoutCustomizationView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .topLeading) {
                         KeyboardPreviewView(
-                            onVowelPreviewWithPoint: isVowelKeyAvailable
-                                ? { vowel, startPoint in
-                                    previewVowelOutput = String(vowel.compatibilityCharacter)
-                                    // startPoint.x is in the keyboardPreview
-                                    // coordinate space (== this GeometryReader's
-                                    // width). Touch on left half → bubble right.
+                            // slot B 모음 키(확장형 / B1 vowelKey) 드래그 미리보기.
+                            onVowelPreviewWithPoint: { vowel, startPoint in
+                                previewVowelOutput = String(vowel.compatibilityCharacter)
+                                // startPoint.x is in the keyboardPreview
+                                // coordinate space (== this GeometryReader's
+                                // width). Touch on left half → bubble right.
+                                previewBubbleOnRight = startPoint.x < geo.size.width / 2
+                            },
+                            // 자음 키 / ㅣ·ㅡ 전용 키(모던) 드래그 미리보기. 모든
+                            // 레이아웃에서 결과 모음을 버블로 보여준다(실제 입력 X).
+                            // `.moved` 단계의 vowel 은 키 타입별로 정확히 계산되므로
+                            // (vowelPrimitive 는 resolveVowelFromPrimitiveDrag) 그 값을
+                            // 사용한다. `.ended` 는 vowelResolver 로만 해석돼
+                            // ㅣ/ㅡ 키에서 부정확할 수 있어 무시한다.
+                            onConsonantPreview: { phase, _, vowel in
+                                switch phase {
+                                case .began(let startPoint, _):
                                     previewBubbleOnRight = startPoint.x < geo.size.width / 2
-                                  }
-                                : nil
+                                    previewVowelOutput = ""
+                                case .moved:
+                                    if let vowel {
+                                        previewVowelOutput = String(vowel.compatibilityCharacter)
+                                    }
+                                case .ended:
+                                    break
+                                }
+                            }
                         )
                         SlotHighlightOverlay(slot: highlightedSlot)
                             .allowsHitTesting(false)
 
-                        if isVowelKeyAvailable, !previewVowelOutput.isEmpty {
+                        if !previewVowelOutput.isEmpty {
                             VowelResultBubble(
                                 text: previewVowelOutput,
                                 onClear: { previewVowelOutput = "" }
@@ -67,9 +77,7 @@ struct LayoutCustomizationView: View {
             } header: {
                 Text("미리보기")
             } footer: {
-                if isVowelKeyAvailable {
-                    Text("스페이스 옆 모음 키(또는 확장형의 모음 키)를 직접 드래그하면 어떤 모음이 입력되는지 표시됩니다. 결과 표시 위치는 손가락 반대편에 나타납니다.")
-                }
+                Text("자음 키나 모음 키를 직접 드래그하면 어떤 모음이 입력되는지 결과가 표시됩니다(실제 입력은 되지 않습니다). 결과는 손가락 반대편에 나타납니다.")
             }
 
             // Slot A
@@ -86,11 +94,15 @@ struct LayoutCustomizationView: View {
                             settings.layoutCustomization = c
                         }
                     ))
+                    Toggle("4방향 전용 모드", isOn: fourWayModeBinding)
+                    Text("상하좌우 4방향만 인식하고 대각선을 끕니다. 각 방향이 90°씩 차지해 ㅗ/ㅜ/ㅏ/ㅓ가 안정적으로 입력됩니다. ㅣ/ㅡ는 전용 키로 입력합니다. (긋기 각도·방향 설정은 무시)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
             } header: {
                 slotHeader(label: "우측 컬럼", slot: .a, systemImage: "rectangle.righthalf.inset.filled")
             } footer: {
-                Text("우측 끝 컬럼의 키 매핑.")
+                Text("우측 끝 컬럼의 키 매핑. 4방향 전용 모드는 ㅣ/ㅡ 전용 키가 있는 ‘모던’에서만 사용할 수 있습니다.")
             }
 
             // Slot A right column — always visible, preset-aware
@@ -325,12 +337,31 @@ struct LayoutCustomizationView: View {
         }
     }
 
-    @ViewBuilder
+    /// 4방향 전용 모드(긋기 설정 소속이지만 모던 레이아웃에서만 의미가 있어
+    /// 이 화면의 모던 옵션 하위에 노출)를 KeyboardSettings 에 바인딩.
+    private var fourWayModeBinding: Binding<Bool> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile.fourWayMode },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile.fourWayMode = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
     private func slotARadioRow(_ preset: SlotAPreset, title: String, desc: String) -> some View {
         Button(action: {
             var c = settings.layoutCustomization
             c.slotA = preset
             settings.layoutCustomization = c
+            // 4방향 전용 모드는 ㅣ/ㅡ 전용 키가 있는 모던(.vowel)에서만 유효하다.
+            // 비모던으로 바꾸면 ㅣ/ㅡ 입력이 막히므로 자동으로 끈다.
+            if preset != .vowel && settings.gestureSettings.swipeProfile.fourWayMode {
+                var gs = settings.gestureSettings
+                gs.swipeProfile.fourWayMode = false
+                settings.gestureSettings = gs
+            }
         }) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {

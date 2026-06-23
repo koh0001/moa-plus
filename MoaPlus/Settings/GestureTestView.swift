@@ -426,6 +426,7 @@ struct GestureTestView: View {
                 rotationOffset: model.rotationOffset,
                 iDelta: model.iDelta,
                 euDelta: model.euDelta,
+                fourWay: model.swipeProfile.fourWayMode,
                 detectedIndex: model.liveDirectionIndex
             )
 
@@ -510,7 +511,17 @@ private struct SectorOverlay: View {
     let rotationOffset: Double
     let iDelta: Double
     let euDelta: Double
+    /// When true, only the four cardinals are drawn, each spanning a full
+    /// 90° quadrant — mirrors `GestureDirection.from`'s four-way branch so
+    /// the test canvas matches what the keyboard actually recognises.
+    var fourWay: Bool = false
     let detectedIndex: Int?
+
+    /// Sector indices to render: cardinals only in four-way mode, otherwise
+    /// the full 8-direction ring.
+    private var activeIndices: [Int] {
+        fourWay ? [0, 2, 4, 6] : Array(0..<min(sectors.count, 8))
+    }
 
     private static let directionColors: [Color] = [
         DirectionPieChart.vowelColors["ㅏ"]!,
@@ -531,12 +542,16 @@ private struct SectorOverlay: View {
 
             Canvas { ctx, _ in
                 let center = CGPoint(x: cx, y: cy)
-                for i in 0..<min(sectors.count, 8) {
+                for i in activeIndices {
                     var s = sectors[i]
-                    switch i {
-                    case 1, 3: s.halfWidth += iDelta
-                    case 5, 7: s.halfWidth += euDelta
-                    default: break
+                    if fourWay {
+                        s.halfWidth = 45
+                    } else {
+                        switch i {
+                        case 1, 3: s.halfWidth += iDelta
+                        case 5, 7: s.halfWidth += euDelta
+                        default: break
+                        }
                     }
                     let startDeg = s.startAngle + rotationOffset
                     let endDeg = s.endAngle + rotationOffset
@@ -564,11 +579,8 @@ private struct SectorOverlay: View {
             }
 
             // Labels
-            ForEach(0..<min(sectors.count, 8), id: \.self) { i in
-                let s = sectors[i]
-                let startDeg = s.startAngle + rotationOffset
-                let endDeg = s.endAngle + rotationOffset
-                let mid = (startDeg + endDeg) / 2
+            ForEach(activeIndices, id: \.self) { i in
+                let mid = sectors[i].centerAngle + rotationOffset
                 let r = radius * 0.7
                 Text(label(at: i))
                     .font(.system(size: 13, weight: .heavy))

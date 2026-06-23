@@ -246,6 +246,102 @@ final class GestureAnalyzerTests: XCTestCase {
         )
     }
 
+    // MARK: - Four-Way Mode (대각선 비활성 + 카디널 90° 자동 분할)
+
+    /// 4방향 모드에서는 대각선 섹터가 사라지고 각 카디널이 90° (±45°) 를
+    /// 차지한다. 8방향에서 ↗(ㅣ) 로 빠지던 55° 벡터가 4방향에서는 ↑(ㅗ)
+    /// 로 스냅되어야 한다 — "ㅗ 각도 넓혀도 대각선이 먼저 먹어 적용 안 됨"
+    /// 리포트의 근본 해결.
+    func testFourWayModeSnaps55DegreeVectorToCardinalUp() {
+        // 55°: dx=cos55·100, dy=-sin55·100 (iOS y축 반전 → 위쪽은 음수)
+        let vector = CGVector(dx: 57.36, dy: -81.92)
+
+        let eightWay = GestureDirection.from(
+            vector: vector,
+            sectors: DirectionSector.defaultSectors,
+            rotationOffset: 0,
+            threshold: 20
+        )
+        XCTAssertEqual(eightWay, .upRight, "기준: 8방향에서 55° 는 ↗ 대각선에 잡힌다")
+
+        let fourWay = GestureDirection.from(
+            vector: vector,
+            sectors: DirectionSector.defaultSectors,
+            rotationOffset: 0,
+            threshold: 20,
+            fourWay: true
+        )
+        XCTAssertEqual(fourWay, .up, "4방향 모드: 55° 는 대각선 없이 가장 가까운 카디널 ↑ 로 스냅")
+    }
+
+    /// 4방향 모드의 경계/카디널 정확성: 정확한 카디널은 그대로, 대각선
+    /// 부근(예: 30° = ↗ 영역)도 가장 가까운 카디널로 흡수된다.
+    func testFourWayModeCoversFullQuadrants() {
+        let sectors = DirectionSector.defaultSectors
+        func dir(_ deg: Double) -> GestureDirection? {
+            let r = deg * .pi / 180
+            return GestureDirection.from(
+                vector: CGVector(dx: cos(r) * 100, dy: -sin(r) * 100),
+                sectors: sectors, rotationOffset: 0, threshold: 20, fourWay: true
+            )
+        }
+        XCTAssertEqual(dir(0), .right,  "0° → →")
+        XCTAssertEqual(dir(30), .right, "30° (8방향이면 ↗) → 4방향에선 가까운 → 로 흡수")
+        XCTAssertEqual(dir(90), .up,    "90° → ↑")
+        XCTAssertEqual(dir(135 + 5), .left, "140° → ←")
+        XCTAssertEqual(dir(270), .down, "270° → ↓")
+    }
+
+    /// 엔진 통합: fourWayMode 가 켜진 설정으로 분석하면 대각선 드리프트가
+    /// 섞인 swipe 도 단일 카디널 stroke 로 정리된다.
+    func testFourWayModeAnalyzerSnapsDiagonalDriftToCardinal() {
+        var settings = GestureSettings.default
+        settings.swipeProfile.fourWayMode = true
+        let analyzer = GestureAnalyzer(settings: settings, columnId: 0)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 157, y: 18))  // ~55° (dx≈57, dy≈-82)
+
+        XCTAssertEqual(
+            analyzer.finalizeGesture(),
+            [.up],
+            "4방향 모드: 55° 드리프트도 단일 ↑ stroke 로 인식되어 ㅗ 매칭"
+        )
+    }
+
+    /// fourWayMode 가 꺼진 기본 설정은 기존 8방향 동작을 그대로 유지한다
+    /// (회귀 방지).
+    func testEightWayModeUnchangedWhenFourWayDisabled() {
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 0)
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 157, y: 18))  // ~55° → ↗
+        XCTAssertEqual(
+            analyzer.finalizeGesture(),
+            [.upRight],
+            "기본(8방향) 모드는 55° 를 여전히 ↗ 로 인식 (회귀 없음)"
+        )
+    }
+
+    // MARK: - Forward-compatible SwipeProfile decoding
+
+    /// fourWayMode 가 없던 구버전 JSON 도 디코딩되어야 하며, sectors 등
+    /// 기존 값이 보존되고 fourWayMode 는 false 로 기본 적용되어야 한다.
+    /// (없으면 `load(...) ?? .default` 가 전체 설정을 초기화한다.)
+    func testLegacySwipeProfileJSONWithoutFourWayModeDecodes() throws {
+        let json = Data("""
+        {"mode":"both","swipeLength":"normal",
+         "sectors":[{"centerAngle":0,"halfWidth":30}],
+         "upLeftMapping":"vowelI","upRightMapping":"vowelI",
+         "downLeftMapping":"vowelEu","downRightMapping":"vowelEu"}
+        """.utf8)
+
+        let profile = try JSONDecoder().decode(SwipeProfile.self, from: json)
+
+        XCTAssertFalse(profile.fourWayMode, "구버전 JSON 은 fourWayMode 가 false 로 기본 적용")
+        XCTAssertEqual(profile.sectors.first?.halfWidth, 30, "기존 sectors 값이 보존되어야 한다")
+        XCTAssertEqual(profile.mode, .both)
+    }
+
     // MARK: - isOpposite Tests
 
     func testIsOpposite() {

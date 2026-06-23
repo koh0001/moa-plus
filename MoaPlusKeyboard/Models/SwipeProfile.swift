@@ -105,6 +105,15 @@ struct SwipeProfile: Codable, Equatable {
     var downLeftMapping: DiagonalMapping = .vowelEu          // ↙ → ㅡ
     var downRightMapping: DiagonalMapping = .vowelEu         // ↘ → ㅡ
 
+    /// When `true`, only the four cardinal directions (↑↓←→) are recognised.
+    /// Each cardinal claims a full 90° quadrant (±45°) and the diagonals are
+    /// disabled entirely. Resolves the "ㅗ/ㅜ 각도를 넓혀도 적용 안 됨" report:
+    /// in 8-way mode the diagonal-first priority in `GestureDirection.from`
+    /// caps how far a cardinal can effectively widen, so users who want a
+    /// diagonal-free layout get cardinals auto-balanced to 90° here instead
+    /// of fighting per-sector sliders. Default `false` keeps 8-way behaviour.
+    var fourWayMode: Bool = false
+
     /// Predefined profiles
     static let bothHands = SwipeProfile(mode: .both)
 
@@ -125,6 +134,35 @@ struct SwipeProfile: Codable, Equatable {
         profile.sectors[5].halfWidth = 20.0
         return profile
     }()
+}
+
+// MARK: - Forward-compatible decoding
+//
+// Defined in an extension so the memberwise initialiser (used by the static
+// presets above and `SwipeProfile(mode:)` call sites) is preserved. Every
+// field is decoded with `decodeIfPresent` and falls back to its default, so
+// older persisted JSON that predates a field (e.g. `fourWayMode`) still
+// decodes cleanly instead of throwing `keyNotFound` and wiping the user's
+// entire gesture configuration via `load(...) ?? .default`.
+extension SwipeProfile {
+    private enum CodingKeys: String, CodingKey {
+        case mode, swipeLength, sectors
+        case upLeftMapping, upRightMapping, downLeftMapping, downRightMapping
+        case fourWayMode
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        mode = try c.decodeIfPresent(SwipeMode.self, forKey: .mode) ?? .both
+        swipeLength = try c.decodeIfPresent(SwipeLength.self, forKey: .swipeLength) ?? .normal
+        sectors = try c.decodeIfPresent([DirectionSector].self, forKey: .sectors) ?? DirectionSector.defaultSectors
+        upLeftMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .upLeftMapping) ?? .vowelI
+        upRightMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .upRightMapping) ?? .vowelI
+        downLeftMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .downLeftMapping) ?? .vowelEu
+        downRightMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .downRightMapping) ?? .vowelEu
+        fourWayMode = try c.decodeIfPresent(Bool.self, forKey: .fourWayMode) ?? false
+    }
 }
 
 extension DirectionSector {

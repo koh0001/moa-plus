@@ -51,7 +51,8 @@ enum GestureDirection: String, CaseIterable {
     static func from(vector: CGVector,
                      sectors: [DirectionSector],
                      rotationOffset: Double,
-                     threshold: CGFloat) -> GestureDirection? {
+                     threshold: CGFloat,
+                     fourWay: Bool = false) -> GestureDirection? {
         let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
         guard magnitude >= threshold else { return nil }
 
@@ -63,6 +64,22 @@ enum GestureDirection: String, CaseIterable {
         // Subtract rotationOffset so a positive offset rotates the sector
         // ring CCW — equivalent to rotating the incoming vector CW.
         let relative = positiveModulo(normalized - rotationOffset, 360)
+
+        // Four-way mode: diagonals are disabled and each cardinal owns a full
+        // 90° quadrant (±45°). Snap to the nearest cardinal so widening a
+        // cardinal is never capped by an adjacent diagonal sector. Sector
+        // half-widths are ignored here — the quadrant split is fixed at 45°.
+        if fourWay {
+            for index in cardinalSectorIndices
+            where index < sectors.count && index < sectorOrder.count {
+                let sector = sectors[index]
+                let delta = abs(signedAngularDistance(from: sector.centerAngle, to: relative))
+                if delta <= 45 {
+                    return sectorOrder[index]
+                }
+            }
+            return nil
+        }
 
         for index in diagonalSectorIndices + cardinalSectorIndices
         where index < sectors.count && index < sectorOrder.count {

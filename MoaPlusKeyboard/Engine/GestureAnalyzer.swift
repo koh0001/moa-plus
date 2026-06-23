@@ -145,6 +145,7 @@ class GestureAnalyzer {
 
         let sectors = effectiveSectors
         let rotation = effectiveRotationOffset
+        let fourWay = settings.swipeProfile.fourWayMode
 
         // Try detecting direction with effective threshold first (respects
         // settings/column overrides, including rotation and ㅣ/ㅡ width deltas).
@@ -152,7 +153,8 @@ class GestureAnalyzer {
             vector: vector,
             sectors: sectors,
             rotationOffset: rotation,
-            threshold: effectiveThreshold
+            threshold: effectiveThreshold,
+            fourWay: fourWay
         )
 
         let effReversal = effectiveReversalThreshold
@@ -163,7 +165,8 @@ class GestureAnalyzer {
                 vector: vector,
                 sectors: sectors,
                 rotationOffset: rotation,
-                threshold: effReversal
+                threshold: effReversal,
+                fourWay: fourWay
             ),
                candidate.isOpposite(to: lastDirection) {
                 newDirection = candidate
