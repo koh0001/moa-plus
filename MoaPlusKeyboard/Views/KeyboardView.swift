@@ -55,6 +55,19 @@ struct KeyboardView: View {
     }
 
     @ViewBuilder
+    private func numberPad(panelWidth: CGFloat, keyHeight: CGFloat) -> some View {
+        // panelWidth is already stripped of outer padding and HStack gap by the caller.
+        // NumberPadView internally subtracts only the 2 inter-key gaps (3 columns → 2 gaps).
+        NumberPadView(
+            panelWidth: panelWidth,
+            keyHeight: keyHeight,
+            onDigit: { viewModel.inputSymbol($0) },
+            onBackspacePressStart: { viewModel.beginBackspacePress() },
+            onBackspacePressEnd: { viewModel.endBackspacePress() }
+        )
+    }
+
+    @ViewBuilder
     private func functionRow(totalWidth: CGFloat) -> some View {
         FunctionRowView(
             totalWidth: totalWidth,
@@ -89,6 +102,14 @@ struct KeyboardView: View {
             let useSplit = KeyboardMetrics.usesIPadSplit(isPad: isPad, isLandscape: isLandscape)
                 && viewModel.keyboardMode == .korean
 
+            // Split-mode panel metrics — hoisted so the long-press popup can
+            // reference them even though the grid block is inside `if useSplit`.
+            let splitSpacing = KeyboardMetrics.keySpacing
+            let numpadWidth = (geometry.size.width - splitSpacing * 3) * 0.31
+            let moakiWidth  = (geometry.size.width - splitSpacing * 3) * 0.69
+            let moakiCenterKeyWidth = KeyboardMetrics.centerKeyWidth(
+                for: moakiWidth, columnCount: 7, mode: .korean)
+
                 ZStack {
                     VStack(spacing: KeyboardMetrics.keySpacing) {
                         // Abbreviation candidate bar
@@ -103,27 +124,17 @@ struct KeyboardView: View {
                         }
 
                         if useSplit {
-                            let spacing = KeyboardMetrics.keySpacing
-                            let numpadWidth = (geometry.size.width - spacing * 3) * 0.31
-                            let moakiWidth = (geometry.size.width - spacing * 3) * 0.69
-                            let moakiCenterKeyWidth = KeyboardMetrics.centerKeyWidth(
-                                for: moakiWidth, columnCount: 7, mode: .korean)
-                            let numpad = NumberPadView(
-                                panelWidth: numpadWidth,
-                                keyHeight: keyHeight,
-                                onDigit: { viewModel.inputSymbol($0) },
-                                onBackspacePressStart: { viewModel.beginBackspacePress() },
-                                onBackspacePressEnd: { viewModel.endBackspacePress() }
-                            )
-                            HStack(spacing: spacing) {
+                            HStack(spacing: splitSpacing) {
                                 if settings.layoutCustomization.numberPadSide == .left {
-                                    numpad.frame(width: numpadWidth)
+                                    numberPad(panelWidth: numpadWidth, keyHeight: keyHeight)
+                                        .frame(width: numpadWidth)
                                     keyGrid(centerKeyWidth: moakiCenterKeyWidth, keyHeight: keyHeight, totalWidth: moakiWidth)
                                         .frame(width: moakiWidth)
                                 } else {
                                     keyGrid(centerKeyWidth: moakiCenterKeyWidth, keyHeight: keyHeight, totalWidth: moakiWidth)
                                         .frame(width: moakiWidth)
-                                    numpad.frame(width: numpadWidth)
+                                    numberPad(panelWidth: numpadWidth, keyHeight: keyHeight)
+                                        .frame(width: numpadWidth)
                                 }
                             }
                             functionRow(totalWidth: geometry.size.width)
@@ -148,7 +159,19 @@ struct KeyboardView: View {
                        let activeRow = gestureState.activeKey?.row,
                        let activeCol = gestureState.activeKey?.column {
                         let sp = KeyboardMetrics.keySpacing
-                        let x = keyXPosition(column: activeCol, row: activeRow, centerKeyWidth: centerKeyWidth, spacing: sp, totalWidth: geometry.size.width)
+                        // In split mode the moaki grid is rendered at moakiWidth/moakiCenterKeyWidth
+                        // and offset from the screen edge by the numpad panel (when numpad is on the
+                        // left). Compute the popup X in the moaki grid's local coordinate space then
+                        // add moakiLeftInset to convert to the full keyboard coordinate space.
+                        let popupCenterKeyWidth = useSplit ? moakiCenterKeyWidth : centerKeyWidth
+                        let popupGridWidth      = useSplit ? moakiWidth          : geometry.size.width
+                        let moakiLeftInset: CGFloat = useSplit
+                            ? (settings.layoutCustomization.numberPadSide == .left
+                                ? (numpadWidth + splitSpacing)
+                                : 0)
+                            : 0
+                        let xInGrid = keyXPosition(column: activeCol, row: activeRow, centerKeyWidth: popupCenterKeyWidth, spacing: sp, totalWidth: popupGridWidth)
+                        let x = xInGrid + moakiLeftInset
                         let y = CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
                         let rawCandidates = popupState.candidates
@@ -192,15 +215,18 @@ struct KeyboardView: View {
                         .position(x: {
                             let cellSize: CGFloat = 36
                             let popupHalfWidth = CGFloat(candidates.count) * (cellSize + 2) / 2 + 8
+                            // Clamp within the moaki grid + its left inset (full width in non-split).
+                            let clampMin = moakiLeftInset + popupHalfWidth + 4
+                            let clampMax = moakiLeftInset + popupGridWidth - popupHalfWidth - 4
                             // Right-edge keys: anchor popup to the left of key
                             if activeCol >= 5 {
-                                return min(x, geometry.size.width - popupHalfWidth - 4)
+                                return min(x, clampMax)
                             }
                             // Left-edge keys: anchor popup to the right
                             if activeCol == 0 {
-                                return max(x, popupHalfWidth + 4)
+                                return max(x, clampMin)
                             }
-                            return min(max(x, popupHalfWidth + 4), geometry.size.width - popupHalfWidth - 4)
+                            return min(max(x, clampMin), clampMax)
                         }(), y: popupY)
                         .allowsHitTesting(false)
                     }

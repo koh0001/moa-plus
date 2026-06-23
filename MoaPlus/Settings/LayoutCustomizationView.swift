@@ -366,8 +366,12 @@ struct LayoutCustomizationView: View {
 
     private var numberPadSideBinding: Binding<NumberPadSide> {
         Binding(
-            get: { KeyboardSettings.shared.layoutCustomization.numberPadSide },
-            set: { KeyboardSettings.shared.layoutCustomization.numberPadSide = $0 }
+            get: { settings.layoutCustomization.numberPadSide },
+            set: { newValue in
+                var lc = settings.layoutCustomization
+                lc.numberPadSide = newValue
+                settings.layoutCustomization = lc
+            }
         )
     }
 
