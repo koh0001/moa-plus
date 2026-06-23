@@ -79,6 +79,18 @@ enum KeyboardMetrics {
         }
     }
 
+    /// 키보드는 항상 화면 폭을 꽉 채우므로, 키보드 폭이 기기 장축이면 가로.
+    /// (단축+장축 중점을 임계로 둬서 인셋/안전영역 오차에 강건.)
+    static func isLandscapeKeyboard(keyboardWidth: CGFloat,
+                                    screenShort: CGFloat, screenLong: CGFloat) -> Bool {
+        keyboardWidth > (screenShort + screenLong) / 2
+    }
+
+    /// 좌우 분리 레이아웃 사용 여부 — 아이패드 가로에서만.
+    static func usesIPadSplit(isPad: Bool, isLandscape: Bool) -> Bool {
+        isPad && isLandscape
+    }
+
     // Audio
     static let clickSoundID: UInt32 = 1104
 

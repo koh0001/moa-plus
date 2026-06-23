@@ -213,4 +213,23 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         // 가상 소형: short 600 → 600*0.44 = 264 → clamp 하한 320
         XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 600, screenLong: 900), 320, accuracy: 0.01)
     }
+
+    // MARK: - iPad split decision (T6)
+
+    func testIsLandscapeKeyboard_widthIsLongEdge_true() {
+        // 키보드 폭 = 장축(1133) → 가로
+        XCTAssertTrue(KeyboardMetrics.isLandscapeKeyboard(keyboardWidth: 1133, screenShort: 744, screenLong: 1133))
+    }
+
+    func testIsLandscapeKeyboard_widthIsShortEdge_false() {
+        // 키보드 폭 = 단축(744) → 세로
+        XCTAssertFalse(KeyboardMetrics.isLandscapeKeyboard(keyboardWidth: 744, screenShort: 744, screenLong: 1133))
+    }
+
+    func testUsesIPadSplit_onlyPadAndLandscape() {
+        XCTAssertTrue(KeyboardMetrics.usesIPadSplit(isPad: true, isLandscape: true))
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: true, isLandscape: false))
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: true))
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: false))
+    }
 }
