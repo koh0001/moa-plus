@@ -159,7 +159,10 @@ class GestureAnalyzer {
 
         let effReversal = effectiveReversalThreshold
 
-        // If standard threshold fails, try lower reversal threshold for opposite directions
+        // If standard threshold fails, try lower reversal threshold for large-angle
+        // turns. sensitivity 0 keeps this to exact opposites (기존 isOpposite 동작);
+        // higher sensitivities also admit near-opposite / right-angle turns so
+        // multi-stroke vowels register without returning to the origin.
         if newDirection == nil, let lastDirection = directions.last, magnitude >= effReversal {
             if let candidate = GestureDirection.from(
                 vector: vector,
@@ -168,7 +171,7 @@ class GestureAnalyzer {
                 threshold: effReversal,
                 fourWay: fourWay
             ),
-               candidate.isOpposite(to: lastDirection) {
+               qualifiesAsTurn(gap: candidate.angularGap(to: lastDirection)) {
                 newDirection = candidate
             }
         }
@@ -181,8 +184,17 @@ class GestureAnalyzer {
         if let lastDirection = directions.last {
             // Only add if direction changed
             if newDirection != lastDirection {
-                // Make sure we've moved enough from the last direction change
-                if magnitude >= changeThreshold || (newDirection.isOpposite(to: lastDirection) && magnitude >= effReversal) {
+                let gap = newDirection.angularGap(to: lastDirection)
+                let turnThreshold = turnRegistrationThreshold(
+                    gap: gap, changeThreshold: changeThreshold, reversal: effReversal
+                )
+                // 진폭 비율 가드: 새 turn 스트로크가 직전 스트로크 진폭 대비 너무
+                // 작으면(손떨림) 등록하지 않는다 — 단일 모음(ㅗ/ㅜ/ㅏ/ㅓ)이 복합
+                // 모음으로 과승격되는 것을 막는다. sensitivity 0 에서는 비율 0 이라
+                // 가드가 비활성 → 기존 동작 보존.
+                let prevMagnitude = directionMagnitudes.last ?? magnitude
+                let passesAmplitudeGuard = magnitude >= prevMagnitude * minTurnAmplitudeRatio
+                if magnitude >= turnThreshold && passesAmplitudeGuard {
                     directions.append(newDirection)
                     directionMagnitudes.append(magnitude)
                     lastDirectionChangePoint = currentPoint
@@ -193,6 +205,48 @@ class GestureAnalyzer {
             directions.append(newDirection)
             directionMagnitudes.append(magnitude)
             lastDirectionChangePoint = currentPoint
+        }
+    }
+
+    /// 2차(낮은 reversal 임계) 방향 분류를 허용할 turn 인지 — sensitivity 기반.
+    /// sensitivity 0 은 정확한 반대(180°)만 허용해 기존 isOpposite 동작과 동등하다.
+    private func qualifiesAsTurn(gap: Double) -> Bool {
+        switch settings.multiStrokeTurnSensitivity {
+        case ...0: return gap > 179
+        case 1:    return gap >= 135
+        default:   return gap >= 90
+        }
+    }
+
+    /// 방향 전환 각도(gap)와 사용자 민감도에 따른 새 스트로크 등록 변위 임계.
+    /// 큰 각도 turn(멀티스트로크 모음의 왕복)일수록 낮은 임계를 적용해 원점 복귀
+    /// 없이 등록되게 한다.
+    /// - sensitivity 0: 정확한 반대(180°)만 reversal, 그 외 change — 기존 동작과 동등.
+    /// - sensitivity 1: near-opposite(≥135°) reversal, 직각(≥90°) 중간.
+    /// - sensitivity 2: 직각(≥90°) reversal, 완만(≥45°) 중간.
+    private func turnRegistrationThreshold(gap: Double, changeThreshold: CGFloat, reversal: CGFloat) -> CGFloat {
+        let mid = (reversal + changeThreshold) / 2
+        switch settings.multiStrokeTurnSensitivity {
+        case ...0:
+            return gap > 179 ? reversal : changeThreshold
+        case 1:
+            if gap >= 135 { return reversal }
+            if gap >= 90 { return mid }
+            return changeThreshold
+        default: // 2 이상
+            if gap >= 90 { return reversal }
+            if gap >= 45 { return mid }
+            return changeThreshold
+        }
+    }
+
+    /// 떨림 컷용 진폭 비율: 새 turn 스트로크가 직전 스트로크 진폭의 이 비율
+    /// 이상일 때만 등록. sensitivity 0 = 0(가드 비활성, 기존 동작 보존).
+    private var minTurnAmplitudeRatio: CGFloat {
+        switch settings.multiStrokeTurnSensitivity {
+        case ...0: return 0
+        case 1:    return 0.3
+        default:   return 0.4
         }
     }
 

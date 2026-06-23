@@ -20,6 +20,13 @@ struct GestureSettings: Codable, Equatable {
     /// Default 0.5 keeps the historical 20pt → 10pt ratio.
     var reversalThresholdRatio: CGFloat = 0.5
 
+    /// 멀티스트로크 모음(ㅛ ㅑ ㅕ 등)을 원점 복귀 없이 "큰 각도 방향 전환"만으로
+    /// 인식하는 민감도. 0 = 끔(기본 — ㅗ/ㅜ/ㅏ/ㅓ 단일 안정성 최우선, 기존 동작 보존),
+    /// 1 = 보통, 2 = 민감. 높일수록 작은 왕복도 새 스트로크로 등록되지만 단일 모음이
+    /// 복합 모음(ㅗ→ㅚ→ㅛ 등)으로 과승격될 위험이 커진다. 떨림 오인식은 진폭 비율
+    /// 가드(직전 스트로크 대비 일정 비율 이상일 때만 등록)로 완화한다.
+    var multiStrokeTurnSensitivity: Int = 0
+
     /// Get effective swipe threshold for a specific column. `keyWidth`
     /// must be the live center-key width measured by the view layer so
     /// the same swipeLength preset behaves consistently across iPhone
@@ -73,4 +80,27 @@ struct GestureSettings: Codable, Equatable {
     }
 
     static let `default` = GestureSettings()
+}
+
+// MARK: - Forward-compatible decoding
+//
+// Every field decoded with `decodeIfPresent` + default so older persisted JSON
+// predating a field (e.g. `multiStrokeTurnSensitivity`) decodes cleanly instead
+// of throwing `keyNotFound` and wiping the user's gesture settings via
+// `load(...) ?? .default`. In an extension to preserve the memberwise init.
+extension GestureSettings {
+    private enum CodingKeys: String, CodingKey {
+        case swipeProfile, columnOverrides, directionChangeThreshold
+        case reversalThresholdRatio, multiStrokeTurnSensitivity
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        swipeProfile = try c.decodeIfPresent(SwipeProfile.self, forKey: .swipeProfile) ?? .bothHands
+        columnOverrides = try c.decodeIfPresent([ColumnGestureOverride].self, forKey: .columnOverrides) ?? ColumnGestureOverride.defaults
+        directionChangeThreshold = try c.decodeIfPresent(CGFloat.self, forKey: .directionChangeThreshold) ?? KeyboardMetrics.directionChangeThreshold
+        reversalThresholdRatio = try c.decodeIfPresent(CGFloat.self, forKey: .reversalThresholdRatio) ?? 0.5
+        multiStrokeTurnSensitivity = try c.decodeIfPresent(Int.self, forKey: .multiStrokeTurnSensitivity) ?? 0
+    }
 }

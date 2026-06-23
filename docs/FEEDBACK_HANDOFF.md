@@ -6,6 +6,7 @@
 ## 현재 상태
 
 **완료(커밋됨): 4방향 전용 모드 (T2+T3+T1 일부) + 레이아웃 호환 + 레이아웃 미리보기 통일** — TDD, 실기기 확인 완료.
+**완료: T4 멀티스트로크 민감도** — `GestureSettings.multiStrokeTurnSensitivity`(0~2, 기본 0=기존 동등) + `angularGap`/`qualifiesAsTurn`/`turnRegistrationThreshold` 차등 임계 + **진폭 비율 가드**(ㅗㅜㅏㅓ→ㅚㅛㅐㅑ 과승격 차단). 긋기 설정에 민감도 Picker + ㅣ/ㅡ키 안내. TDD 5종, clean 빌드 26/26.
 **완료(커밋됨): T5 자음 힌트 깜빡임 제거** — `isGestureActive` 전역 플래그를 키별 `isActive`로 좁힘
 ([ConsonantGridView](../MoaPlusKeyboard/Views/ConsonantGridView.swift), [KeyboardView](../MoaPlusKeyboard/Views/KeyboardView.swift)). 빌드 통과, 실기기 확인 예정.
 
@@ -60,7 +61,11 @@ T5 근본 원인: 타이핑 시 `gestureState.activeKey` 변경 → 전역 `isGe
   ([ConsonantGridView:158](../MoaPlusKeyboard/Views/ConsonantGridView.swift), prop 제거 + [KeyboardView](../MoaPlusKeyboard/Views/KeyboardView.swift) 호출 정리).
 - `viewModel.activeKey` == `gestureState.activeKey`(forward) 확인 → 키별 판정으로 동작 보존.
 
-### T4. 멀티스트로크 모음 ⚡️ 인식 (원점 복귀 불필요) `[대]` — 피드백 2, 6  ← **다음 차례**
+### ~~T4. 멀티스트로크 모음 ⚡️ 인식~~ ✅ 완료 — 피드백 2, 6
+- 보수적 완화(옵션 C 변형) + 사용자 민감도 설정 + 진폭 가드. sens 0 회귀 0. 상세는 위 현재 상태 참조.
+- 워크플로 분석으로 "⚡️ 완화 = ㅗㅜㅏㅓ 과승격" trade-off 사전 발견 → 진폭 비율 가드로 대응.
+
+### T4(원본 분석 메모). 멀티스트로크 모음 — 피드백 2, 6
 - 원인: `GestureAnalyzer`가 방향 벡터를 **터치 시작점이 아닌 `lastDirectionChangePoint`(직전 꺾인 점)
   기준**으로 계산 ([GestureAnalyzer.swift:136-141](../MoaPlusKeyboard/Engine/GestureAnalyzer.swift)).
   → ㅛ(↑↓↑)가 정확한 N자 궤적(원점 복귀)을 요구.
@@ -68,7 +73,7 @@ T5 근본 원인: 타이핑 시 `gestureState.activeKey` 변경 → 전역 `isGe
 - 회귀 위험 최대 → **TDD 필수**. 기존 `testTripleReversalForYoVowel` 등과의 호환 유지하며 확장.
 - 4방향 모드 작업으로 ㅣ 오인식(피드백6)은 부분 완화됐을 수 있음 — 재현 재확인 후 범위 조정.
 
-### T6. 아이패드 레이아웃 (높이 + 가로 좌우 분리) `[대]` — 피드백 4
+### T6. 아이패드 레이아웃 (높이 + 가로 좌우 분리) `[대]` — 피드백 4  ← **다음 차례**
 - 현황: 높이 260pt 완전 고정, iPad/orientation 감지 코드 없음
   ([KeyboardMetrics.swift:59](../MoaPlusKeyboard/Utilities/KeyboardMetrics.swift),
   [KeyboardViewController.swift:37-54](../MoaPlusKeyboard/KeyboardViewController.swift)).

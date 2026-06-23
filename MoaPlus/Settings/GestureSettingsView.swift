@@ -21,6 +21,18 @@ struct GestureSettingsView: View {
         )
     }
 
+    /// 멀티스트로크 모음 turn 민감도(GestureSettings 직속, 0~2) 바인딩.
+    private var sensitivityBinding: Binding<Int> {
+        Binding(
+            get: { settings.gestureSettings.multiStrokeTurnSensitivity },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.multiStrokeTurnSensitivity = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
     var body: some View {
         List {
             // Real-time gesture test (placed first for discoverability)
@@ -62,6 +74,20 @@ struct GestureSettingsView: View {
                 Text("긋기 길이")
             } footer: {
                 Text(swipeLengthDescription)
+            }
+
+            // Multi-stroke turn sensitivity (T4)
+            Section {
+                Picker("민감도", selection: sensitivityBinding) {
+                    Text("끔").tag(0)
+                    Text("보통").tag(1)
+                    Text("민감").tag(2)
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("멀티스트로크 모음 (ㅛ ㅑ ㅕ 등)")
+            } footer: {
+                Text("자음 키에서 ㅛ·ㅑ·ㅕ 같은 모음을 한 번에 그을 때의 인식 민감도입니다. ‘끔’은 정확한 왕복(원점으로 되돌아오기)이 필요하고, 높일수록 방향만 꺾어도 인식되지만 ㅗ·ㅜ·ㅏ·ㅓ가 복합 모음으로 잘못 입력될 수 있습니다.\n\n참고: ㅑ·ㅕ·ㅛ·ㅠ는 ㅣ/ㅡ 키를 한 방향으로 긋는 것이 더 정확합니다 (ㅣ키 ↑=ㅕ, ↓=ㅑ / ㅡ키 ←=ㅛ, →=ㅠ).")
             }
 
             // Direction mapping

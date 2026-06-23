@@ -342,6 +342,71 @@ final class GestureAnalyzerTests: XCTestCase {
         XCTAssertEqual(profile.mode, .both)
     }
 
+    // MARK: - Multi-stroke turn sensitivity (T4)
+    //
+    // sensitivity 0 = 기존 동작(원점 복귀 필요, ㅗㅜㅏㅓ 안정). 높일수록 큰 각도
+    // turn 을 낮은 변위로 등록(⚡️ 궤적)하되 진폭 비율 가드로 단일 모음 과승격을 막는다.
+    // 값: effectiveThreshold 20, effReversal 10, changeThreshold 15 (keyWidth 50).
+
+    func testSensitivity0KeepsRightAngleTurnUnregistered() {
+        var settings = GestureSettings.default
+        settings.multiStrokeTurnSensitivity = 0
+        let analyzer = GestureAnalyzer(settings: settings, columnId: 0)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 75))   // ↑ 25
+        analyzer.addPoint(CGPoint(x: 112, y: 75))   // → 12 (gap 90, change 15 미달)
+
+        XCTAssertEqual(analyzer.getDirections(), [.up],
+                       "sens 0: 직각 12px turn 은 미등록 (기존 동작 보존)")
+    }
+
+    func testSensitivity2RegistersRightAngleTurnWithoutOriginReturn() {
+        var settings = GestureSettings.default
+        settings.multiStrokeTurnSensitivity = 2
+        let analyzer = GestureAnalyzer(settings: settings, columnId: 0)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 75))   // ↑ 25
+        analyzer.addPoint(CGPoint(x: 112, y: 75))   // → 12 (gap 90)
+
+        XCTAssertEqual(analyzer.getDirections(), [.up, .right],
+                       "sens 2: 직각 turn 이 12px 만으로 등록 (원점 복귀 불필요 ⚡️)")
+    }
+
+    func testSensitivity2AmplitudeGuardBlocksTinyJitterPromotion() {
+        var settings = GestureSettings.default
+        settings.multiStrokeTurnSensitivity = 2
+        let analyzer = GestureAnalyzer(settings: settings, columnId: 0)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 60))   // ↑ 40 (의도적 ㅗ)
+        analyzer.addPoint(CGPoint(x: 100, y: 72))   // ↓ 12 (40*0.4=16 미만 → 진폭가드 컷)
+
+        XCTAssertEqual(analyzer.finalizeGesture(), [.up],
+                       "sens 2: ㅗ 끝의 작은 떨림은 진폭 가드로 컷되어 ㅛ 과승격 방지")
+    }
+
+    func testSensitivity0RegistersTinyReversalLikeBefore() {
+        var settings = GestureSettings.default
+        settings.multiStrokeTurnSensitivity = 0
+        let analyzer = GestureAnalyzer(settings: settings, columnId: 0)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 60))   // ↑ 40
+        analyzer.addPoint(CGPoint(x: 100, y: 72))   // ↓ 12
+
+        XCTAssertEqual(analyzer.getDirections(), [.up, .down],
+                       "sens 0: 12px 반대 turn 은 그대로 등록 (진폭 가드 비활성 = 기존 동작)")
+    }
+
+    func testLegacyGestureSettingsJSONWithoutSensitivityDecodes() throws {
+        let json = Data(#"{"swipeProfile":{"mode":"both"},"directionChangeThreshold":15,"reversalThresholdRatio":0.5}"#.utf8)
+        let gs = try JSONDecoder().decode(GestureSettings.self, from: json)
+        XCTAssertEqual(gs.multiStrokeTurnSensitivity, 0, "구버전 JSON 은 sensitivity 0 기본")
+        XCTAssertEqual(gs.directionChangeThreshold, 15, "기존 필드 보존")
+    }
+
     // MARK: - isOpposite Tests
 
     func testIsOpposite() {

@@ -158,4 +158,26 @@ enum GestureDirection: String, CaseIterable {
     func isAdjacentTo(_ other: GestureDirection) -> Bool {
         Self.adjacencyMap[self]?.contains(other) ?? false
     }
+
+    /// Standard center angle of each direction (math convention: 0°=→, 90°=↑).
+    private var standardAngle: Double {
+        switch self {
+        case .right:     return 0
+        case .upRight:   return 45
+        case .up:        return 90
+        case .upLeft:    return 135
+        case .left:      return 180
+        case .downLeft:  return 225
+        case .down:      return 270
+        case .downRight: return 315
+        }
+    }
+
+    /// Smallest angle between two directions' center angles (0...180°).
+    /// Used to size how sharply a multi-stroke gesture turned: 180° = exact
+    /// reversal (↑↓), 135° = near-opposite (↑↘), 90° = right angle (↑→).
+    func angularGap(to other: GestureDirection) -> Double {
+        let diff = abs(standardAngle - other.standardAngle).truncatingRemainder(dividingBy: 360)
+        return min(diff, 360 - diff)
+    }
 }
