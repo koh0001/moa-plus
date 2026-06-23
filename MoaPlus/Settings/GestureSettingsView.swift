@@ -96,9 +96,6 @@ struct GestureSettingsView: View {
                     Label {
                         Text("**보통 / 민감** — 끝까지 돌아오지 않고 방향만 살짝 바꿔도 인식. 빠르지만 ㅗ·ㅜ·ㅏ·ㅓ를 그을 때 손이 떨리면 ㅚ·ㅛ·ㅐ·ㅑ로 잘못 입력될 수 있음")
                     } icon: { Image(systemName: "bolt.fill").foregroundColor(.secondary) }
-                    Label {
-                        Text("ㅑ·ㅕ·ㅛ·ㅠ는 **ㅣ/ㅡ 키를 한 방향으로 긋는 것**이 가장 정확합니다 (ㅣ키 ↑=ㅕ ↓=ㅑ / ㅡ키 ←=ㅛ →=ㅠ)")
-                    } icon: { Image(systemName: "lightbulb.fill").foregroundColor(.yellow) }
                 }
                 .font(.footnote)
             }
