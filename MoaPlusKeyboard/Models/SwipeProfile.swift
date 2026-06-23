@@ -84,11 +84,65 @@ enum DiagonalMapping: String, Codable, CaseIterable {
 struct DirectionSector: Codable, Equatable {
     /// Center angle of this sector in degrees (0=right, 90=up, 180=left, 270=down)
     var centerAngle: Double
-    /// Half-width of sector in degrees (sector spans centerAngle ± halfWidth)
-    var halfWidth: Double = 22.5 // Default: 45° total
+    /// Half-width of sector in degrees (sector spans centerAngle ± halfWidth).
+    /// Retained as the symmetric base used by the four-way path and the
+    /// legacy visualisation; per-side recognition reads `leftHalfWidth` /
+    /// `rightHalfWidth`.
+    ///
+    /// Assigning `halfWidth` resets both sides to that symmetric value (so any
+    /// existing `sector.halfWidth = x` call site keeps recognising the same
+    /// way it always did). To make a side independent, assign the side
+    /// *after* `halfWidth`.
+    var halfWidth: Double = 22.5 { // Default: 45° total
+        didSet {
+            leftHalfWidth = halfWidth
+            rightHalfWidth = halfWidth
+        }
+    }
+
+    /// Independent half-width on the CCW (left, increasing-angle) side of the
+    /// center. Default equals `halfWidth` → symmetric, identical to legacy.
+    var leftHalfWidth: Double = 22.5
+    /// Independent half-width on the CW (right, decreasing-angle) side of the
+    /// center. Default equals `halfWidth` → symmetric, identical to legacy.
+    var rightHalfWidth: Double = 22.5
 
     var startAngle: Double { centerAngle - halfWidth }
     var endAngle: Double { centerAngle + halfWidth }
+
+    /// Memberwise initialiser is preserved (a custom `init(from:)` is provided
+    /// in an extension so older JSON without per-side fields stays decodable).
+    init(centerAngle: Double,
+         halfWidth: Double = 22.5,
+         leftHalfWidth: Double? = nil,
+         rightHalfWidth: Double? = nil) {
+        self.centerAngle = centerAngle
+        self.halfWidth = halfWidth
+        self.leftHalfWidth = leftHalfWidth ?? halfWidth
+        self.rightHalfWidth = rightHalfWidth ?? halfWidth
+    }
+}
+
+// MARK: - Forward-compatible decoding (DirectionSector)
+//
+// `leftHalfWidth` / `rightHalfWidth` are decoded with `decodeIfPresent` and
+// fall back to `halfWidth`, so older persisted JSON (which only has
+// `centerAngle` + `halfWidth`) decodes as a symmetric sector — bit-for-bit the
+// same recognition as before per-side widths existed.
+extension DirectionSector {
+    private enum CodingKeys: String, CodingKey {
+        case centerAngle, halfWidth, leftHalfWidth, rightHalfWidth
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let center = try c.decode(Double.self, forKey: .centerAngle)
+        let half = try c.decodeIfPresent(Double.self, forKey: .halfWidth) ?? 22.5
+        let left = try c.decodeIfPresent(Double.self, forKey: .leftHalfWidth) ?? half
+        let right = try c.decodeIfPresent(Double.self, forKey: .rightHalfWidth) ?? half
+        self.init(centerAngle: center, halfWidth: half,
+                  leftHalfWidth: left, rightHalfWidth: right)
+    }
 }
 
 /// Swipe profile containing angle and length settings
@@ -113,6 +167,13 @@ struct SwipeProfile: Codable, Equatable {
     /// diagonal-free layout get cardinals auto-balanced to 90° here instead
     /// of fighting per-sector sliders. Default `false` keeps 8-way behaviour.
     var fourWayMode: Bool = false
+
+    /// Global axis rotation in degrees applied to the entire sector ring
+    /// (math convention: positive rotates sectors counter-clockwise). This is
+    /// a separate axis from per-column `rotationOffsetDeg`; the two are summed
+    /// when computing the effective rotation. Default `0` keeps legacy
+    /// behaviour. Range ±20° is enforced by the UI.
+    var axisRotation: Double = 0
 
     /// Predefined profiles
     static let bothHands = SwipeProfile(mode: .both)
@@ -148,7 +209,7 @@ extension SwipeProfile {
     private enum CodingKeys: String, CodingKey {
         case mode, swipeLength, sectors
         case upLeftMapping, upRightMapping, downLeftMapping, downRightMapping
-        case fourWayMode
+        case fourWayMode, axisRotation
     }
 
     init(from decoder: Decoder) throws {
@@ -162,6 +223,7 @@ extension SwipeProfile {
         downLeftMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .downLeftMapping) ?? .vowelEu
         downRightMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .downRightMapping) ?? .vowelEu
         fourWayMode = try c.decodeIfPresent(Bool.self, forKey: .fourWayMode) ?? false
+        axisRotation = try c.decodeIfPresent(Double.self, forKey: .axisRotation) ?? 0
     }
 }
 
