@@ -303,7 +303,9 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
         // Slot B is not associated with any consonant column override.
+        // slot B 는 자음 드래그 패턴(ㅢ 등 대각선 포함)을 쓰므로 카디널 강제 OFF.
         gestureAnalyzer.columnId = 0
+        gestureAnalyzer.forceCardinalOnly = false
         gestureAnalyzer.reset()
         gestureAnalyzer.addPoint(point)
         slotBVowelStartPoint = point
@@ -663,11 +665,23 @@ class KeyboardViewModel: ObservableObject {
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
         if keyboardMode == .korean,
-           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization),
-           case .consonant(let consonant) = content {
-            gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
+           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization) {
+            switch content {
+            case .consonant(let consonant):
+                gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
+                gestureAnalyzer.forceCardinalOnly = false
+            case .vowelPrimitive:
+                // ㅣ/ㅡ 키는 4방향 파생모음만 쓰므로 카디널 스냅으로 인식해
+                // 기운 긋기(↖↗↙↘)가 의도한 ←→↑↓ 로 가게 한다.
+                gestureAnalyzer.columnId = 0
+                gestureAnalyzer.forceCardinalOnly = true
+            default:
+                gestureAnalyzer.columnId = 0
+                gestureAnalyzer.forceCardinalOnly = false
+            }
         } else {
             gestureAnalyzer.columnId = 0
+            gestureAnalyzer.forceCardinalOnly = false
         }
         gestureAnalyzer.reset()
         gestureAnalyzer.addPoint(point)

@@ -356,4 +356,28 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: 80, dy: 0)
         XCTAssertEqual(vm.composingText, "ㅠ", "ㅡ키 → 긋기 = ㅠ")
     }
+
+    // MARK: - ㅣ/ㅡ 키 기운 긋기 (실기기 ㅛㅠㅕㅑ 안 됨 재현)
+    //
+    // 실기기에서 손끝이 살짝 기운 긋기는 대각선(↖↗↙↘)으로 잡힌다. ㅡ키는
+    // 좌우(←→)가 ㅛㅠ 인데, 대각선이 상하로만 정규화되면 ㅗㅜ 로 뒤바뀐다.
+    // ㅣ/ㅡ 키 긋기를 카디널(가까운 4방향)로 스냅해 의도한 모음이 나와야 한다.
+
+    func test_dashKey_tiltedUpLeftDrag_yieldsYo() {
+        // ㅡ키 ← 가 살짝 위로 기울어 ↖(약 148°)로 잡혀도 ㅛ 여야 한다.
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: -80, dy: -50)
+        XCTAssertEqual(vm.composingText, "ㅛ", "ㅡ키 살짝 기운 ← 긋기도 ㅛ (ㅗ 오인식 방지)")
+    }
+
+    func test_dashKey_tiltedDownRightDrag_yieldsYu() {
+        // ㅡ키 → 가 살짝 아래로 기울어 ↘로 잡혀도 ㅠ 여야 한다.
+        driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: 80, dy: 50)
+        XCTAssertEqual(vm.composingText, "ㅠ", "ㅡ키 살짝 기운 → 긋기도 ㅠ (ㅜ 오인식 방지)")
+    }
+
+    func test_barKey_tiltedUpRightDrag_yieldsYeo() {
+        // ㅣ키 ↑ 가 살짝 오른쪽으로 기울어 ↗로 잡혀도 ㅕ 여야 한다.
+        driveKeyGesture(row: Self.barKey.row, column: Self.barKey.column, dx: 50, dy: -80)
+        XCTAssertEqual(vm.composingText, "ㅕ", "ㅣ키 살짝 기운 ↑ 긋기도 ㅕ")
+    }
 }

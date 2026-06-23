@@ -22,6 +22,12 @@ class GestureAnalyzer {
     /// Column ID for per-column gesture correction (1-5, 0 = no column override)
     var columnId: Int = 0
 
+    /// vowel-primitive 키(ㅣ/ㅡ)는 4방향 파생모음(←→↑↓)만 쓰므로 카디널만
+    /// 인식하도록 강제. 대각선을 무조건 상하로 정규화(normalizedCardinal)하던
+    /// 탓에 ㅡ키 좌우(ㅛㅠ)가 기운 긋기에서 ㅗㅜ 로 뒤바뀌던 문제를 막는다.
+    /// (fourWayMode 와 동일하게 GestureDirection.from 의 카디널 스냅을 켠다.)
+    var forceCardinalOnly: Bool = false
+
     /// Live center-key width, set by the view layer once geometry is
     /// known. Drives the proportional swipe threshold so the same
     /// "보통" / "길게" preset feels right on every iPhone size.
@@ -145,7 +151,7 @@ class GestureAnalyzer {
 
         let sectors = effectiveSectors
         let rotation = effectiveRotationOffset
-        let fourWay = settings.swipeProfile.fourWayMode
+        let fourWay = settings.swipeProfile.fourWayMode || forceCardinalOnly
 
         // Try detecting direction with effective threshold first (respects
         // settings/column overrides, including rotation and ㅣ/ㅡ width deltas).
