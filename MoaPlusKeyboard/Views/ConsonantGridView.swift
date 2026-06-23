@@ -8,7 +8,6 @@ struct KeyGridView: View {
     let layoutCustomization: LayoutCustomization
     let activeKey: (row: Int, column: Int)?
     let previewVowel: Jungseong?
-    var isGestureActive: Bool = false
     var shiftState: ShiftState = .off
     let onConsonantTap: (Choseong) -> Void
     let onSymbolTap: (String) -> Void
@@ -155,7 +154,9 @@ struct KeyGridView: View {
                             secondaryAction: resolvedSecondaryAction,
                             showSecondaryHints: KeyboardSettings.shared.showSecondaryHints,
                             hintSize: KeyboardSettings.shared.hintSize,
-                            isGestureActive: isGestureActive,
+                            // 키별 active 판정: 누른 키만 hint/라벨을 숨긴다.
+                            // (전역 플래그를 쓰면 타이핑마다 28개 키 hint 가 깜빡임)
+                            isGestureActive: isActive,
                             row: row,
                             column: column,
                             shiftState: shiftState,

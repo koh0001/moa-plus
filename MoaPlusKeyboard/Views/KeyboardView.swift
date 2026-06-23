@@ -56,7 +56,6 @@ struct KeyboardView: View {
                             layoutCustomization: settings.layoutCustomization,
                             activeKey: viewModel.activeKey,
                             previewVowel: viewModel.previewVowel,
-                            isGestureActive: gestureState.activeKey != nil,
                             shiftState: viewModel.shiftState,
                             onConsonantTap: { consonant in
                                 viewModel.inputConsonant(consonant)
