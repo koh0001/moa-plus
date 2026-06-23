@@ -25,6 +25,53 @@ struct KeyboardView: View {
         }
     }
 
+    @ViewBuilder
+    private func keyGrid(centerKeyWidth: CGFloat, keyHeight: CGFloat, totalWidth: CGFloat) -> some View {
+        KeyGridView(
+            centerKeyWidth: centerKeyWidth,
+            keyHeight: keyHeight,
+            totalWidth: totalWidth,
+            mode: viewModel.keyboardMode,
+            layoutCustomization: settings.layoutCustomization,
+            activeKey: viewModel.activeKey,
+            previewVowel: viewModel.previewVowel,
+            shiftState: viewModel.shiftState,
+            onConsonantTap: { viewModel.inputConsonant($0) },
+            onSymbolTap: { viewModel.inputSymbol($0) },
+            onBackspacePressStart: { viewModel.beginBackspacePress() },
+            onBackspacePressEnd: { viewModel.endBackspacePress() },
+            onLongPressNumber: { viewModel.inputLongPressNumber($0) },
+            onShiftLongPress: { viewModel.lockShift() },
+            onGestureStart: { row, column, point in viewModel.gestureStarted(row: row, column: column, at: point) },
+            onGestureMove: { viewModel.gestureMoved(to: $0) },
+            onGestureEnd: { row, column in viewModel.gestureEnded(row: row, column: column) },
+            onPopupDrag: { viewModel.updatePopupSelection(translationX: $0) },
+            onPopupRelease: { viewModel.confirmPopupSelection() },
+            onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
+            onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },
+            onSlotBVowelGestureEnd: { viewModel.slotBVowelGestureEnded() },
+            onPunctuationSlot: { viewModel.inputSymbol($0, bypassAutoBracket: true) }
+        )
+    }
+
+    @ViewBuilder
+    private func functionRow(totalWidth: CGFloat) -> some View {
+        FunctionRowView(
+            totalWidth: totalWidth,
+            mode: viewModel.keyboardMode,
+            onToggleSymbolPressed: { viewModel.toggleSymbolMode() },
+            onToggleLetterPressed: { viewModel.toggleLetterMode() },
+            onSpacePressed: { viewModel.inputSpace() },
+            onPunctuation: { viewModel.inputSymbol($0, bypassAutoBracket: true) },
+            onReturnPressed: { viewModel.inputReturn() },
+            onCursorMoveDelta: { viewModel.moveCursor(by: $0) },
+            layoutCustomization: settings.layoutCustomization,
+            onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
+            onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },
+            onSlotBVowelGestureEnd: { viewModel.slotBVowelGestureEnded() }
+        )
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let centerKeyWidth = KeyboardMetrics.centerKeyWidth(
@@ -33,6 +80,14 @@ struct KeyboardView: View {
                 mode: viewModel.keyboardMode
             )
             let keyHeight = KeyboardMetrics.keyHeight(for: geometry.size.height)
+            let screen = UIScreen.main.bounds
+            let screenShort = min(screen.width, screen.height)
+            let screenLong = max(screen.width, screen.height)
+            let isPad = UIDevice.current.userInterfaceIdiom == .pad
+            let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
+                keyboardWidth: geometry.size.width, screenShort: screenShort, screenLong: screenLong)
+            let useSplit = KeyboardMetrics.usesIPadSplit(isPad: isPad, isLandscape: isLandscape)
+                && viewModel.keyboardMode == .korean
 
                 ZStack {
                     VStack(spacing: KeyboardMetrics.keySpacing) {
@@ -47,96 +102,35 @@ struct KeyboardView: View {
                             )
                         }
 
-                        // Key grid (consonants or symbols based on mode)
-                        KeyGridView(
-                            centerKeyWidth: centerKeyWidth,
-                            keyHeight: keyHeight,
-                            totalWidth: geometry.size.width,
-                            mode: viewModel.keyboardMode,
-                            layoutCustomization: settings.layoutCustomization,
-                            activeKey: viewModel.activeKey,
-                            previewVowel: viewModel.previewVowel,
-                            shiftState: viewModel.shiftState,
-                            onConsonantTap: { consonant in
-                                viewModel.inputConsonant(consonant)
-                            },
-                            onSymbolTap: { symbol in
-                                viewModel.inputSymbol(symbol)
-                            },
-                            onBackspacePressStart: {
-                                viewModel.beginBackspacePress()
-                            },
-                            onBackspacePressEnd: {
-                                viewModel.endBackspacePress()
-                            },
-                            onLongPressNumber: { number in
-                                viewModel.inputLongPressNumber(number)
-                            },
-                            onShiftLongPress: {
-                                viewModel.lockShift()
-                            },
-                            onGestureStart: { row, column, point in
-                                viewModel.gestureStarted(row: row, column: column, at: point)
-                            },
-                            onGestureMove: { point in
-                                viewModel.gestureMoved(to: point)
-                            },
-                            onGestureEnd: { row, column in
-                                viewModel.gestureEnded(row: row, column: column)
-                            },
-                            onPopupDrag: { translationX in
-                                viewModel.updatePopupSelection(translationX: translationX)
-                            },
-                            onPopupRelease: {
-                                viewModel.confirmPopupSelection()
-                            },
-                            onSlotBVowelGestureStart: { point in
-                                viewModel.slotBVowelGestureStarted(at: point)
-                            },
-                            onSlotBVowelGestureMove: { point in
-                                viewModel.slotBVowelGestureMoved(to: point)
-                            },
-                            onSlotBVowelGestureEnd: {
-                                viewModel.slotBVowelGestureEnded()
-                            },
-                            onPunctuationSlot: { symbol in
-                                viewModel.inputSymbol(symbol, bypassAutoBracket: true)
+                        if useSplit {
+                            let spacing = KeyboardMetrics.keySpacing
+                            let numpadWidth = (geometry.size.width - spacing * 3) * 0.31
+                            let moakiWidth = (geometry.size.width - spacing * 3) * 0.69
+                            let moakiCenterKeyWidth = KeyboardMetrics.centerKeyWidth(
+                                for: moakiWidth, columnCount: 7, mode: .korean)
+                            let numpad = NumberPadView(
+                                panelWidth: numpadWidth,
+                                keyHeight: keyHeight,
+                                onDigit: { viewModel.inputSymbol($0) },
+                                onBackspacePressStart: { viewModel.beginBackspacePress() },
+                                onBackspacePressEnd: { viewModel.endBackspacePress() }
+                            )
+                            HStack(spacing: spacing) {
+                                if settings.layoutCustomization.numberPadSide == .left {
+                                    numpad.frame(width: numpadWidth)
+                                    keyGrid(centerKeyWidth: moakiCenterKeyWidth, keyHeight: keyHeight, totalWidth: moakiWidth)
+                                        .frame(width: moakiWidth)
+                                } else {
+                                    keyGrid(centerKeyWidth: moakiCenterKeyWidth, keyHeight: keyHeight, totalWidth: moakiWidth)
+                                        .frame(width: moakiWidth)
+                                    numpad.frame(width: numpadWidth)
+                                }
                             }
-                        )
-
-                        // Function row
-                        FunctionRowView(
-                            totalWidth: geometry.size.width,
-                            mode: viewModel.keyboardMode,
-                            onToggleSymbolPressed: {
-                                viewModel.toggleSymbolMode()
-                            },
-                            onToggleLetterPressed: {
-                                viewModel.toggleLetterMode()
-                            },
-                            onSpacePressed: {
-                                viewModel.inputSpace()
-                            },
-                            onPunctuation: { symbol in
-                                viewModel.inputSymbol(symbol, bypassAutoBracket: true)
-                            },
-                            onReturnPressed: {
-                                viewModel.inputReturn()
-                            },
-                            onCursorMoveDelta: { offset in
-                                viewModel.moveCursor(by: offset)
-                            },
-                            layoutCustomization: settings.layoutCustomization,
-                            onSlotBVowelGestureStart: { point in
-                                viewModel.slotBVowelGestureStarted(at: point)
-                            },
-                            onSlotBVowelGestureMove: { point in
-                                viewModel.slotBVowelGestureMoved(to: point)
-                            },
-                            onSlotBVowelGestureEnd: {
-                                viewModel.slotBVowelGestureEnded()
-                            }
-                        )
+                            functionRow(totalWidth: geometry.size.width)
+                        } else {
+                            keyGrid(centerKeyWidth: centerKeyWidth, keyHeight: keyHeight, totalWidth: geometry.size.width)
+                            functionRow(totalWidth: geometry.size.width)
+                        }
                     }
                     .padding(KeyboardMetrics.keySpacing)
 

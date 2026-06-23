@@ -104,6 +104,7 @@
 				Views/FunctionRowView.swift,
 				Views/GestureOverlayView.swift,
 				Views/KeyboardView.swift,
+				Views/NumberPadView.swift,
 				Views/SpecialCharacterLayerView.swift,
 			);
 			target = 3A2FCBAD2FA210D9006847D0 /* MoaPlusKeyboardTests */;
@@ -139,6 +140,7 @@
 				Views/FunctionRowView.swift,
 				Views/GestureOverlayView.swift,
 				Views/KeyboardView.swift,
+				Views/NumberPadView.swift,
 				Views/SpecialCharacterLayerView.swift,
 			);
 			target = 00A43CE32F2A2F8C005FF0AB /* MoaPlus */;
