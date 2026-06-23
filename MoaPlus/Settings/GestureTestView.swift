@@ -253,12 +253,14 @@ final class GestureTestKeyboardDelegate: ObservableObject, KeyboardViewModelDele
 struct GestureTestView: View {
     @StateObject private var model = GestureTestModel()
     @StateObject private var inputDelegate = GestureTestKeyboardDelegate()
+    @ObservedObject private var settings = KeyboardSettings.shared
 
     private static let canvasDimension: CGFloat = 280
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
+                sensitivitySection
                 canvasSection
                 keyboardPreviewSection
                 resultCards
@@ -268,6 +270,63 @@ struct GestureTestView: View {
         .navigationTitle("긋기 테스트")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { model.configureEngine() }
+    }
+
+    // MARK: - Multi-stroke sensitivity (live adjust)
+
+    private var sensitivityBinding: Binding<Int> {
+        Binding(
+            get: { settings.gestureSettings.multiStrokeTurnSensitivity },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.multiStrokeTurnSensitivity = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
+    private var sensitivityDescription: String {
+        switch settings.gestureSettings.multiStrokeTurnSensitivity {
+        case 0:  return "방향을 꺾은 뒤 처음 위치로 되돌아와야 새 획으로 인식됩니다 (기존 방식)."
+        case 1:  return "적당히 꺾으면 끝까지 되돌아오지 않아도 새 획으로 인식됩니다."
+        default: return "살짝만 꺾어도 새 획으로 인식됩니다. ㅗ·ㅜ·ㅏ·ㅓ 오인식에 주의하세요."
+        }
+    }
+
+    private var sensitivitySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "dial.medium")
+                    .foregroundColor(.accentColor)
+                Text("멀티스트로크 민감도")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+            }
+            Picker("민감도", selection: sensitivityBinding) {
+                Text("끔").tag(0)
+                Text("보통").tag(1)
+                Text("민감").tag(2)
+            }
+            .pickerStyle(.segmented)
+
+            Text(sensitivityDescription)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("아래 키보드에서 ㅛ(위·아래·위)처럼 방향을 꺾어 긋고, 위 캔버스의 인식 결과가 어떻게 달라지는지 확인하세요.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 
     // MARK: - Sector canvas (top)
@@ -346,13 +405,13 @@ struct GestureTestView: View {
                 resultCard(
                     title: "실시간",
                     vowel: liveVowelLabel,
-                    sequence: liveStrokeSequence,
+                    directions: model.liveDirections,
                     accent: .blue
                 )
                 resultCard(
                     title: "최종 결과",
                     vowel: finalVowelLabel,
-                    sequence: finalStrokeSequence,
+                    directions: model.finalDirections,
                     accent: .accentColor
                 )
             }
@@ -361,7 +420,7 @@ struct GestureTestView: View {
         }
     }
 
-    private func resultCard(title: String, vowel: String, sequence: String, accent: Color) -> some View {
+    private func resultCard(title: String, vowel: String, directions: [GestureDirection], accent: Color) -> some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.caption.weight(.semibold))
@@ -372,12 +431,7 @@ struct GestureTestView: View {
                 .foregroundColor(accent)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 56)
-            Text(sequence)
-                .font(.system(.body, design: .monospaced))
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            strokeArrowChips(directions, accent: accent)
         }
         .padding(12)
         .frame(maxWidth: .infinity)
@@ -387,8 +441,39 @@ struct GestureTestView: View {
         )
     }
 
+    /// 인식된 방향 시퀀스를 화살표 칩 체인으로 — ↑↓↑ 처럼 어떻게 인식됐는지 한눈에.
+    private func strokeArrowChips(_ directions: [GestureDirection], accent: Color) -> some View {
+        Group {
+            if directions.isEmpty {
+                Text("—")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            } else {
+                HStack(spacing: 4) {
+                    ForEach(Array(directions.enumerated()), id: \.offset) { item in
+                        Text(item.element.symbol)
+                            .font(.headline)
+                            .foregroundColor(accent)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(accent.opacity(0.18)))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var sensitivityLabel: String {
+        switch settings.gestureSettings.multiStrokeTurnSensitivity {
+        case 0:  return "끔"
+        case 1:  return "보통"
+        default: return "민감"
+        }
+    }
+
     private var metricsCard: some View {
         VStack(alignment: .leading, spacing: 6) {
+            metricRow("멀티스트로크 민감도", sensitivityLabel)
             metricRow("스트로크 수", "\(model.liveDirections.count)")
             metricRow("적용된 회전 보정", String(format: "%.1f°", model.rotationOffset))
             metricRow("ㅣ 폭 보정", String(format: "+%.1f°", model.iDelta))
@@ -481,16 +566,6 @@ struct GestureTestView: View {
     }
 
     // MARK: - Computed labels
-
-    private var liveStrokeSequence: String {
-        guard !model.liveDirections.isEmpty else { return "—" }
-        return model.liveDirections.map { $0.symbol }.joined()
-    }
-
-    private var finalStrokeSequence: String {
-        guard !model.finalDirections.isEmpty else { return "—" }
-        return model.finalDirections.map { $0.symbol }.joined()
-    }
 
     private var liveVowelLabel: String {
         guard let v = model.liveVowel else { return "—" }

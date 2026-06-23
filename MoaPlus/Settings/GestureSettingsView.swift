@@ -87,7 +87,20 @@ struct GestureSettingsView: View {
             } header: {
                 Text("멀티스트로크 모음 (ㅛ ㅑ ㅕ 등)")
             } footer: {
-                Text("자음 키에서 ㅛ·ㅑ·ㅕ 같은 모음을 한 번에 그을 때의 인식 민감도입니다. ‘끔’은 정확한 왕복(원점으로 되돌아오기)이 필요하고, 높일수록 방향만 꺾어도 인식되지만 ㅗ·ㅜ·ㅏ·ㅓ가 복합 모음으로 잘못 입력될 수 있습니다.\n\n참고: ㅑ·ㅕ·ㅛ·ㅠ는 ㅣ/ㅡ 키를 한 방향으로 긋는 것이 더 정확합니다 (ㅣ키 ↑=ㅕ, ↓=ㅑ / ㅡ키 ←=ㅛ, →=ㅠ).")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ㅛ·ㅑ·ㅕ 같은 모음은 자음 키에서 방향을 두 번 꺾어 입력합니다. 예: ㅛ = 위 → 아래 → 위")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Label {
+                        Text("**끔** — 처음 위치로 정확히 되돌아와야 인식 (오인식 적음, 기존 방식)")
+                    } icon: { Image(systemName: "lock.fill").foregroundColor(.secondary) }
+                    Label {
+                        Text("**보통 / 민감** — 끝까지 돌아오지 않고 방향만 살짝 바꿔도 인식. 빠르지만 ㅗ·ㅜ·ㅏ·ㅓ를 그을 때 손이 떨리면 ㅚ·ㅛ·ㅐ·ㅑ로 잘못 입력될 수 있음")
+                    } icon: { Image(systemName: "bolt.fill").foregroundColor(.secondary) }
+                    Label {
+                        Text("ㅑ·ㅕ·ㅛ·ㅠ는 **ㅣ/ㅡ 키를 한 방향으로 긋는 것**이 가장 정확합니다 (ㅣ키 ↑=ㅕ ↓=ㅑ / ㅡ키 ←=ㅛ →=ㅠ)")
+                    } icon: { Image(systemName: "lightbulb.fill").foregroundColor(.yellow) }
+                }
+                .font(.footnote)
             }
 
             // Direction mapping
