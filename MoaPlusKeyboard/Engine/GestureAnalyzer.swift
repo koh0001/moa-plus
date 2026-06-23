@@ -258,11 +258,12 @@ class GestureAnalyzer {
 
     /// 떨림 컷용 진폭 비율: 새 turn 스트로크가 직전 스트로크 진폭의 이 비율
     /// 이상일 때만 등록. sensitivity 0 = 0(가드 비활성, 기존 동작 보존).
+    ///
+    /// 주의: forceCardinalOnly(ㅣ/ㅡ 키)에서 0.6 을 강제하던 코드를 제거했다.
+    /// ㅣ/ㅡ 키는 천지인 멀티스트로크(↑↓↑=ㅛ, ↓↑↓=ㅠ, ←→←=ㅕ, →←→=ㅑ)를
+    /// 만드는 유일한 키인데, 거기서 가드를 강제하면 가운데 반전 획(↑/↓)이
+    /// 첫 획의 60% 진폭에 못 미쳐 잘려 멀티스트로크가 깨졌다(ㅠ→ㅜ 회귀).
     private var minTurnAmplitudeRatio: CGFloat {
-        // ㅣ/ㅡ 키(forceCardinalOnly)는 단일 방향 파생모음(ㅕㅑㅛㅠ)이 주 용도라,
-        // 실기기 촘촘 터치로 잘게 쪼개진 작은 후속 stroke 가 base 모음을 복합으로
-        // 바꾸는 과인식을 강하게 차단한다. 의도적 ㅔㅐ(큰 ←→)는 0.6 을 넘어 보존.
-        if forceCardinalOnly { return 0.6 }
         switch settings.multiStrokeTurnSensitivity {
         case ...0: return 0
         case 1:    return 0.3

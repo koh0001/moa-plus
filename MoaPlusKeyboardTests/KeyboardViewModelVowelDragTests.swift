@@ -407,4 +407,38 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         driveKeyGesture(row: Self.dashKey.row, column: Self.dashKey.column, dx: -5, dy: 0)
         XCTAssertEqual(vm.composingText, "ㅡ", "거의 안 움직인 탭(5pt)은 여전히 ㅡ (긋기 오인 방지)")
     }
+
+    // MARK: - 전용 ㅣ/ㅡ 키 천지인 멀티스트로크 (↑↓↑=ㅛ, ↓↑↓=ㅠ, ←→←=ㅕ, →←→=ㅑ)
+    //
+    // 사용자가 "ㅜ에서 아래위아래(↓↑↓)" 처럼 천지인 방식으로 ㅛㅠㅕㅑ 를 입력한다.
+    // 전용 키 applySecondaryStroke 에 ㅚ→ㅛ(↑), ㅟ→ㅠ(↓), ㅔ→ㅕ(←), ㅐ→ㅑ(→) 추가.
+
+    func test_dashKey_cheonjiin_upDownUp_yieldsYo() {
+        XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.up, .down, .up]), .ㅛ,
+                       "ㅡ키 ↑↓↑ = ㅛ (천지인)")
+    }
+
+    func test_dashKey_cheonjiin_downUpDown_yieldsYu() {
+        XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.down, .up, .down]), .ㅠ,
+                       "ㅡ키 ↓↑↓ = ㅠ (천지인, 사용자 보고 케이스)")
+    }
+
+    func test_barKey_cheonjiin_leftRightLeft_yieldsYeo() {
+        XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .bar, directions: [.left, .right, .left]), .ㅕ,
+                       "ㅣ키 ←→← = ㅕ (천지인)")
+    }
+
+    func test_barKey_cheonjiin_rightLeftRight_yieldsYa() {
+        XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .bar, directions: [.right, .left, .right]), .ㅑ,
+                       "ㅣ키 →←→ = ㅑ (천지인)")
+    }
+
+    // 단일 방향(기존)도 유지되는지 회귀 확인
+    func test_dashKey_singleLeft_stillYo() {
+        XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.left]), .ㅛ)
+    }
+
+    func test_dashKey_singleRight_stillYu() {
+        XCTAssertEqual(vm.resolveVowelFromPrimitiveDrag(primitive: .dash, directions: [.right]), .ㅠ)
+    }
 }

@@ -993,6 +993,9 @@ class KeyboardViewModel: ObservableObject {
             case (.ㅝ, .right): return .ㅞ
             case (.ㅝ, .up):    return .ㅞ
             case (.ㅝ, .down):  return .ㅞ
+            // 천지인 멀티스트로크: ㅗ→ㅚ→ㅛ (↑↓↑), ㅜ→ㅟ→ㅠ (↓↑↓)
+            case (.ㅚ, .up):    return .ㅛ
+            case (.ㅟ, .down):  return .ㅠ
             default: return nil
             }
         case .bar:
@@ -1013,6 +1016,9 @@ class KeyboardViewModel: ObservableObject {
             case (.ㅑ, .right): return .ㅒ
             case (.ㅑ, .left):  return .ㅒ
             case (.ㅑ, .up):    return .ㅒ
+            // 천지인 멀티스트로크: ㅓ→ㅔ→ㅕ (←→←), ㅏ→ㅐ→ㅑ (→←→)
+            case (.ㅔ, .left):  return .ㅕ
+            case (.ㅐ, .right): return .ㅑ
             default: return nil
             }
         case .dot:
