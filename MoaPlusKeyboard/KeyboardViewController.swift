@@ -41,7 +41,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             toItem: nil,
             attribute: .notAnAttribute,
             multiplier: 1.0,
-            constant: KeyboardMetrics.keyboardHeight
+            constant: computedKeyboardHeight()
         )
         // 999, not .required(1000): on globe-key keyboard switches iOS lays
         // the input container out at its own provisional height first. A
@@ -78,7 +78,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // layout pass once avoids a visible double-layout flicker on first
         // appearance.
         KeyboardSettings.shared.loadAll()
-        heightConstraint?.constant = KeyboardMetrics.keyboardHeight
+        heightConstraint?.constant = computedKeyboardHeight()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -95,6 +95,34 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
         // Reset any stuck gesture state (e.g., user was mid-drag when backgrounding)
         viewModel.resetGestureState()
+    }
+
+    private func computedKeyboardHeight() -> CGFloat {
+        let bounds = UIScreen.main.bounds
+        let screenShort = min(bounds.width, bounds.height)
+        let screenLong = max(bounds.width, bounds.height)
+        let isPad = traitCollection.userInterfaceIdiom == .pad
+        // 키보드 폭 = 현재 화면 폭. 레이아웃 전이면 UIScreen 폭으로 폴백.
+        let width = view.bounds.width > 0 ? view.bounds.width : bounds.width
+        let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
+            keyboardWidth: width, screenShort: screenShort, screenLong: screenLong)
+        return KeyboardMetrics.keyboardHeight(
+            isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong)
+    }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            guard let self else { return }
+            let bounds = UIScreen.main.bounds
+            let screenShort = min(bounds.width, bounds.height)
+            let screenLong = max(bounds.width, bounds.height)
+            let isPad = self.traitCollection.userInterfaceIdiom == .pad
+            let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
+                keyboardWidth: size.width, screenShort: screenShort, screenLong: screenLong)
+            self.heightConstraint?.constant = KeyboardMetrics.keyboardHeight(
+                isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong)
+        })
     }
 
     private func setupKeyboardView() {
