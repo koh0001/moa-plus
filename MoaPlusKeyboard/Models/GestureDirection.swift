@@ -81,11 +81,41 @@ enum GestureDirection: String, CaseIterable {
             return nil
         }
 
+        // STEP 1: a cardinal the user has widened past its base (22.5°) on the
+        // claiming side takes priority over the diagonal that would otherwise
+        // eat that angle. Sign convention: positive signedAngularDistance =
+        // CCW = left side → leftHalfWidth; negative = CW = right side →
+        // rightHalfWidth. Only fires when the side exceeds base AND the angle
+        // is past base but within the widened side, so the base range stays
+        // diagonal-first (per-column behaviour preserved). On conflict the
+        // cardinal nearest the incoming angle wins.
+        var widenedCardinal: (direction: GestureDirection, distance: Double)?
+        for index in cardinalSectorIndices
+        where index < sectors.count && index < sectorOrder.count {
+            let sector = sectors[index]
+            let signed = signedAngularDistance(from: sector.centerAngle, to: relative)
+            let side = signed >= 0 ? sector.leftHalfWidth : sector.rightHalfWidth
+            let delta = abs(signed)
+            if side > sector.halfWidth && delta > sector.halfWidth && delta <= side {
+                if widenedCardinal == nil || delta < widenedCardinal!.distance {
+                    widenedCardinal = (sectorOrder[index], delta)
+                }
+            }
+        }
+        if let widenedCardinal {
+            return widenedCardinal.direction
+        }
+
+        // STEP 2: legacy diagonal-first sweep, now per-side. A sector claims
+        // the angle when |signedDist| <= the half-width on the side the angle
+        // falls. Default sectors have left == right == halfWidth so this is
+        // identical to the previous `delta <= sector.halfWidth` check.
         for index in diagonalSectorIndices + cardinalSectorIndices
         where index < sectors.count && index < sectorOrder.count {
             let sector = sectors[index]
-            let delta = abs(signedAngularDistance(from: sector.centerAngle, to: relative))
-            if delta <= sector.halfWidth {
+            let signed = signedAngularDistance(from: sector.centerAngle, to: relative)
+            let side = signed >= 0 ? sector.leftHalfWidth : sector.rightHalfWidth
+            if abs(signed) <= side {
                 return sectorOrder[index]
             }
         }
