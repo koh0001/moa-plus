@@ -92,6 +92,12 @@ class GestureAnalyzer {
         // with the ㅡ delta. Cardinals stay at their base widths and are
         // shrunk implicitly by the diagonal-first priority in
         // `GestureDirection.from`.
+        //
+        // Assigning `halfWidth` mirrors into both per-side widths (see
+        // `DirectionSector.halfWidth`'s `didSet`), so the symmetric per-column
+        // diagonal widening that `GestureDirection.from`'s per-side claim reads
+        // — and `testColumn5SteepDiagonalStaysAsUpRight` depends on — is kept
+        // in sync automatically.
         for index in [1, 3] where index < sectors.count {
             sectors[index].halfWidth += iDelta
         }
@@ -102,8 +108,11 @@ class GestureAnalyzer {
     }
 
     private var effectiveRotationOffset: Double {
-        guard columnId > 0 else { return 0 }
-        return settings.effectiveRotationOffset(forColumn: columnId)
+        // Global axis rotation applies to every column (and to columnId 0);
+        // per-column rotationOffset is summed on top of it.
+        let global = settings.swipeProfile.axisRotation
+        guard columnId > 0 else { return global }
+        return global + settings.effectiveRotationOffset(forColumn: columnId)
     }
 
     private let hasCustomDirectionChangeThreshold: Bool
