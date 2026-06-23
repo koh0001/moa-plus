@@ -7,6 +7,10 @@ struct KeyboardView: View {
     // Observe sub-states directly to reduce unnecessary redraws
     @ObservedObject var gestureState: GestureState
     @ObservedObject var popupState: PopupState
+    /// Test/preview seam (default nil = production, no behavior change). When
+    /// set, forces the iPad split decision instead of reading UIDevice/UIScreen
+    /// — host-less unit tests can't observe the real idiom, so snapshots use it.
+    var layoutOverride: (isPad: Bool, isLandscape: Bool)? = nil
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
     @State private var cachedBgImage: UIImage?
     @State private var cachedBgImageId: String?
@@ -96,8 +100,8 @@ struct KeyboardView: View {
             let screen = UIScreen.main.bounds
             let screenShort = min(screen.width, screen.height)
             let screenLong = max(screen.width, screen.height)
-            let isPad = UIDevice.current.userInterfaceIdiom == .pad
-            let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
+            let isPad = layoutOverride?.isPad ?? (UIDevice.current.userInterfaceIdiom == .pad)
+            let isLandscape = layoutOverride?.isLandscape ?? KeyboardMetrics.isLandscapeKeyboard(
                 keyboardWidth: geometry.size.width, screenShort: screenShort, screenLong: screenLong)
             let useSplit = KeyboardMetrics.usesIPadSplit(isPad: isPad, isLandscape: isLandscape)
                 && viewModel.keyboardMode == .korean

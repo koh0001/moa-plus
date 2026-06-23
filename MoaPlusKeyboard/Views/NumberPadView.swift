@@ -36,7 +36,8 @@ struct NumberPadView: View {
                 .font(.system(size: 22))
                 .frame(width: keyWidth, height: keyHeight)
                 .background(RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
-                    .fill(theme.resolvedFunctionKeyBackground))
+                    .fill(theme.resolvedFunctionKeyBackground)
+                    .shadow(color: .black.opacity(0.2), radius: 1, y: 1))
                 .foregroundColor(theme.resolvedKeyText)
                 .contentShape(Rectangle())
                 .onLongPressGesture(minimumDuration: 0, pressing: { pressing in
@@ -48,7 +49,8 @@ struct NumberPadView: View {
                     .font(.system(size: 22))
                     .frame(width: keyWidth, height: keyHeight)
                     .background(RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
-                        .fill(theme.resolvedKeyBackground))
+                        .fill(theme.resolvedKeyBackground)
+                        .shadow(color: .black.opacity(0.2), radius: 1, y: 1))
                     .foregroundColor(theme.resolvedKeyText)
                     .contentShape(Rectangle())
             }
