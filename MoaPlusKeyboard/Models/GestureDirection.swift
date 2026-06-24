@@ -44,10 +44,12 @@ enum GestureDirection: String, CaseIterable {
     /// pure — no global settings lookups happen here.
     ///
     /// Boundary handling: a sector includes its endpoints. Diagonal-first
-    /// priority resolves any overlap that user widening creates. If the
-    /// sector ring leaves a gap (only possible with negative deltas
-    /// shrinking everything), the function returns nil rather than
-    /// guessing — gaps are a misconfiguration the caller should surface.
+    /// priority (STEP2) resolves any overlap that user widening creates. If
+    /// per-side narrowing leaves a gap that no sector claims, STEP3 falls back
+    /// to the nearest-center sector so a narrowed direction never produces a
+    /// dead zone (user-confirmed rule: "넓히면 뺏고, 좁힌 빈곳은 가장 가까운
+    /// 방향"). nil is returned only below `threshold` (too short a swipe) or
+    /// when `sectors` is empty.
     static func from(vector: CGVector,
                      sectors: [DirectionSector],
                      rotationOffset: Double,
@@ -119,7 +121,22 @@ enum GestureDirection: String, CaseIterable {
                 return sectorOrder[index]
             }
         }
-        return nil
+
+        // STEP 3: nearest-center fallback. Reached only when per-side
+        // narrowing has opened a gap that neither STEP1 nor STEP2 claimed —
+        // assign the angle to the sector whose center is closest so a narrowed
+        // direction never leaves a dead zone. With default sectors STEP2 tiles
+        // all 360°, so this never fires (legacy output is bit-identical). On a
+        // distance tie the earlier index in `sectorOrder` wins (strict `<`),
+        // matching STEP1's tie-break convention.
+        var nearest: (direction: GestureDirection, distance: Double)?
+        for index in 0..<min(sectors.count, sectorOrder.count) {
+            let delta = abs(signedAngularDistance(from: sectors[index].centerAngle, to: relative))
+            if nearest == nil || delta < nearest!.distance {
+                nearest = (sectorOrder[index], delta)
+            }
+        }
+        return nearest?.direction
     }
 
     private static func positiveModulo(_ value: Double, _ modulus: Double) -> Double {

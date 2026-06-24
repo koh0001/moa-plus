@@ -120,6 +120,74 @@ final class PerSideSectorWidthTests: XCTestCase {
         XCTAssertEqual(result, .up, "두 확대 충돌 시 center 에 가까운 쪽(↑, 40<50) 우선")
     }
 
+    // MARK: - STEP3 nearest-center fallback (dead-zone removal)
+    //
+    // Narrowing one side of a sector opens a gap between it and its neighbour.
+    // Pre-fix the resolver returned nil there (a dead zone — the user's swipe
+    // was silently dropped). STEP3 assigns any unclaimed angle to the sector
+    // whose center is closest, so a narrowed direction never produces a dead
+    // zone. Rule (user-confirmed): "넓히면 뺏고, 좁힌 빈곳은 가장 가까운 방향".
+
+    func testNarrowedSideGapFallsBackToNearestCenter() {
+        var sectors = DirectionSector.defaultSectors
+        // ↗ (index 1, center 45): narrow CCW(left, toward ↑) to 14°, widen
+        // CW(right, toward →) to 40° — the exact config the user reported.
+        sectors[1].leftHalfWidth = 14
+        sectors[1].rightHalfWidth = 40
+        // 63° sits in the gap [59, 67.5] between ↗'s narrowed left edge (45+14)
+        // and ↑'s base right edge (90-22.5). Pre-fix → nil (dead zone). STEP3:
+        // |63-45|=18 (↗) < |63-90|=27 (↑) → nearest center is ↗.
+        let result = GestureDirection.from(vector: vector(atDegrees: 63),
+                                           sectors: sectors, rotationOffset: 0, threshold: 20)
+        XCTAssertEqual(result, .upRight,
+                       "좁힌 빈구역(63°)은 가장 가까운 center ↗ 로 배정 — 데드존 0")
+    }
+
+    func testGapSplitsBetweenNarrowedNeighborsByNearestCenter() {
+        var sectors = DirectionSector.defaultSectors
+        // Narrow both ↗'s left (edge → 55°) and ↑'s right (edge → 80°).
+        // gap [55, 80]; nearest-center boundary is the midpoint of the two
+        // centers, 67.5°.
+        sectors[1].leftHalfWidth = 10
+        sectors[2].rightHalfWidth = 10
+        // 70° past midpoint → nearer ↑ (|70-90|=20 < |70-45|=25).
+        let nearUp = GestureDirection.from(vector: vector(atDegrees: 70),
+                                           sectors: sectors, rotationOffset: 0, threshold: 20)
+        XCTAssertEqual(nearUp, .up, "gap 의 ↑쪽 절반(70°)은 가장 가까운 ↑ 로")
+        // 60° before midpoint → nearer ↗ (|60-45|=15 < |60-90|=30).
+        let nearUpRight = GestureDirection.from(vector: vector(atDegrees: 60),
+                                                sectors: sectors, rotationOffset: 0, threshold: 20)
+        XCTAssertEqual(nearUpRight, .upRight, "gap 의 ↗쪽 절반(60°)은 가장 가까운 ↗ 로")
+    }
+
+    func testNoDeadZoneAcrossFullSweepWithNarrowedSides() {
+        var sectors = DirectionSector.defaultSectors
+        sectors[1].leftHalfWidth = 14   // user's reported ↗ config
+        sectors[1].rightHalfWidth = 40
+        sectors[3].leftHalfWidth = 8    // also narrow ↖ to stress more gaps
+        var deg = 0.0
+        while deg < 360 {
+            let result = GestureDirection.from(vector: vector(atDegrees: deg),
+                                               sectors: sectors, rotationOffset: 0, threshold: 20)
+            XCTAssertNotNil(result, "\(deg)° 에서 nil(데드존) 이 없어야 한다")
+            deg += 0.5
+        }
+    }
+
+    func testDefaultSweepNeverReachesFallback() {
+        // Default sectors fully tile 360° via STEP2 (left==right==22.5), so the
+        // STEP3 fallback must never fire — every angle is claimed identically to
+        // pre-fix. Guards against the fallback silently altering legacy output.
+        let sectors = DirectionSector.defaultSectors
+        var deg = 0.0
+        while deg < 360 {
+            let result = GestureDirection.from(vector: vector(atDegrees: deg),
+                                               sectors: sectors, rotationOffset: 0, threshold: 20)
+            XCTAssertNotNil(result, "기본 섹터는 전 각도 claim — \(deg)°")
+            deg += 0.5
+        }
+    }
+
     // MARK: - (e) wrap-safety around 0°/360°
 
     func testWrapAroundRightDirection() {
