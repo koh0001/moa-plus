@@ -84,28 +84,16 @@ class GestureAnalyzer {
     /// Sector ring with per-column rotation+delta adjustments folded in,
     /// ready to hand to `GestureDirection.from`.
     private var effectiveSectors: [DirectionSector] {
-        var sectors = settings.swipeProfile.sectors
+        let sectors = settings.swipeProfile.sectors
         guard columnId > 0 else { return sectors }
-        let iDelta = settings.verticalIWidthDelta(forColumn: columnId)
-        let euDelta = settings.horizontalEuWidthDelta(forColumn: columnId)
-        // ↗ (1) and ↖ (3) widen with the ㅣ delta; ↙ (5) and ↘ (7) widen
-        // with the ㅡ delta. Cardinals stay at their base widths and are
-        // shrunk implicitly by the diagonal-first priority in
-        // `GestureDirection.from`.
-        //
-        // Widen both per-side widths directly (not via `halfWidth`, whose
-        // `didSet` would reset any user-set asymmetry on these diagonals).
-        // `GestureDirection.from`'s per-side claim reads these — and
-        // `testColumn5SteepDiagonalStaysAsUpRight` depends on the result.
-        for index in [1, 3] where index < sectors.count {
-            sectors[index].leftHalfWidth += iDelta
-            sectors[index].rightHalfWidth += iDelta
-        }
-        for index in [5, 7] where index < sectors.count {
-            sectors[index].leftHalfWidth += euDelta
-            sectors[index].rightHalfWidth += euDelta
-        }
-        return sectors
+        // ↗(1)/↖(3) widen with the ㅣ delta; ↙(5)/↘(7) with the ㅡ delta —
+        // added to both per-side widths so any user asymmetry survives.
+        // Shared with the settings pie charts via `applyingDiagonalDeltas`
+        // so the visual can never drift from what `from()` actually claims
+        // (`testColumn5SteepDiagonalStaysAsUpRight` depends on the result).
+        return sectors.applyingDiagonalDeltas(
+            iDelta: settings.verticalIWidthDelta(forColumn: columnId),
+            euDelta: settings.horizontalEuWidthDelta(forColumn: columnId))
     }
 
     private var effectiveRotationOffset: Double {

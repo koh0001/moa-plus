@@ -284,16 +284,13 @@ extension DirectionPieChart {
         ]
         let symbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
 
-        return (0..<min(sectors.count, 8)).map { i in
-            var s = sectors[i]
-            // Apply ㅣ/ㅡ delta to diagonal sectors. Assigning `halfWidth`
-            // mirrors the delta into both sides via its didSet, so the per-side
-            // reads below already include it.
-            switch i {
-            case 1, 3: s.halfWidth += iDelta   // ↗, ↖
-            case 5, 7: s.halfWidth += euDelta   // ↙, ↘
-            default: break
-            }
+        // Apply the ㅣ/ㅡ deltas exactly the way the recogniser does (per-side,
+        // asymmetry-preserving). With deltas 0 this is a no-op, so the mapping /
+        // editor pies render the user's per-side widths unchanged.
+        let adjusted = sectors.applyingDiagonalDeltas(iDelta: iDelta, euDelta: euDelta)
+
+        return (0..<min(adjusted.count, 8)).map { i in
+            let s = adjusted[i]
             // Per-side wedge: CW edge = centre − rightHalfWidth (start),
             // CCW edge = centre + leftHalfWidth (end). Matches recognition.
             return (
@@ -320,8 +317,12 @@ extension DirectionPieChart {
         euDelta: Double
     ) -> [PieSlice] {
         let profile = settings.gestureSettings.swipeProfile
+        // Mirror GestureAnalyzer.effectiveRotationOffset: the global axis
+        // rotation applies on top of the per-column rotation, so the column
+        // preview shows the same ring the recogniser uses for this column.
         let bases = baseSlices(sectors: profile.sectors, profile: profile,
-                               rotationOffset: rotationOffset, iDelta: iDelta, euDelta: euDelta)
+                               rotationOffset: rotationOffset + profile.axisRotation,
+                               iDelta: iDelta, euDelta: euDelta)
         let fixedLabels = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
 
         return bases.enumerated().map { i, b in

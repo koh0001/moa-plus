@@ -245,3 +245,28 @@ extension DirectionSector {
     static let directionLabels = ["→ ㅏ", "↗ ㅣ", "↑ ㅗ", "↖", "← ㅓ", "↙", "↓ ㅜ", "↘ ㅡ"]
     static let directionSymbols = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"]
 }
+
+extension Array where Element == DirectionSector {
+    /// Applies per-column diagonal width deltas the way the recogniser does
+    /// (`GestureAnalyzer.effectiveSectors`): the ㅣ delta widens ↗(1)/↖(3) and
+    /// the ㅡ delta widens ↙(5)/↘(7). The delta is added to **both** per-side
+    /// widths so a user's left/right asymmetry survives — it never assigns
+    /// `halfWidth`, whose `didSet` would mirror-reset the two sides and wipe
+    /// that asymmetry. With both deltas 0 this is a no-op, so the mapping /
+    /// editor pies (which pass 0) render the exact per-side widths the user set.
+    ///
+    /// Shared by the recogniser and every settings pie chart so the visual and
+    /// the actual recognition can never drift apart.
+    func applyingDiagonalDeltas(iDelta: Double, euDelta: Double) -> [DirectionSector] {
+        var copy = self
+        for idx in [1, 3] where idx < copy.count {
+            copy[idx].leftHalfWidth += iDelta
+            copy[idx].rightHalfWidth += iDelta
+        }
+        for idx in [5, 7] where idx < copy.count {
+            copy[idx].leftHalfWidth += euDelta
+            copy[idx].rightHalfWidth += euDelta
+        }
+        return copy
+    }
+}

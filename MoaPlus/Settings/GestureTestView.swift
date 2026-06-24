@@ -661,23 +661,18 @@ private struct SectorOverlay: View {
             let cy = geo.size.height / 2
             let radius = min(geo.size.width, geo.size.height) / 2 - 8
 
+            // Apply the ㅣ/ㅡ deltas per-side (asymmetry-preserving) the same
+            // way the recogniser does, so the test canvas matches recognition.
+            let adjusted = sectors.applyingDiagonalDeltas(iDelta: iDelta, euDelta: euDelta)
             Canvas { ctx, _ in
                 let center = CGPoint(x: cx, y: cy)
                 for i in activeIndices {
-                    var s = sectors[i]
-                    if fourWay {
-                        s.halfWidth = 45
-                    } else {
-                        switch i {
-                        case 1, 3: s.halfWidth += iDelta
-                        case 5, 7: s.halfWidth += euDelta
-                        default: break
-                        }
-                    }
+                    var s = fourWay ? sectors[i] : adjusted[i]
+                    // Four-way: each cardinal spans a symmetric 90° quadrant;
+                    // assigning halfWidth mirrors both sides via didSet.
+                    if fourWay { s.halfWidth = 45 }
                     // Per-side wedge: CW edge = centre − rightHalfWidth (start),
-                    // CCW edge = centre + leftHalfWidth (end). `halfWidth`
-                    // assignments above mirror into both sides via didSet, so
-                    // four-way (45) and column deltas are already reflected.
+                    // CCW edge = centre + leftHalfWidth (end).
                     let startDeg = s.centerAngle - s.rightHalfWidth + rotationOffset
                     let endDeg = s.centerAngle + s.leftHalfWidth + rotationOffset
 

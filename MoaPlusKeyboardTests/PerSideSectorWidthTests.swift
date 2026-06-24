@@ -232,6 +232,46 @@ final class PerSideSectorWidthTests: XCTestCase {
         XCTAssertEqual(result, .right, "4방향 경로는 per-side 무시, 가까운 카디널 → 로 스냅")
     }
 
+    // MARK: - applyingDiagonalDeltas: shared widen helper (engine ↔ pie parity)
+    //
+    // The recogniser (`GestureAnalyzer.effectiveSectors`) and every settings
+    // pie chart must widen diagonal sectors the SAME way: add the ㅣ/ㅡ column
+    // delta to BOTH per-side widths, never touching `halfWidth` (whose didSet
+    // mirror-resets the sides and silently destroys a user's left/right
+    // asymmetry — the root cause of the "편집 파이 ↔ 매핑 파이 불일치" report).
+
+    func testApplyingDiagonalDeltasPreservesAsymmetry() {
+        var sectors = DirectionSector.defaultSectors
+        sectors[1].leftHalfWidth = 14    // ↗ asymmetric (user's reported config)
+        sectors[1].rightHalfWidth = 40
+        let out = sectors.applyingDiagonalDeltas(iDelta: 5, euDelta: 0)
+        XCTAssertEqual(out[1].leftHalfWidth, 19, accuracy: 1e-9, "왼쪽 14+5=19, 비대칭 보존")
+        XCTAssertEqual(out[1].rightHalfWidth, 45, accuracy: 1e-9, "오른쪽 40+5=45, 비대칭 보존")
+        XCTAssertEqual(out[1].halfWidth, 22.5, accuracy: 1e-9,
+                       "halfWidth 는 건드리지 않음 (didSet 미발동)")
+    }
+
+    func testApplyingZeroDeltasIsNoOp() {
+        var sectors = DirectionSector.defaultSectors
+        sectors[1].leftHalfWidth = 14
+        sectors[1].rightHalfWidth = 40
+        sectors[3].leftHalfWidth = 8
+        let out = sectors.applyingDiagonalDeltas(iDelta: 0, euDelta: 0)
+        XCTAssertEqual(out, sectors,
+                       "delta 0 은 no-op — 매핑 파이가 편집 파이와 동일한 per-side 폭을 그린다")
+    }
+
+    func testApplyingDiagonalDeltasMapsCorrectDiagonalIndices() {
+        let out = DirectionSector.defaultSectors.applyingDiagonalDeltas(iDelta: 5, euDelta: 3)
+        // ↗(1)/↖(3) widen with ㅣ delta; ↙(5)/↘(7) with ㅡ delta; cardinals untouched.
+        XCTAssertEqual(out[1].leftHalfWidth, 27.5, accuracy: 1e-9)  // 22.5+5
+        XCTAssertEqual(out[3].rightHalfWidth, 27.5, accuracy: 1e-9)
+        XCTAssertEqual(out[5].leftHalfWidth, 25.5, accuracy: 1e-9)  // 22.5+3
+        XCTAssertEqual(out[7].rightHalfWidth, 25.5, accuracy: 1e-9)
+        XCTAssertEqual(out[0].leftHalfWidth, 22.5, accuracy: 1e-9, "→ 카디널 불변")
+        XCTAssertEqual(out[2].rightHalfWidth, 22.5, accuracy: 1e-9, "↑ 카디널 불변")
+    }
+
     // MARK: - Codable: legacy (no fields) round-trips symmetric
 
     func testLegacyDirectionSectorJSONDecodesSymmetric() throws {
