@@ -1,8 +1,19 @@
-# 핸드오프 — 자음 대각선 ㅣ/ㅡ 파생모음 (GestureAnalyzer 근본 fix 필요)
+# 핸드오프 — 자음 대각선 ㅣ/ㅡ 파생모음 (GestureAnalyzer 근본 fix ✅ 완료)
 
-> 작성 2026-06-25. 새 세션이 콜드스타트로 이어가도록.
+> 작성 2026-06-25. fix 적용·시뮬 전체 유닛테스트 통과. 남은 것 = 실기기 QA + main 머지.
 
-## 0. TL;DR
+## ✅ FIX 완료 (2026-06-25)
+- **fix(split5, `Engine/GestureAnalyzer.swift`):** `analyzeLatestMovement` referencePoint 분리.
+  - 방향값 = 최근 window(`effectiveReversalThreshold` 호길이, `windowReferenceIndex`) 궤적으로 판정 → 흡수/유령방향 제거.
+  - turn 변위 = 직전 stroke 마지막점(`strokeAnchorPoint` = turn 지점)부터 측정 → 긴 진입 stroke의 누적 부풀림 배제.
+  - 비reversal turn은 `effectiveThreshold` 바닥 게이트(정수직 ↗ wobble/끝휨 차단 = ㅗ→ㅘ 방지), reversal은 낮은 임계 유지(ㅛㅠ 촘촘 반전 보존).
+  - public API(addPoint/finalizeGesture/reset) 무변경. 신규 변수 `strokeAnchorPoint`, 헬퍼 `windowReferenceIndex(arcLength:)`.
+- **검증:** Python 정밀 포팅으로 회귀 41 + 신규 11 전부 통과(점밀도 4~80 무관, 곡선 robustness current 대비 대폭 개선) → `xcodebuild test -only-testing:MoaPlusKeyboardTests` 전체 `** TEST SUCCEEDED **`(실패 0). 통합 `driveKeyMulti` 15개(`KeyboardViewModelVowelDragTests`) + 직접 진단 3개(`GestureAnalyzerTests`) 추가. "기"→"가", ↙↑="고", 21모음 파생 전부 GREEN.
+- **남은 것:** 실기기 QA(⌘R → 자음 ㄱ ↗→="가", ↙↑="고" 등), main 머지(ci 미머지 누적 `e3f71c7`~`f14d268` + 이 fix 함께).
+
+---
+
+## 0. TL;DR (작업 당시 기록 — 아래는 히스토리)
 - 브랜치 `ci/cli-test-and-actions`. main 미머지 ci 누적: `e3f71c7`(trie skip 오류허용)·`3305fef`/`01f05cf`(spec)·`1240181`(자음 대각선 파생 헬퍼).
 - **자음 대각선 ㅣ/ㅡ 진입 후 파생모음 기능 = 실기기 미작동**(ㅢ만 됨). 헬퍼 코드는 맞으나 **GestureAnalyzer가 directions를 의도와 다르게 생성**하는 게 root cause. systematic-debugging으로 확정.
 - 다음: GestureAnalyzer 근본 fix (사용자 승인). **단 미묘·회귀 위험 큼 → spec→autoplan→TDD 권장.**

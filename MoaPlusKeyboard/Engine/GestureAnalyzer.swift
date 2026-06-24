@@ -10,7 +10,12 @@ class GestureAnalyzer {
     private var touchPoints: [CGPoint] = []
     private var directions: [GestureDirection] = []
     private var directionMagnitudes: [CGFloat] = []
+    /// 현재 stroke가 처음 등록된 지점(누적 magnitude/finalize 기준).
     private var lastDirectionChangePoint: CGPoint?
+    /// 현재 stroke에서 마지막으로 같은 방향이 관측된 점. 방향이 바뀌면 이 점이
+    /// 곧 "turn 지점"이 되어 새 stroke 변위의 측정 기준이 된다. 같은 방향이
+    /// 이어질 때마다 최근 점으로 전진한다.
+    private var strokeAnchorPoint: CGPoint?
 
     private let threshold: CGFloat
     private let reversalThreshold: CGFloat
@@ -129,6 +134,7 @@ class GestureAnalyzer {
         directions.removeAll(keepingCapacity: true)
         directionMagnitudes.removeAll(keepingCapacity: true)
         lastDirectionChangePoint = nil
+        strokeAnchorPoint = nil
     }
 
     func addPoint(_ point: CGPoint) {
@@ -145,84 +151,119 @@ class GestureAnalyzer {
     }
 
     private func analyzeLatestMovement() {
-        guard touchPoints.count >= 2 else { return }
-
-        guard let referencePoint = lastDirectionChangePoint ?? touchPoints.first,
-              let currentPoint = touchPoints.last else { return }
-
-        let vector = CGVector(
-            dx: currentPoint.x - referencePoint.x,
-            dy: currentPoint.y - referencePoint.y
-        )
-
-        let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
+        guard touchPoints.count >= 2,
+              let currentPoint = touchPoints.last,
+              let startPoint = touchPoints.first else { return }
 
         let sectors = effectiveSectors
         let rotation = effectiveRotationOffset
         let fourWay = settings.swipeProfile.fourWayMode || forceCardinalOnly
         let fillGap = settings.swipeProfile.gapFillNearest
 
-        // Try detecting direction with effective threshold first (respects
-        // settings/column overrides, including rotation and ㅣ/ㅡ width deltas).
-        var newDirection = GestureDirection.from(
-            vector: vector,
-            sectors: sectors,
-            rotationOffset: rotation,
-            threshold: effectiveThreshold,
-            fourWay: fourWay,
-            fillGap: fillGap
+        // 방향 값은 "최근 window"(reversal 거리만큼의 궤적)로 판정한다. 먼 stroke
+        // 시작점 기준이 아니라 직전 짧은 궤적을 보므로, 긴 진입 stroke(자음 대각선
+        // ↗/↙)에 이은 후속 카디널이 진입 방향에 흡수되거나(↗→ → ↗) 전환 중간에
+        // 엉뚱한 방향이 끼어드는(↙↑ → ↙←↑) 왜곡이 사라진다.
+        let windowRef = touchPoints[windowReferenceIndex(arcLength: effectiveDirectionWindow)]
+        let dirVector = CGVector(
+            dx: currentPoint.x - windowRef.x,
+            dy: currentPoint.y - windowRef.y
         )
 
-        let effReversal = effectiveReversalThreshold
+        // window 벡터는 길이가 짧으므로 reversal 절반 임계로 방향만 분류한다. 실제
+        // "등록" 여부는 아래의 누적/turn 변위 게이트가 결정한다.
+        guard let newDirection = GestureDirection.from(
+            vector: dirVector,
+            sectors: sectors,
+            rotationOffset: rotation,
+            threshold: effectiveDirectionThreshold,
+            fourWay: fourWay,
+            fillGap: fillGap
+        ) else { return }
 
-        // If standard threshold fails, try lower reversal threshold for large-angle
-        // turns. sensitivity 0 keeps this to exact opposites (기존 isOpposite 동작);
-        // higher sensitivities also admit near-opposite / right-angle turns so
-        // multi-stroke vowels register without returning to the origin.
-        if newDirection == nil, let lastDirection = directions.last, magnitude >= effReversal {
-            if let candidate = GestureDirection.from(
-                vector: vector,
-                sectors: sectors,
-                rotationOffset: rotation,
-                threshold: effReversal,
-                fourWay: fourWay,
-                fillGap: fillGap
-            ),
-               qualifiesAsTurn(gap: candidate.angularGap(to: lastDirection)) {
-                newDirection = candidate
-            }
-        }
-
-        guard let newDirection else { return }
-
-        let changeThreshold = effectiveDirectionChangeThreshold
-
-        // Check if this is a new direction or continuation
         if let lastDirection = directions.last {
-            // Only add if direction changed
-            if newDirection != lastDirection {
-                let gap = newDirection.angularGap(to: lastDirection)
-                let turnThreshold = turnRegistrationThreshold(
-                    gap: gap, changeThreshold: changeThreshold, reversal: effReversal
-                )
-                // 진폭 비율 가드: 새 turn 스트로크가 직전 스트로크 진폭 대비 너무
-                // 작으면(손떨림) 등록하지 않는다 — 단일 모음(ㅗ/ㅜ/ㅏ/ㅓ)이 복합
-                // 모음으로 과승격되는 것을 막는다. sensitivity 0 에서는 비율 0 이라
-                // 가드가 비활성 → 기존 동작 보존.
-                let prevMagnitude = directionMagnitudes.last ?? magnitude
-                let passesAmplitudeGuard = magnitude >= prevMagnitude * minTurnAmplitudeRatio
-                if magnitude >= turnThreshold && passesAmplitudeGuard {
-                    directions.append(newDirection)
-                    directionMagnitudes.append(magnitude)
-                    lastDirectionChangePoint = currentPoint
-                }
+            if newDirection == lastDirection {
+                // 같은 방향 연장: 다음 turn 측정 기준점(anchor)을 최근 점으로 전진.
+                strokeAnchorPoint = currentPoint
+                return
+            }
+
+            let gap = newDirection.angularGap(to: lastDirection)
+            let changeThreshold = effectiveDirectionChangeThreshold
+            let effReversal = effectiveReversalThreshold
+            let baseTurn = turnRegistrationThreshold(
+                gap: gap, changeThreshold: changeThreshold, reversal: effReversal
+            )
+            // reversal(왕복)은 낮은 임계로 즉시 등록해 촘촘한 반전(ㅛ ↑↓↑, ㅠ ↓↑↓)을
+            // 보존한다. 비reversal(직각/완만 turn)은 full-swipe 임계를 바닥으로 둬,
+            // 정수직 stroke 안의 작은 ↗ 흔들림이나 끝부분 휨이 새 stroke 로 과등록
+            // 되는 것을 막는다(ㅗ → ㅘ 오인식 방지).
+            let turnThreshold = qualifiesAsTurn(gap: gap)
+                ? baseTurn
+                : max(baseTurn, effectiveThreshold)
+
+            // turn 변위는 "직전 stroke 의 마지막 관측점(= turn 지점)"부터 잰다. 새
+            // stroke 자체 길이만 보므로, 긴 진입 stroke 뒤의 누적 부풀림 없이 작은
+            // 곁가지(wobble)는 미달로 버리고 의도된 후속만 등록한다. 방향이 원래대로
+            // 복귀하면 위의 `newDirection == lastDirection` 분기에서 anchor 가 전진해
+            // 곁가지가 자연히 무시된다.
+            let anchor = strokeAnchorPoint ?? lastDirectionChangePoint ?? startPoint
+            let dx = currentPoint.x - anchor.x
+            let dy = currentPoint.y - anchor.y
+            let displacement = sqrt(dx * dx + dy * dy)
+
+            // 진폭 비율 가드: sensitivity 0 에서는 비율 0 이라 비활성(기존 동작 보존).
+            let prevMagnitude = directionMagnitudes.last ?? displacement
+            let passesAmplitudeGuard = displacement >= prevMagnitude * minTurnAmplitudeRatio
+            if displacement >= turnThreshold && passesAmplitudeGuard {
+                directions.append(newDirection)
+                directionMagnitudes.append(displacement)
+                lastDirectionChangePoint = currentPoint
+                strokeAnchorPoint = currentPoint
             }
         } else {
-            // First direction
-            directions.append(newDirection)
-            directionMagnitudes.append(magnitude)
-            lastDirectionChangePoint = currentPoint
+            // 첫 방향: 시작점부터 누적 변위가 full swipe 임계를 넘어야 등록(탭/짧은
+            // 떨림은 방향으로 잡지 않음).
+            let dx = currentPoint.x - startPoint.x
+            let dy = currentPoint.y - startPoint.y
+            let displacement = sqrt(dx * dx + dy * dy)
+            if displacement >= effectiveThreshold {
+                directions.append(newDirection)
+                directionMagnitudes.append(displacement)
+                lastDirectionChangePoint = currentPoint
+                strokeAnchorPoint = currentPoint
+            }
         }
+    }
+
+    /// 현재 점에서 궤적을 거슬러 올라가 누적 호 길이가 `arcLength` 이상이 되는
+    /// 가장 가까운 과거 점의 인덱스. 못 채우면(아직 짧으면) 시작점(0). 점 밀도와
+    /// 무관하게 "최근 arcLength 만큼의 궤적"을 가리키므로 기기/터치 샘플링 레이트가
+    /// 달라도 방향 판정이 일관된다.
+    private func windowReferenceIndex(arcLength: CGFloat) -> Int {
+        guard touchPoints.count >= 2 else { return 0 }
+        var accumulated: CGFloat = 0
+        var index = touchPoints.count - 1
+        while index > 0 {
+            let p0 = touchPoints[index - 1]
+            let p1 = touchPoints[index]
+            let dx = p1.x - p0.x
+            let dy = p1.y - p0.y
+            accumulated += sqrt(dx * dx + dy * dy)
+            index -= 1
+            if accumulated >= arcLength { return index }
+        }
+        return 0
+    }
+
+    /// 방향 판정용 window 호 길이(= reversal 거리). 최근 이만큼의 궤적으로 방향을
+    /// 본다. 컬럼/keyWidth 보정이 이미 반영된 effectiveReversalThreshold 를 재사용.
+    private var effectiveDirectionWindow: CGFloat { effectiveReversalThreshold }
+
+    /// window 벡터의 방향 분류 임계. window 길이의 절반이라 직선에 가까운 궤적은
+    /// 통과하고 거의 정지한 구간은 무시한다(최소 1pt 가드).
+    private var effectiveDirectionThreshold: CGFloat {
+        max(effectiveReversalThreshold * 0.5, 1)
     }
 
     /// 2차(낮은 reversal 임계) 방향 분류를 허용할 turn 인지 — sensitivity 기반.

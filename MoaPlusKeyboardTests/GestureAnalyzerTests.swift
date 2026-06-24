@@ -407,6 +407,54 @@ final class GestureAnalyzerTests: XCTestCase {
         XCTAssertEqual(gs.directionChangeThreshold, 15, "기존 필드 보존")
     }
 
+    // MARK: - 자음 대각선 진입 후 후속 stroke 정확도 (referencePoint 분리 fix)
+    //
+    // 긴 대각선 진입 stroke(↗/↙) 뒤의 후속 카디널이 진입 방향에 흡수되거나
+    // (↗→ → [.upRight]) 전환 중간에 유령 방향이 끼어드는(↙↑ → [.downLeft,.left,.up])
+    // root cause 회귀 테스트. driveKeyMulti 와 동일한 8점 점열을 직접 주입한다.
+
+    /// driveKeyMulti 와 동일: 시작점(100,100) + 각 stroke 4보간점.
+    private func feedStrokes(_ analyzer: GestureAnalyzer, _ strokes: [(CGFloat, CGFloat)]) {
+        var p = CGPoint(x: 100, y: 100)
+        analyzer.addPoint(p)
+        for s in strokes {
+            for i in 1...4 {
+                let f = CGFloat(i) / 4
+                analyzer.addPoint(CGPoint(x: p.x + s.0 * f, y: p.y + s.1 * f))
+            }
+            p = CGPoint(x: p.x + s.0, y: p.y + s.1)
+        }
+    }
+
+    func testConsonantDiagonalUpRightThenRightKeepsBothStrokes() {
+        // col 4 (ㄱ): ↗ 70pt 진입 후 → 70pt. 후속 → 가 ↗ 에 흡수되지 않아야 한다.
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 4)
+        feedStrokes(analyzer, [(70, -70), (70, 0)])
+        XCTAssertEqual(
+            analyzer.finalizeGesture(), [.upRight, .right],
+            "↗ 진입 후 → 는 흡수되지 않고 별도 stroke (자음 대각선 ㅏ 파생)"
+        )
+    }
+
+    func testConsonantDiagonalDownLeftThenUpHasNoPhantomLeft() {
+        // col 4 (ㄱ): ↙ 70pt 진입 후 ↑ 70pt. 전환 중간에 유령 ← 가 끼지 않아야 한다.
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 4)
+        feedStrokes(analyzer, [(-70, 70), (0, -70)])
+        XCTAssertEqual(
+            analyzer.finalizeGesture(), [.downLeft, .up],
+            "↙ 진입 후 ↑ 전환에 유령 ← 가 끼지 않음 (ㅗ 파생, 기존 ↙←↑ 왜곡 제거)"
+        )
+    }
+
+    func testConsonantDiagonalUpRightThenUpKeepsBothStrokes() {
+        let analyzer = GestureAnalyzer(settings: .default, columnId: 4)
+        feedStrokes(analyzer, [(70, -70), (0, -70)])
+        XCTAssertEqual(
+            analyzer.finalizeGesture(), [.upRight, .up],
+            "↗ 진입 후 ↑ 는 별도 stroke (ㅕ 파생)"
+        )
+    }
+
     // MARK: - isOpposite Tests
 
     func testIsOpposite() {
