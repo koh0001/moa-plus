@@ -81,7 +81,7 @@ struct TypingPracticeView: View {
                 .focused($isInputFocused)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-                .onChange(of: inputText) { _ in
+                .onChange(of: inputText) {
                     checkLineCompletion()
                 }
 

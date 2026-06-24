@@ -239,7 +239,7 @@ struct KeyboardView: View {
                 }
                 .background(keyboardBackground)
                 .onAppear { viewModel.setCenterKeyWidth(centerKeyWidth) }
-                .onChange(of: centerKeyWidth) { newValue in
+                .onChange(of: centerKeyWidth) { _, newValue in
                     viewModel.setCenterKeyWidth(newValue)
                 }
         }
@@ -250,7 +250,7 @@ struct KeyboardView: View {
         // ignores this — the value is only consumed in preview mode.
         .coordinateSpace(name: "keyboardPreview")
         .onAppear { loadBackgroundIfNeeded() }
-        .onChange(of: settings.themeSettings.backgroundImageId) { _ in loadBackgroundIfNeeded() }
+        .onChange(of: settings.themeSettings.backgroundImageId) { loadBackgroundIfNeeded() }
     }
 
     private func loadBackgroundIfNeeded() {

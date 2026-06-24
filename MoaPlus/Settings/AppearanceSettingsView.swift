@@ -112,7 +112,7 @@ struct AppearanceSettingsView: View {
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
                     Label("사진 선택", systemImage: "photo.on.rectangle")
                 }
-                .onChange(of: selectedPhoto) { newItem in
+                .onChange(of: selectedPhoto) { _, newItem in
                     Task {
                         guard let data = try? await newItem?.loadTransferable(type: Data.self),
                               let image = UIImage(data: data) else { return }
@@ -299,7 +299,6 @@ struct KeyboardPreviewCard: View {
                 // Same formula as KeyboardMetrics: side = center * sideRatio
                 let ckw = innerW / (sideRatio * 2 + 5 + sp * 6 / (innerW / (sideRatio * 2 + 5)))
                 let sw = ckw * sideRatio
-                let bsw = sw + ckw + sp
                 let rowH = (h - pad * 2 - sp * 4) / 5  // 4 key rows + 1 func row
 
                 VStack(spacing: sp) {
