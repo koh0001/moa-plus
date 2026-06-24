@@ -85,9 +85,31 @@ enum TutorialContent {
             tip: "자유롭게 본인 이름도 입력해 보세요!"
         ),
 
-        // Stage 3: Y-Vowels
+        // Stage 3: Consonant diagonal entry → derived vowels (v1.7)
         TutorialStage(
             id: 3,
+            title: "자음에서 바로 모음 (대각선 진입)",
+            description: "ㅣ/ㅡ를 대각선으로 시작한 뒤 멈추지 않고 이어 그으면 모음이 완성됩니다.\n↗→ = ㅏ, ↙↑ = ㅗ",
+            vowelGestures: [
+                VowelGesture(vowel: "ㅏ", directions: ["↗", "→"], label: "오른쪽위→오른쪽 (ㅣ 진입 후 →)"),
+                VowelGesture(vowel: "ㅓ", directions: ["↖", "←"], label: "왼쪽위→왼쪽 (ㅣ 진입 후 ←)"),
+                VowelGesture(vowel: "ㅗ", directions: ["↙", "↑"], label: "왼쪽아래→위 (ㅡ 진입 후 ↑)"),
+                VowelGesture(vowel: "ㅜ", directions: ["↙", "↓"], label: "왼쪽아래→아래 (ㅡ 진입 후 ↓)"),
+                VowelGesture(vowel: "ㅘ", directions: ["↙", "↑", "→"], label: "ㅡ 진입→위→오른쪽"),
+                VowelGesture(vowel: "ㅟ", directions: ["↙", "↓", "→"], label: "ㅡ 진입→아래→오른쪽"),
+            ],
+            practiceLines: [
+                "가거고구",
+                "고기",
+                "거기",
+                "과자",
+            ],
+            tip: "대각선으로 시작해도 괜찮아요 — ㅣ/ㅡ 방향으로 떠난 뒤 원하는 모음 방향으로 자연스럽게 이어 그으면 됩니다."
+        ),
+
+        // Stage 4: Y-Vowels
+        TutorialStage(
+            id: 4,
             title: "빠른 모음 (왕복 긋기)",
             description: "같은 방향을 왕복하면 Y-모음이 됩니다.\n→←→ = ㅑ, ↑↓↑ = ㅛ",
             vowelGestures: [
@@ -105,9 +127,9 @@ enum TutorialContent {
             tip: "리듬감 있게 긋기 — 왕복을 부드럽게 하면 잘 인식됩니다."
         ),
 
-        // Stage 4: Common compound vowels
+        // Stage 5: Common compound vowels
         TutorialStage(
-            id: 4,
+            id: 5,
             title: "일상 속 복합 모음",
             description: "방향을 꺾으면 복합 모음이 만들어집니다.",
             vowelGestures: [
@@ -128,9 +150,9 @@ enum TutorialContent {
             tip: "ㅐ(→←)와 ㅔ(←→)는 시작 방향이 반대입니다."
         ),
 
-        // Stage 5: Rare compound vowels
+        // Stage 6: Rare compound vowels
         TutorialStage(
-            id: 5,
+            id: 6,
             title: "나머지 모음 완성",
             description: "자주 쓰이진 않지만, 알아두면 좋은 모음들입니다.",
             vowelGestures: [
@@ -148,9 +170,9 @@ enum TutorialContent {
             tip: "ㅒ와 ㅖ는 ㅐ/ㅔ를 두 번 왕복하면 됩니다."
         ),
 
-        // Stage 6: Long-press, space drag, shortcuts
+        // Stage 7: Long-press, space drag, shortcuts
         TutorialStage(
-            id: 6,
+            id: 7,
             title: "보조 입력 — 숫자, 커서, 단축어",
             description: "자음 키를 길게 누르면 숫자와 기호가 입력됩니다. 그대로 드래그하면 다른 후보를 선택할 수 있어요.\n\n스페이스바를 좌우로 드래그하면 커서가 한 글자씩 이동합니다.\n\n설정에서 단축어를 등록하면 자음 몇 개로 긴 문장을 입력할 수 있어요. 같은 글자로 시작하는 단축어가 여러 개면 후보 바에서 골라 쓸 수 있고, 입력 직후 백스페이스를 한 번 누르면 원래 글자로 되돌립니다.",
             practiceLines: [
@@ -160,9 +182,9 @@ enum TutorialContent {
             tip: "예: ㅇㅎ + 스페이스 → '확인했습니다' (단축어 설정 후)"
         ),
 
-        // Stage 7: English mode & caps lock
+        // Stage 8: English mode & caps lock
         TutorialStage(
-            id: 7,
+            id: 8,
             title: "영문 모드 & Caps Lock",
             description: "키보드 하단의 한/영 키를 누르면 영문 QWERTY 모드로 전환됩니다.\n123 키를 누르면 숫자·기호 모드입니다.\n\n영문 모드의 Shift 키:\n• 한 번 탭 → 다음 한 글자만 대문자\n• 더블탭 또는 길게 누르기 → Caps Lock (대문자 고정). 다시 길게 누르면 풀립니다.",
             practiceLines: [
@@ -173,9 +195,9 @@ enum TutorialContent {
             tip: "한↔영 / 123 / 한글은 같은 자리의 모드 키로 순환됩니다."
         ),
 
-        // Stage 8: Real sentences
+        // Stage 9: Real sentences
         TutorialStage(
-            id: 8,
+            id: 9,
             title: "실전 문장 연습",
             description: "지금까지 배운 모든 제스처를 활용해 문장을 입력해보세요.\n틀려도 괜찮아요. 연습하면 빨라집니다!",
             practiceLines: [

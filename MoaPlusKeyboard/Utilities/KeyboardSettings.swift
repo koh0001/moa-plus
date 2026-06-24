@@ -32,6 +32,7 @@ final class KeyboardSettings: ObservableObject {
         static let firstLaunchModalShown = "firstLaunchModalShown"
         static let rememberLastKeyboardMode = "rememberLastKeyboardMode"
         static let lastKeyboardLetterMode = "lastKeyboardLetterMode"
+        static let lastSeenWhatsNewVersion = "lastSeenWhatsNewVersion"
     }
 
     /// Shared UserDefaults (App Group) with fallback to standard
@@ -162,6 +163,14 @@ final class KeyboardSettings: ObservableObject {
     /// Stored as a raw string ("korean" / "english") to keep KeyboardSettings independent of KeyboardMode types.
     @Published var lastKeyboardLetterMode: String = "korean" {
         didSet { guard !isLoading else { return }; writePrimitive(lastKeyboardLetterMode, forKey: Keys.lastKeyboardLetterMode) }
+    }
+
+    /// 마지막으로 "새로운 기능" 모달을 보여준 앱 버전(CFBundleShortVersionString).
+    /// 현재 버전과 다르면 업데이트한 기존 사용자에게 모달을 1회 표시한다.
+    /// 신규 사용자는 FirstLaunch 모달만 보고 이 값을 현재 버전으로 미리 set 해
+    /// What's New 모달을 건너뛴다(이미 모든 기능이 처음이므로).
+    @Published var lastSeenWhatsNewVersion: String = "" {
+        didSet { guard !isLoading else { return }; writePrimitive(lastSeenWhatsNewVersion, forKey: Keys.lastSeenWhatsNewVersion) }
     }
 
     /// Computed repeat interval from speed setting
@@ -302,6 +311,7 @@ final class KeyboardSettings: ObservableObject {
         firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
         rememberLastKeyboardMode = defaults.bool(forKey: Keys.rememberLastKeyboardMode)
         lastKeyboardLetterMode = defaults.string(forKey: Keys.lastKeyboardLetterMode) ?? "korean"
+        lastSeenWhatsNewVersion = defaults.string(forKey: Keys.lastSeenWhatsNewVersion) ?? ""
     }
 
     private func save<T: Encodable>(_ value: T, forKey key: String) {
@@ -354,6 +364,7 @@ final class KeyboardSettings: ObservableObject {
         firstLaunchModalShown = false
         rememberLastKeyboardMode = false
         lastKeyboardLetterMode = "korean"
+        lastSeenWhatsNewVersion = ""
     }
 
     /// Reset gesture settings only

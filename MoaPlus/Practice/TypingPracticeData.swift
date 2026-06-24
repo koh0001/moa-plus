@@ -394,6 +394,25 @@ enum TypingPracticeContent {
             ]
         ),
 
+        // MARK: - 자음 대각선 진입 모음 (자음에서 ㅣ/ㅡ 방향으로 시작)
+
+        TypingPracticeItem(
+            id: 34,
+            title: "자음 대각선 모음 (ㅣ/ㅡ 진입)",
+            author: "모아+ 연습",
+            category: .vowel,
+            lines: [
+                "가",   // ㄱ ↗(ㅣ) → = ㅏ
+                "거",   // ㄱ ↖(ㅣ) ← = ㅓ
+                "고",   // ㄱ ↙(ㅡ) ↑ = ㅗ
+                "구",   // ㄱ ↙(ㅡ) ↓ = ㅜ
+                "과",   // ㄱ ↙(ㅡ) ↑→ = ㅘ
+                "귀",   // ㄱ ↙(ㅡ) ↓→ = ㅟ
+                "고기",
+                "거기",
+            ]
+        ),
+
         // MARK: - 영문 입력 (PR E3 / F / G2 / G17)
 
         TypingPracticeItem(

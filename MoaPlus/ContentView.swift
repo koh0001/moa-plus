@@ -5,6 +5,7 @@ struct ContentView: View {
     private let accentBlue = Color(red: 0.26, green: 0.38, blue: 0.93)
 
     @State private var showFirstLaunchModal = false
+    @State private var showWhatsNewModal = false
 
     var body: some View {
         NavigationStack {
@@ -99,15 +100,36 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear {
-            if !KeyboardSettings.shared.firstLaunchModalShown {
+            let settings = KeyboardSettings.shared
+            if !settings.firstLaunchModalShown {
+                // 신규 사용자: 레이아웃 선택 모달만 보여주고, "새로운 기능" 모달은
+                // 건너뛴다(이미 모든 기능이 처음이므로). lastSeen 을 현재 버전으로
+                // 미리 기록해 다음 실행에서도 What's New 가 뜨지 않게 한다.
+                if settings.lastSeenWhatsNewVersion != Self.appVersion {
+                    settings.lastSeenWhatsNewVersion = Self.appVersion
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     showFirstLaunchModal = true
+                }
+            } else if settings.lastSeenWhatsNewVersion != Self.appVersion {
+                // 업데이트한 기존 사용자: "새로운 기능" 모달을 1회 표시.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showWhatsNewModal = true
                 }
             }
         }
         .sheet(isPresented: $showFirstLaunchModal) {
             FirstLaunchLayoutModalView()
         }
+        .sheet(isPresented: $showWhatsNewModal) {
+            NewFeaturesModalView()
+        }
+    }
+
+    /// 현재 앱 버전. `NewFeaturesModalView.appVersion` 과 같은 값을 써야 모달이
+    /// 닫힌 뒤 재표시되지 않는다.
+    private static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.7"
     }
 }
 
