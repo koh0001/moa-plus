@@ -17,6 +17,44 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
         super.tearDown()
     }
 
+    // MARK: - 자음 대각선 진입 파생 (spec 2026-06-25)
+    // 자음 키에서 ↗↖=ㅣ, ↙↘=ㅡ 로 시작한 뒤 후속 방향으로 천지인 파생.
+
+    func test_consonantDiagonal_iStart_base() {
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .right]), .ㅏ)  // ↗ㅣ→
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upLeft, .left]), .ㅓ)    // ↖ㅣ←
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .up]), .ㅕ)     // ↗ㅣ↑
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .down]), .ㅑ)   // ↗ㅣ↓
+    }
+
+    func test_consonantDiagonal_iStart_compound() {
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .right, .left]), .ㅐ)  // ↗ㅣ→←
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upLeft, .left, .right]), .ㅔ)   // ↖ㅣ←→
+    }
+
+    func test_consonantDiagonal_euStart_base() {
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up]), .ㅗ)    // ↙ㅡ↑
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down]), .ㅜ)  // ↙ㅡ↓
+    }
+
+    func test_consonantDiagonal_euStart_compound() {
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .right]), .ㅘ)  // ↙ㅡ↑→
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .left]), .ㅚ)   // ↙ㅡ↑←
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .left]), .ㅝ) // ↙ㅡ↓←
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .right]), .ㅟ)// ↙ㅡ↓→
+    }
+
+    func test_consonantDiagonal_eui() {
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downRight, .upLeft]), .ㅢ)  // ↘ㅡ↖
+        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .upRight]), .ㅢ)  // ↙ㅡ↗
+    }
+
+    func test_consonantDiagonal_soloAndCardinalReturnNil() {
+        XCTAssertNil(vm.resolveConsonantDiagonalVowel([.upRight]))      // 단독 대각선 → 폴백
+        XCTAssertNil(vm.resolveConsonantDiagonalVowel([.downRight]))    // 단독 → 폴백
+        XCTAssertNil(vm.resolveConsonantDiagonalVowel([.right, .left])) // 카디널 시작 → 폴백
+    }
+
     // MARK: - Multi-stroke vowel drag (PR G14)
 
     func test_dashUpRight_yieldsWa() {

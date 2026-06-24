@@ -844,8 +844,9 @@ class KeyboardViewModel: ObservableObject {
                 // Gesture completed - input consonant + vowel
                 inputConsonant(consonant)
 
-                let resolution = vowelResolver.resolve(directions: directions)
-                if let vowel = resolution.vowel {
+                let vowel = resolveConsonantDiagonalVowel(directions)
+                    ?? vowelResolver.resolve(directions: directions).vowel
+                if let vowel {
                     inputVowel(vowel)
                 }
             }
@@ -914,7 +915,8 @@ class KeyboardViewModel: ObservableObject {
            case .vowelPrimitive(let primitive) = content {
             return resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
         }
-        return vowelResolver.resolve(directions: directions).vowel
+        return resolveConsonantDiagonalVowel(directions)
+            ?? vowelResolver.resolve(directions: directions).vowel
     }
 
     func resolveVowelFromPrimitiveDrag(primitive: VowelPrimitiveType, directions: [GestureDirection]) -> Jungseong? {
@@ -935,6 +937,22 @@ class KeyboardViewModel: ObservableObject {
             }
         }
         return current
+    }
+
+    /// 자음 키에서 첫 획이 대각선이면 ㅣ/ㅡ 진입으로 보고, 후속 방향을 전용
+    /// ㅣ/ㅡ 키와 동일한 천지인 파생 규칙으로 해석한다(↗↖=ㅣ, ↙↘=ㅡ).
+    /// ㅡ 진입 후 ㅣ방향(↗/↖) 후속은 ㅢ. 첫 획이 카디널이거나 후속 없는 단독
+    /// 대각선이면 nil → 호출부가 기존 `VowelResolver`(ㅣ/ㅡ 단독)로 폴백한다.
+    func resolveConsonantDiagonalVowel(_ directions: [GestureDirection]) -> Jungseong? {
+        guard let first = directions.first, first.isDiagonal else { return nil }
+        let primitive: VowelPrimitiveType = (first == .upRight || first == .upLeft) ? .bar : .dash
+        let rest = Array(directions.dropFirst())
+        guard !rest.isEmpty else { return nil }   // 단독 대각선(ㅣ/ㅡ)은 기존 경로에 맡김
+        // ㅡ + ㅣ방향(대각선 후속) = ㅢ (전용키 로직엔 없어 여기서 보강)
+        if primitive == .dash, rest.contains(where: { $0 == .upLeft || $0 == .upRight }) {
+            return .ㅢ
+        }
+        return resolveVowelFromPrimitiveDrag(primitive: primitive, directions: rest)
     }
 
     private func normalizedCardinal(_ direction: GestureDirection) -> GestureDirection {
