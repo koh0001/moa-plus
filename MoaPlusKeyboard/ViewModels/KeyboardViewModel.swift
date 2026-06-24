@@ -716,7 +716,11 @@ class KeyboardViewModel: ObservableObject {
             case .vowelPrimitive(let primitive):
                 previewVowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
             case .consonant:
-                previewVowel = vowelResolver.peekVowel(directions: directions)
+                // 자음 키도 대각선 진입(↗↖=ㅣ, ↙↘=ㅡ) 후 파생 모음을 실시간으로
+                // 미리 보여준다. 실제 입력(handleKoreanModeGesture)과 동일하게
+                // resolveConsonantDiagonalVowel 을 먼저 시도하고, 아니면 trie peek.
+                previewVowel = resolveConsonantDiagonalVowel(directions)
+                    ?? vowelResolver.peekVowel(directions: directions)
             default:
                 previewVowel = nil
             }
@@ -776,7 +780,10 @@ class KeyboardViewModel: ObservableObject {
         // input handlers. We must not finalize/reset the analyzer here — the
         // mode-specific handlers below call `finalizeGesture()` themselves.
         if onPreviewConsonantGesture != nil {
-            let directions = gestureAnalyzer.getDirections()
+            // finalizeGesture() 로 정리된 directions 를 써서 시각화 "최종 결과"가
+            // 실제 입력 경로(handleKoreanModeGesture)와 정확히 일치하게 한다.
+            // finalizeGesture 는 상태를 바꾸지 않으므로 아래 핸들러가 다시 호출해도 무방.
+            let directions = gestureAnalyzer.finalizeGesture()
             let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions)
             onPreviewConsonantGesture?(
                 .ended(points: previewGesturePoints,
