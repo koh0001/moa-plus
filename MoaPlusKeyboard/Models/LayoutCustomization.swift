@@ -57,8 +57,12 @@ struct LayoutCustomization: Codable, Equatable {
     /// 한글 모드 우측 컬럼 row 0 펑크 옵션(모던 #자리 / 확장형 1번 셀) 전용 슬롯.
     /// 슬롯 B 슬롯과 독립적으로 편집됨.
     var slotARightColumnPunctuationSlots: PunctuationSlots = .defaultKorean
-    /// iPad 가로 분리 레이아웃에서 숫자패드 위치. 아이폰/세로에선 무시.
+    /// iPad 분리 레이아웃에서 숫자패드 위치(왼쪽/오른쪽). 가로·세로 분리에 공통
+    /// 적용. 아이폰에선 무시.
     var numberPadSide: NumberPadSide = .left
+    /// iPad 세로에서도 숫자패드 분리(확장) 레이아웃을 쓸지. 기본 OFF(세로=단일
+    /// 확대 그리드). 가로는 이 값과 무관하게 항상 분리. 아이폰에선 무시.
+    var iPadPortraitSplitEnabled: Bool = false
 
     static let defaultSlotC: [String] = ["~", "^", ";", "*"]
     static let defaultSlotARightColumn: [String] = ["!", "?", "."]
@@ -80,6 +84,7 @@ struct LayoutCustomization: Codable, Equatable {
         englishPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .englishPunctuationSlots) ?? .defaultEnglish
         slotARightColumnPunctuationSlots = try c.decodeIfPresent(PunctuationSlots.self, forKey: .slotARightColumnPunctuationSlots) ?? .defaultKorean
         numberPadSide = try c.decodeIfPresent(NumberPadSide.self, forKey: .numberPadSide) ?? .left
+        iPadPortraitSplitEnabled = try c.decodeIfPresent(Bool.self, forKey: .iPadPortraitSplitEnabled) ?? false
     }
 
     private static func normalizeSlotC(_ raw: [String]) -> [String] {
@@ -99,5 +104,6 @@ struct LayoutCustomization: Codable, Equatable {
         case koreanPunctuationEnabled, englishPunctuationEnabled, slotARightColumnTopAsPunctuation
         case koreanPunctuationSlots, englishPunctuationSlots, slotARightColumnPunctuationSlots
         case numberPadSide
+        case iPadPortraitSplitEnabled
     }
 }

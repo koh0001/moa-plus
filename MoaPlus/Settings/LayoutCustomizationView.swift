@@ -296,14 +296,15 @@ struct LayoutCustomizationView: View {
                 Text("좌우 끝 키의 너비. 기본 70% (정사각).")
             }
 
-            // iPad 가로 숫자패드 위치
+            // iPad 분리(확장) 레이아웃
             Section {
-                Picker("iPad 가로 숫자패드 위치", selection: numberPadSideBinding) {
+                Toggle("세로에서도 분리 레이아웃", isOn: iPadPortraitSplitBinding)
+                Picker("숫자패드 위치", selection: numberPadSideBinding) {
                     Text("왼쪽").tag(NumberPadSide.left)
                     Text("오른쪽").tag(NumberPadSide.right)
                 }
                 .pickerStyle(.segmented)
-                Text("아이패드를 가로로 쓸 때 숫자패드를 어느 쪽에 둘지 선택합니다.")
+                Text("아이패드 가로에서는 숫자패드와 한글 자판이 항상 좌우로 나뉩니다. ‘세로에서도 분리’를 켜면 세로에서도 같은 확장 레이아웃을 씁니다. ‘숫자패드 위치’는 숫자패드를 좌·우 어느 쪽에 둘지 정합니다(가로·세로 공통).")
                     .font(.footnote)
                     .foregroundColor(.secondary)
             } header: {
@@ -370,6 +371,17 @@ struct LayoutCustomizationView: View {
             set: { newValue in
                 var lc = settings.layoutCustomization
                 lc.numberPadSide = newValue
+                settings.layoutCustomization = lc
+            }
+        )
+    }
+
+    private var iPadPortraitSplitBinding: Binding<Bool> {
+        Binding(
+            get: { settings.layoutCustomization.iPadPortraitSplitEnabled },
+            set: { newValue in
+                var lc = settings.layoutCustomization
+                lc.iPadPortraitSplitEnabled = newValue
                 settings.layoutCustomization = lc
             }
         )

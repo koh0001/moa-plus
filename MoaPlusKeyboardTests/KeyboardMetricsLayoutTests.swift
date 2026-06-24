@@ -233,6 +233,20 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: false))
     }
 
+    func testUsesIPadSplit_portraitFollowsToggle() {
+        // 가로는 토글과 무관하게 항상 분리.
+        XCTAssertTrue(KeyboardMetrics.usesIPadSplit(isPad: true, isLandscape: true, portraitSplitEnabled: false))
+        XCTAssertTrue(KeyboardMetrics.usesIPadSplit(isPad: true, isLandscape: true, portraitSplitEnabled: true))
+        // 세로는 토글에 따른다.
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: true, isLandscape: false, portraitSplitEnabled: false),
+                       "세로 + 토글 off → 단일")
+        XCTAssertTrue(KeyboardMetrics.usesIPadSplit(isPad: true, isLandscape: false, portraitSplitEnabled: true),
+                      "세로 + 토글 on → 분리")
+        // 아이폰은 토글과 무관하게 분리하지 않는다.
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: false, portraitSplitEnabled: true))
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: false, isLandscape: true, portraitSplitEnabled: true))
+    }
+
     // MARK: - number pad model (T6)
 
     func testNumberPadKeys_shape() {

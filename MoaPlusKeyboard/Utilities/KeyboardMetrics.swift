@@ -86,9 +86,12 @@ enum KeyboardMetrics {
         keyboardWidth > (screenShort + screenLong) / 2
     }
 
-    /// 좌우 분리 레이아웃 사용 여부 — 아이패드 가로에서만.
-    static func usesIPadSplit(isPad: Bool, isLandscape: Bool) -> Bool {
-        isPad && isLandscape
+    /// 좌우 분리 레이아웃 사용 여부. 아이패드 가로는 항상 분리, 세로는 사용자
+    /// 토글(`LayoutCustomization.iPadPortraitSplitEnabled`)에 따른다. 아이폰은
+    /// 항상 false. 기본 인자(false)는 기존 가로 전용 호출과 호환된다.
+    static func usesIPadSplit(isPad: Bool, isLandscape: Bool,
+                              portraitSplitEnabled: Bool = false) -> Bool {
+        isPad && (isLandscape || portraitSplitEnabled)
     }
 
     /// 아이패드 분리 레이아웃 좌(또는 우) 숫자패드. 계산기식 3×4.

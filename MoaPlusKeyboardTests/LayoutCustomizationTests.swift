@@ -121,4 +121,24 @@ final class LayoutCustomizationTests: XCTestCase {
         let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
         XCTAssertEqual(decoded, original)
     }
+
+    // MARK: - iPad 세로 분리 토글
+
+    func testIPadPortraitSplitDefaultsFalse() {
+        XCTAssertFalse(LayoutCustomization().iPadPortraitSplitEnabled, "세로 분리 신규 기능 — 기본 OFF")
+    }
+
+    func testIPadPortraitSplitRoundTrips() throws {
+        var lc = LayoutCustomization()
+        lc.iPadPortraitSplitEnabled = true
+        let data = try JSONEncoder().encode(lc)
+        let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
+        XCTAssertTrue(decoded.iPadPortraitSplitEnabled)
+    }
+
+    func testLegacyDataDefaultsIPadPortraitSplitFalse() throws {
+        let legacyJSON = #"{"slotA":"vowel","slotB":"punctuation","slotC":["~","^",";","*"]}"#
+        let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: legacyJSON.data(using: .utf8)!)
+        XCTAssertFalse(decoded.iPadPortraitSplitEnabled, "구버전 JSON → false 기본")
+    }
 }

@@ -103,7 +103,9 @@ struct KeyboardView: View {
             let isPad = layoutOverride?.isPad ?? (UIDevice.current.userInterfaceIdiom == .pad)
             let isLandscape = layoutOverride?.isLandscape ?? KeyboardMetrics.isLandscapeKeyboard(
                 keyboardWidth: geometry.size.width, screenShort: screenShort, screenLong: screenLong)
-            let useSplit = KeyboardMetrics.usesIPadSplit(isPad: isPad, isLandscape: isLandscape)
+            let useSplit = KeyboardMetrics.usesIPadSplit(
+                isPad: isPad, isLandscape: isLandscape,
+                portraitSplitEnabled: settings.layoutCustomization.iPadPortraitSplitEnabled)
                 && viewModel.keyboardMode == .korean
 
             // Split-mode panel metrics — hoisted so the long-press popup can
