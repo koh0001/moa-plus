@@ -227,8 +227,8 @@ struct DirectionPieChart: View {
                     for step in 0...steps {
                         let t = Double(step) / Double(steps)
                         let angle = startRad + (endRad - startRad) * t
-                        let px = cx + radius * cos(angle)
-                        let py = cy + radius * sin(angle)
+                        let px = cx + radius * CGFloat(cos(angle))
+                        let py = cy + radius * CGFloat(sin(angle))
                         path.addLine(to: CGPoint(x: px, y: py))
                     }
                     path.closeSubpath()
@@ -250,8 +250,8 @@ struct DirectionPieChart: View {
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundColor(Color(.label))
                     .position(
-                        x: cx + r * cos(mid * .pi / 180),
-                        y: cy - r * sin(mid * .pi / 180)
+                        x: cx + r * CGFloat(cos(mid * .pi / 180)),
+                        y: cy - r * CGFloat(sin(mid * .pi / 180))
                     )
             }
 
@@ -875,8 +875,8 @@ private struct PerSidePieChart: View {
     // MARK: Geometry helpers
 
     private func point(cx: CGFloat, cy: CGFloat, radius: CGFloat, deg: Double) -> CGPoint {
-        CGPoint(x: cx + radius * cos(deg * .pi / 180),
-                y: cy - radius * sin(deg * .pi / 180))
+        CGPoint(x: cx + radius * CGFloat(cos(deg * .pi / 180)),
+                y: cy - radius * CGFloat(sin(deg * .pi / 180)))
     }
 
     private func wedgePath(cx: CGFloat, cy: CGFloat, radius: CGFloat,
@@ -887,7 +887,7 @@ private struct PerSidePieChart: View {
         for step in 0...steps {
             let t = Double(step) / Double(steps)
             let a = (fromDeg + (toDeg - fromDeg) * t) * .pi / 180
-            path.addLine(to: CGPoint(x: cx + radius * cos(a), y: cy - radius * sin(a)))
+            path.addLine(to: CGPoint(x: cx + radius * CGFloat(cos(a)), y: cy - radius * CGFloat(sin(a))))
         }
         path.closeSubpath()
         return path
