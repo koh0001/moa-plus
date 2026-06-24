@@ -175,6 +175,14 @@ struct SwipeProfile: Codable, Equatable {
     /// behaviour. Range ±20° is enforced by the UI.
     var axisRotation: Double = 0
 
+    /// When `true` (default), an angle that no sector claims (a gap opened by
+    /// per-side narrowing) is recognised as the nearest-center direction —
+    /// `GestureDirection.from`'s STEP3 fallback — so narrowing never leaves a
+    /// dead zone. When `false`, an unclaimed angle returns nil (the swipe is
+    /// dropped), so narrowing a side turns it into an intentionally inactive
+    /// zone. Default `true` keeps the dead-zone-free behaviour.
+    var gapFillNearest: Bool = true
+
     /// Predefined profiles
     static let bothHands = SwipeProfile(mode: .both)
 
@@ -209,7 +217,7 @@ extension SwipeProfile {
     private enum CodingKeys: String, CodingKey {
         case mode, swipeLength, sectors
         case upLeftMapping, upRightMapping, downLeftMapping, downRightMapping
-        case fourWayMode, axisRotation
+        case fourWayMode, axisRotation, gapFillNearest
     }
 
     init(from decoder: Decoder) throws {
@@ -224,6 +232,7 @@ extension SwipeProfile {
         downRightMapping = try c.decodeIfPresent(DiagonalMapping.self, forKey: .downRightMapping) ?? .vowelEu
         fourWayMode = try c.decodeIfPresent(Bool.self, forKey: .fourWayMode) ?? false
         axisRotation = try c.decodeIfPresent(Double.self, forKey: .axisRotation) ?? 0
+        gapFillNearest = try c.decodeIfPresent(Bool.self, forKey: .gapFillNearest) ?? true
     }
 }
 

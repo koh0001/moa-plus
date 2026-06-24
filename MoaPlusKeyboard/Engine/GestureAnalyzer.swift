@@ -160,6 +160,7 @@ class GestureAnalyzer {
         let sectors = effectiveSectors
         let rotation = effectiveRotationOffset
         let fourWay = settings.swipeProfile.fourWayMode || forceCardinalOnly
+        let fillGap = settings.swipeProfile.gapFillNearest
 
         // Try detecting direction with effective threshold first (respects
         // settings/column overrides, including rotation and ㅣ/ㅡ width deltas).
@@ -168,7 +169,8 @@ class GestureAnalyzer {
             sectors: sectors,
             rotationOffset: rotation,
             threshold: effectiveThreshold,
-            fourWay: fourWay
+            fourWay: fourWay,
+            fillGap: fillGap
         )
 
         let effReversal = effectiveReversalThreshold
@@ -183,7 +185,8 @@ class GestureAnalyzer {
                 sectors: sectors,
                 rotationOffset: rotation,
                 threshold: effReversal,
-                fourWay: fourWay
+                fourWay: fourWay,
+                fillGap: fillGap
             ),
                qualifiesAsTurn(gap: candidate.angularGap(to: lastDirection)) {
                 newDirection = candidate

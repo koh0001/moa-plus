@@ -505,6 +505,7 @@ struct SectorAngleHybridView: View {
             }
             selectedDirectionSection
             globalRotationSection
+            gapFillSection
             resetSection
         }
         .navigationTitle("방향별 좌/우 각도")
@@ -616,6 +617,20 @@ struct SectorAngleHybridView: View {
         .opacity(isFourWay ? 0.4 : 1)
     }
 
+    // MARK: Gap-fill toggle
+
+    private var gapFillSection: some View {
+        Section {
+            Toggle("빈 각도 자동 인식", isOn: gapFillBinding)
+        } header: {
+            Text("빈 각도 처리")
+        } footer: {
+            Text("한쪽 폭을 좁혀 생긴 빈 각도로 비스듬히 그었을 때, 가장 가까운 방향으로 자동 인식합니다. 끄면 빈 각도는 인식되지 않아 해당 방향을 의도적으로 차단할 수 있습니다.")
+        }
+        .disabled(isFourWay)
+        .opacity(isFourWay ? 0.4 : 1)
+    }
+
     // MARK: Reset
 
     private var resetSection: some View {
@@ -698,6 +713,17 @@ struct SectorAngleHybridView: View {
             set: { newValue in
                 var gs = settings.gestureSettings
                 gs.swipeProfile.axisRotation = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
+    private var gapFillBinding: Binding<Bool> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile.gapFillNearest },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile.gapFillNearest = newValue
                 settings.gestureSettings = gs
             }
         )

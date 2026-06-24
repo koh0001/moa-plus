@@ -188,6 +188,45 @@ final class PerSideSectorWidthTests: XCTestCase {
         }
     }
 
+    // MARK: - STEP3 toggle (gapFillNearest on/off)
+    //
+    // The nearest-center fallback is user-toggleable. ON (default) removes the
+    // dead zone; OFF restores strict behaviour so a narrowed side becomes a
+    // genuinely inactive zone (intentional blocking).
+
+    func testGapFillDisabledReturnsNilInGap() {
+        var sectors = DirectionSector.defaultSectors
+        sectors[1].leftHalfWidth = 14
+        sectors[1].rightHalfWidth = 40
+        // 63° is in the gap [59, 67.5]. fillGap:false → nil (dead zone kept).
+        let result = GestureDirection.from(vector: vector(atDegrees: 63),
+                                           sectors: sectors, rotationOffset: 0,
+                                           threshold: 20, fillGap: false)
+        XCTAssertNil(result, "fillGap off: 빈 각도는 미인식(nil)")
+    }
+
+    func testGapFillEnabledIsDefaultParameter() {
+        var sectors = DirectionSector.defaultSectors
+        sectors[1].leftHalfWidth = 14
+        sectors[1].rightHalfWidth = 40
+        // fillGap defaults to true → STEP3 assigns nearest center ↗.
+        let result = GestureDirection.from(vector: vector(atDegrees: 63),
+                                           sectors: sectors, rotationOffset: 0, threshold: 20)
+        XCTAssertEqual(result, .upRight, "fillGap 기본 on: gap→nearest")
+    }
+
+    func testGapFillDisabledStillClaimsClaimedAngles() {
+        // Disabling the fallback must NOT change angles a sector actually owns.
+        var sectors = DirectionSector.defaultSectors
+        sectors[1].leftHalfWidth = 14
+        sectors[1].rightHalfWidth = 40
+        // 30° is inside ↗'s right side (|30-45|=15 ≤ 40) → claimed regardless.
+        let result = GestureDirection.from(vector: vector(atDegrees: 30),
+                                           sectors: sectors, rotationOffset: 0,
+                                           threshold: 20, fillGap: false)
+        XCTAssertEqual(result, .upRight, "fillGap off 여도 claim 된 각도는 그대로")
+    }
+
     // MARK: - (e) wrap-safety around 0°/360°
 
     func testWrapAroundRightDirection() {
@@ -314,5 +353,25 @@ final class PerSideSectorWidthTests: XCTestCase {
         let data = try JSONEncoder().encode(profile)
         let decoded = try JSONDecoder().decode(SwipeProfile.self, from: data)
         XCTAssertEqual(decoded.axisRotation, 12.5, "axisRotation round-trip 보존")
+    }
+
+    func testGapFillNearestDefaultsTrueAndRoundTrips() throws {
+        var profile = SwipeProfile()
+        XCTAssertTrue(profile.gapFillNearest, "gapFillNearest 기본 true")
+        profile.gapFillNearest = false
+        let data = try JSONEncoder().encode(profile)
+        let decoded = try JSONDecoder().decode(SwipeProfile.self, from: data)
+        XCTAssertFalse(decoded.gapFillNearest, "false round-trip 보존")
+    }
+
+    func testLegacySwipeProfileJSONDefaultsGapFillTrue() throws {
+        let json = Data("""
+        {"mode":"both","swipeLength":"normal",
+         "sectors":[{"centerAngle":0,"halfWidth":22.5}],
+         "upLeftMapping":"vowelI","upRightMapping":"vowelI",
+         "downLeftMapping":"vowelEu","downRightMapping":"vowelEu"}
+        """.utf8)
+        let profile = try JSONDecoder().decode(SwipeProfile.self, from: json)
+        XCTAssertTrue(profile.gapFillNearest, "구버전 JSON 은 gapFillNearest true 기본")
     }
 }

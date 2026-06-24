@@ -48,13 +48,15 @@ enum GestureDirection: String, CaseIterable {
     /// per-side narrowing leaves a gap that no sector claims, STEP3 falls back
     /// to the nearest-center sector so a narrowed direction never produces a
     /// dead zone (user-confirmed rule: "넓히면 뺏고, 좁힌 빈곳은 가장 가까운
-    /// 방향"). nil is returned only below `threshold` (too short a swipe) or
-    /// when `sectors` is empty.
+    /// 방향"). nil is returned only below `threshold` (too short a swipe),
+    /// when `sectors` is empty, or when `fillGap` is off and no sector claims
+    /// the angle.
     static func from(vector: CGVector,
                      sectors: [DirectionSector],
                      rotationOffset: Double,
                      threshold: CGFloat,
-                     fourWay: Bool = false) -> GestureDirection? {
+                     fourWay: Bool = false,
+                     fillGap: Bool = true) -> GestureDirection? {
         let magnitude = sqrt(vector.dx * vector.dx + vector.dy * vector.dy)
         guard magnitude >= threshold else { return nil }
 
@@ -129,6 +131,11 @@ enum GestureDirection: String, CaseIterable {
         // all 360°, so this never fires (legacy output is bit-identical). On a
         // distance tie the earlier index in `sectorOrder` wins (strict `<`),
         // matching STEP1's tie-break convention.
+        //
+        // Toggleable via `fillGap` (SwipeProfile.gapFillNearest): when off, an
+        // unclaimed angle returns nil so a narrowed side is an intentionally
+        // inactive zone.
+        guard fillGap else { return nil }
         var nearest: (direction: GestureDirection, distance: Double)?
         for index in 0..<min(sectors.count, sectorOrder.count) {
             let delta = abs(signedAngularDistance(from: sectors[index].centerAngle, to: relative))
