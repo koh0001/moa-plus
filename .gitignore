@@ -37,3 +37,6 @@ Pods/
 
 # Rendered/generated docs
 docs/moakey_ios_custom_docs/rendered/
+
+# App Store / 마케팅 스크린샷 (로컬 보관, 저장소 미추적)
+screenshots/
