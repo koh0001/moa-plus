@@ -52,6 +52,13 @@ final class VowelResolverTests: XCTestCase {
         XCTAssertEqual(resolver.resolve(directions: [.left, .right, .left]).vowel, .ㅕ)
     }
 
+    // MARK: - Error Tolerance (trie skip)
+
+    func testErrorTolerance_skipsUnmatchedMidStroke() {
+        // ↑↓↑(ㅛ) 사이에 무관한 ← 노이즈가 끼어도 skip 되어 ㅛ 완성
+        XCTAssertEqual(resolver.resolve(directions: [.up, .left, .down, .up]).vowel, .ㅛ)
+    }
+
     // MARK: - Y-Vowel Diagonal Drift Tests
 
     func testYVowelDiagonalDrift() {

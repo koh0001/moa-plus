@@ -92,7 +92,10 @@ class PatternTrie {
 
         for (index, direction) in directions.enumerated() {
             guard let next = current.children[direction] else {
-                break
+                // Skip an unmatched stroke instead of aborting, so a stray /
+                // noise stroke mid-gesture (e.g. ↑←↓↑ for ㅛ) doesn't void the
+                // whole input — error tolerance for multi-stroke vowels.
+                continue
             }
             current = next
 
