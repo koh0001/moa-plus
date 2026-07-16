@@ -1,34 +1,28 @@
 # 다음 버전 "무엇이 새로운지" (App Store 릴리스 노트)
 
-> 대상: 1.7(build 12). 이번 개발 사이클의 사용자향 변경.
+> 대상: 1.7.2(build 14). 버그 수정 패치 릴리스.
 > 규칙(appstore_submission.txt 준수): ASCII 구두점 + 한글 완성형. 화살표/단독 자모/도형문자/통화기호/특수기호 배제 — App Store "유효하지 않은 문자" 회피.
 
 ## 포함된 변경 (개발 요약)
-- 아이패드 동적 높이 + 가로 좌우 분리 레이아웃(숫자판 + 한글), 숫자판 좌/우 위치 설정 (커밋 `6e7e815`~`45bc0fe`, main 머지/CI green).
-- 긋기 인식 각도를 방향별 좌/우 독립 조절(파이 탭선택 + 경계 손잡이 드래그 + 좌/우 폭 슬라이더 + 리셋 + 전체 회전). 코어는 좌/우 폭(per-side) 추가로 기존 동작 무손상.
-- 단일 방향 긋기 파생모음 안내 제거(실기기 미작동, 멀티스트로크 경로 유지).
-- 한쪽을 좁혀 생긴 빈 각도를 가장 가까운 방향으로 인식해 데드존 제거(STEP3 nearest-center 폴백) + on/off 토글 (커밋 `14a394b`, `27ce484`).
-- 설정 파이 4종의 좌/우 비대칭 표시 일관성 + 키별 보정 미리보기 회전 반영 (커밋 `c16f1ae`). CI 빌드 모호성 핫픽스 (`be158c9`).
+- 커서 탭 이동 후 재입력 시 직전 조합 글자가 중복 삽입되던 버그 수정. 원인: 커서 탭 시 selectionDidChange 미발생 + 필드 맨 앞에서 documentContextBeforeInput이 nil이라 기존 감지 경로가 모두 침묵 → 입력 시점 backstop(freezeComposerIfCaretMoved)으로 "커서가 조합 글자 바로 뒤"라는 확증이 없으면 조합 동결. before/after 컨텍스트 둘 다 nil인 호스트는 불개입 (PR #18, 커밋 `06c8669`).
+- 단축어 확장 직후 스페이스에서 더블스페이스 마침표가 오발동해 마침표가 찍히던 버그 수정. 확장이 삽입한 끝 공백이 "첫 공백"으로 오인되던 것 — 확장 직후 1회에 한해 마침표 단축 억제 (커밋 `7d63cb1`).
+- 회귀 테스트 2종 추가 (CaretMoveTests, AbbreviationPeriodTests). 전체 유닛 테스트 통과 + 실기기 재현 시나리오 해소 확인.
 
 ## 한국어 (복사용 - 안전본)
-아이패드 사용성과 긋기 입력 정확도를 높였습니다.
+입력 안정성을 높인 버그 수정 업데이트입니다.
 
-- 아이패드 가로 화면 분리 레이아웃을 추가했습니다. 한쪽은 숫자판, 다른 한쪽은 한글 키보드로 나뉘어 레이어 전환 없이 숫자를 바로 입력합니다.
-- 아이패드 화면 크기에 맞춰 키보드 높이가 자동으로 조절됩니다.
-- 숫자판을 왼쪽이나 오른쪽 중 원하는 쪽에 둘 수 있습니다.
-- 긋기 인식 범위를 방향마다 왼쪽과 오른쪽을 따로 미세 조정하는 설정을 추가했습니다. 자주 잘못 인식되는 방향을 직접 넓히거나 좁혀서 교정할 수 있습니다.
-- 한쪽을 좁혀 생긴 빈 각도로 비스듬히 그어도 가장 가까운 방향으로 인식하도록 보정했으며, 이 자동 인식은 설정에서 끌 수 있습니다.
-- 그 밖의 안정성 개선이 포함되었습니다.
+- 글자를 조합하는 중에 화면을 눌러 커서를 다른 곳으로 옮긴 뒤 이어서 입력하면, 직전에 입력하던 글자가 새 위치에 한 번 더 들어가던 문제를 고쳤습니다.
+- 단축어가 펼쳐진 직후에 스페이스를 누르면 마침표가 잘못 찍히던 문제를 고쳤습니다. 더블 스페이스 마침표 기능은 이후 입력부터 정상 동작합니다.
+
+기본 입력은 전체 접근 권한 없이 동작합니다. 햅틱 진동을 쓰려면 iOS 제약상 전체 접근 허용이 필요하지만(선택), 켜더라도 입력하신 내용은 외부로 전송되지 않습니다.
 
 ## English (paste-ready)
-Better iPad support and more accurate gesture typing.
+A bug-fix update for more reliable typing.
 
-- New iPad landscape split layout: a number pad on one side and the Korean keyboard on the other, so you can enter numbers without switching layers.
-- Keyboard height now adapts to your iPad screen size.
-- Choose whether the number pad sits on the left or the right.
-- New setting to fine-tune the gesture recognition range for each direction, left and right independently. Widen or narrow a direction that often gets misread.
-- An empty angle left by narrowing a direction is now recognized as the nearest direction so swipes are not dropped, and this auto-fill can be turned off in settings.
-- Other stability improvements.
+- Fixed an issue where, after tapping to move the cursor while composing a syllable, the previous character was inserted again at the new position.
+- Fixed an issue where pressing space right after a text shortcut expanded would insert an unwanted period. The double-space period shortcut now behaves correctly afterward.
+
+Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.
 
 ## 프로모션 텍스트 대안 (선택, 최대 170자)
-아이패드 가로에서 숫자판과 한글 키보드를 좌우로 나눠 씁니다. 긋기 인식 각도를 방향마다 좌우 따로 미세 조정해 자주 틀리는 방향을 직접 교정할 수 있습니다.
+변경 없음 — 기존 프로모션 텍스트 유지 (버그 수정 릴리스).

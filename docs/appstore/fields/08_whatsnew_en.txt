@@ -1,14 +1,7 @@
-This update brings full iPad support and more accurate gesture typing.
+A bug-fix update for more reliable typing.
 
-[New]
-- Full iPad support: an iPad-optimized layout with a split keyboard in both landscape and portrait. In landscape, a number pad sits on one side and the Korean keyboard on the other, so you can type numbers without switching layers; place the number pad on the left or right. Keyboard height adapts to your screen size.
-- Vowels straight from consonants: swipe a consonant key diagonally (vertical or horizontal lead) and keep going to complete the vowel. For example, swiping up-right then right makes a vowel like the one in 'ga', and down-left then up makes the one in 'go'.
-
-[Accuracy improvements]
-- Fine-tune the 8-direction recognition angle for each direction, left and right independently.
-- New 4-way-only mode that disables diagonals.
-- Adjustable sensitivity for back-and-forth vowels.
-- A live gesture tester shows how your swipes are recognized so you can calibrate.
-- Follow-up strokes are recognized more accurately, even after small jitters or long entry motions.
+[Bug fixes]
+- Fixed an issue where, after tapping to move the cursor while composing a syllable, the previous character was inserted again at the new position.
+- Fixed an issue where pressing space right after a text shortcut expanded would insert an unwanted period. The double-space period shortcut now behaves correctly afterward.
 
 Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.

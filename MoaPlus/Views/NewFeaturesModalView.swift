@@ -117,7 +117,7 @@ struct NewFeaturesModalView: View {
     /// 현재 앱 버전(CFBundleShortVersionString). 트리거 비교와 동일한 값을 써야
     /// 모달이 닫힌 뒤 재표시되지 않는다.
     static var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.7"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.7.2"
     }
 
     private func markSeen() {
