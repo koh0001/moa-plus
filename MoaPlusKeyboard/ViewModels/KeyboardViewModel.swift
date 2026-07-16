@@ -539,13 +539,21 @@ class KeyboardViewModel: ObservableObject {
         if previewMode { return }
         // Commit composing text first (feeds abbreviation engine via commitCurrent)
         commitCurrent()
+        // An abbreviation that just expanded already inserted its own trailing
+        // space (`replacement + " "`). Snapshot that BEFORE processCharacter
+        // clears the flag: otherwise this space would be read as the user's
+        // *first* space and the double-space→period shortcut would turn it into
+        // ". " (e.g. "하트 " + space → "하트. "). commitCurrent() only clears the
+        // flag when there was composing text to flush, so typing anything after
+        // the expansion restores normal period behavior.
+        let didJustExpandAbbreviation = abbreviationEngine.canRestoreLastExpansion
         // Process delimiter - if abbreviation matches, delegate handles replacement
         // The engine's delegate callback will insert replacement + delimiter
         abbreviationEngine.processCharacter(" ")
         // If no abbreviation matched, either apply the double-space → period
         // shortcut or insert a plain space.
         if !abbreviationEngine.canRestoreLastExpansion {
-            if !applyPeriodShortcut() {
+            if didJustExpandAbbreviation || !applyPeriodShortcut() {
                 delegate?.insertText(" ")
             }
         }
