@@ -61,7 +61,7 @@ moa-plus/
 │       ├── HapticManager.swift        # 설정을 매번 직접 읽음 (캐시 없음)
 │       └── BackgroundImageManager.swift
 │
-├── MoaPlusKeyboardTests/             # 유닛 테스트 (HangulComposer + Cursor + Shift + VowelDrag)
+├── MoaPlusKeyboardTests/             # 유닛 테스트 16파일 (Composer/Gesture/Layout/Snapshot + ViewModel: Cursor·CaretMove·Shift·VowelDrag·Abbreviation·Period·LongPress 등)
 ├── scripts/
 │   └── add_target_membership.rb       # xcodeproj 자동 멤버십 추가 (메인 앱 ↔ 익스텐션)
 └── docs/                             # 개발 문서
@@ -135,6 +135,7 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수
+- 일부 호스트(SwiftUI `TextField` 등)는 커서 탭 시 `selectionDidChange`를 발화하지 않음 → `handleExternalCursorMove`만으로는 부족. 입력 시점 백스톱 `freezeComposerIfCaretMoved()`가 `inputConsonant`/`inputVowel`/`deleteBackward` 진입 시 `textBeforeCursor()`가 조합 글자로 끝나지 않으면 조합을 리셋 (필드 맨 앞 = before nil 포함). 단 before/after 컨텍스트가 둘 다 nil인 호스트(시큐어 필드, 컨텍스트 미구현 테스트 스텁)는 no-op — 이 백스톱을 우회하는 변경 시 v1.7.2 커서 탭 중복 삽입 버그 회귀 주의 (`KeyboardViewModelCaretMoveTests`)
 
 ### 모드 시스템
 ```swift
@@ -248,6 +249,10 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 │   └── resolvedKeyBackground/KeyText/FunctionKeyBackground (커스텀 vs 프리셋)
 ├── secondaryKeyActions: [SecondaryKeyAction]  (한글 자음 19키 + 영문 숫자 10키)
 ├── shortcutExpansionStore: ShortcutExpansionStore
+├── abbreviationEnabled: Bool               (약어 확장 마스터 토글)
+├── periodOnDoubleSpaceEnabled: Bool        (더블 스페이스 → 마침표)
+├── layoutCustomization: LayoutCustomization (프리셋/슬롯/펑크 구성)
+├── rememberLastKeyboardMode: Bool + lastKeyboardLetterMode: String (한/영 모드 복원)
 ├── clickSoundEnabled: Bool                 (독립 저장)
 ├── longPressDelay: Double                  (0.2~1.0초)
 ├── sideKeyWidthRatio: Double               (0.15~1.0, 기본 0.7 정사각)
@@ -271,6 +276,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ### 커서 이동 / 약어 리셋 패턴
 ```swift
 func moveCursor(by offset: Int) {
+    guard offset != 0 else { return }
     commitCurrent()                     // 미확정 글자 freeze
     abbreviationEngine.resetBuffer()    // stale trie state 제거
     delegate?.moveCursor(by: offset)    // proxy.adjustTextPosition
