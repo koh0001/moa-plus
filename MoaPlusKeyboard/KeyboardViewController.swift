@@ -231,4 +231,8 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
     func textBeforeCursor() -> String? {
         textDocumentProxy.documentContextBeforeInput
     }
+
+    func textAfterCursor() -> String? {
+        textDocumentProxy.documentContextAfterInput
+    }
 }

@@ -279,15 +279,66 @@ class KeyboardViewModel: ObservableObject {
     // MARK: - Input Methods
 
     func inputConsonant(_ consonant: Choseong) {
+        freezeComposerIfCaretMoved()
         let action = composer.inputChoseong(consonant)
         handleComposerAction(action)
         triggerHapticFeedback()
     }
 
     func inputVowel(_ vowel: Jungseong) {
+        freezeComposerIfCaretMoved()
         let action = composer.inputJungseong(vowel)
         handleComposerAction(action)
         triggerHapticFeedback()
+    }
+
+    /// Backstop for a stale composing glyph after the user moved the caret by
+    /// tapping in the host field. `selectionDidChange` → `handleExternalCursorMove`
+    /// is the primary signal, but some hosts bundle a `textWillChange` around a
+    /// caret tap, so the controller's `isProgrammaticTextChange` gate suppresses
+    /// the external-move handler and leaves the composer pointed at the OLD
+    /// caret. Without this, the next keystroke's commit path re-inserts the old
+    /// composing glyph at the new caret ("마지막 입력 글자 중복 삽입" bug).
+    ///
+    /// Our composing glyph is real inserted text at the old caret, so if the
+    /// text immediately before the caret no longer ends with it, the caret has
+    /// moved away. Freeze composer state — proxy-free, exactly like
+    /// `handleExternalCursorMove` — so the next input starts a fresh
+    /// composition at the new caret.
+    ///
+    /// Reset UNLESS we have positive confirmation the caret is still right after
+    /// our composing glyph — i.e. `textBeforeCursor()` ends with it. Both a
+    /// `nil` before-context (caret moved to the field start, where
+    /// `documentContextBeforeInput` is `nil`) and a context that doesn't end with
+    /// the glyph (caret moved elsewhere in the text) mean the caret is no longer
+    /// after the glyph, so we freeze.
+    ///
+    /// Why "reset unless proven" rather than "reset only if proven moved": the
+    /// host that surfaced this bug (SwiftUI `TextField` / `UITextField`) fires
+    /// NO `selectionDidChange` on a caret tap — the move is silent — so the
+    /// `handleExternalCursorMove` path never runs and this backstop is the only
+    /// signal. On-device logs show that during normal composition
+    /// `documentContextBeforeInput` ALWAYS returns the just-inserted glyph
+    /// (the caret sits immediately after it right after our own insert), and it
+    /// is `nil` ONLY after the user moved the caret to the field start. So the
+    /// aggressive rule fixes the caret-to-start case ("가나다" → caret before 가
+    /// → 라 → "다라가나다" dup) without over-resetting mid-composition.
+    ///
+    /// One carve-out: a host that reports NO context at all (before AND after
+    /// both `nil` — opaque/secure fields, and unit-test stubs that don't
+    /// implement the context methods) gives us zero evidence either way, and
+    /// resetting there would break composition on every keystroke. Leave the
+    /// composer alone in that case; the caret-to-front case is distinguishable
+    /// because the text that was in the field shows up in the AFTER context.
+    private func freezeComposerIfCaretMoved() {
+        guard !lastComposingText.isEmpty else { return }
+        let before = delegate?.textBeforeCursor()
+        if before == nil && delegate?.textAfterCursor() == nil { return }
+        if before?.hasSuffix(lastComposingText) != true {
+            lastComposingText = ""
+            composer.reset()
+            abbreviationEngine.resetBuffer()
+        }
     }
 
     // MARK: - Slot B Vowel Key (multi-stroke)
@@ -522,6 +573,9 @@ class KeyboardViewModel: ObservableObject {
 
     func deleteBackward() {
         if previewMode { return }
+        // A caret tap can leave the composer pointed at the old glyph; freeze it
+        // first so backspace acts at the current caret, not on stale state.
+        freezeComposerIfCaretMoved()
         if abbreviationEngine.processBackspace() {
             triggerHapticFeedback()
             return
@@ -1208,10 +1262,16 @@ protocol KeyboardViewModelDelegate: AnyObject {
     /// automation (double-space → period). Returns nil when the host
     /// context is unavailable.
     func textBeforeCursor() -> String?
+    /// Text immediately after the caret. Used together with
+    /// `textBeforeCursor()` to tell "caret at field start" (before nil,
+    /// after non-nil) apart from "host reports no context at all"
+    /// (both nil) in `freezeComposerIfCaretMoved`.
+    func textAfterCursor() -> String?
 }
 
 extension KeyboardViewModelDelegate {
     func textBeforeCursor() -> String? { nil }
+    func textAfterCursor() -> String? { nil }
 }
 
 // MARK: - AbbreviationEngineDelegate
