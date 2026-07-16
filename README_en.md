@@ -6,11 +6,17 @@
 
 Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 8-directional gesture combinations.
 
-**New in v1.5**: In-app mail composer with auto-attached diagnostics (app/iOS/device), symbol-mode long-press alternates (₩ € [ { etc.), independent right-column punctuation slots, layout settings terminology cleanup, cold-start render flicker fix, swipe-length-linked reversal threshold.
+**New in v1.7.2**: Fixed duplicate insertion of the last composing syllable after tapping to move the caret; suppressed the double-space period misfire right after an abbreviation expansion.
+
+**v1.7**: Native iPad support (universal, split landscape layout + dynamic height), consonant-diagonal vowel entry (swipe ㄱ up-right then right = 가), per-side sector angle tuning, 4-direction-only mode, multi-stroke sensitivity, what's-new modal.
+
+**v1.6**: Double-space period, abbreviation backspace-restore fix.
+
+**v1.5**: In-app mail composer with auto-attached diagnostics (app/iOS/device), symbol-mode long-press alternates (₩ € [ { etc.), independent right-column punctuation slots, layout settings terminology cleanup, cold-start render flicker fix, swipe-length-linked reversal threshold.
 
 **v1.4**: Three layout presets (Modern / Classic / Extended), Slot B vowel key beside the space bar, first-launch layout selection modal, flat 6-item settings structure, last-keyboard-mode persistence, Help section (tutorial replay + typing practice), redesigned gesture test screen.
 
-**v1.3**: Caps Lock via long-press Shift, abbreviation master ON/OFF toggle, per-column gesture correction sliders, device-proportional swipe thresholds.
+**v1.3**: Caps Lock via long-press Shift, abbreviation master ON/OFF toggle, per-column gesture correction sliders, device-proportional swipe thresholds, App Group sync + memory stability hardening.
 
 **v1.2**: English QWERTY keyboard, Cheonjiin vowel input (ㅣ · dot · ㅡ), space-bar drag for cursor movement, unified gesture settings screen.
 
@@ -18,7 +24,7 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 
 ## Screenshots
 
-### v1.4 — Keyboard and Appearance preview
+### Keyboard and Appearance preview
 
 | Korean keyboard | English keyboard | Appearance preview |
 |:--:|:--:|:--:|
@@ -34,6 +40,8 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 
 ### Input
 - **Gesture vowel input** — 8-directional swipe on consonant keys for all 21 vowels
+- **Consonant-diagonal vowel entry** (v1.7) — Start a swipe on a consonant key toward the ㅣ/ㅡ diagonal, then continue to complete the vowel in one stroke (e.g. ㄱ up-right then right = 가)
+- **Native iPad support** (v1.7) — Universal build. Split landscape layout (number pad + Korean keyboard) with height that adapts to the screen
 - **Cheonjiin vowel input** (v1.2) — Compose every Korean vowel using just three keys: ㅣ, dot (ㆍ), and ㅡ. Includes dot-stroke accumulation (dot+dot+ㅣ → ㅕ).
 - **English QWERTY mode** (v1.2) — Switch instantly with the language key. Double-tap Shift for Caps Lock.
 - **Long-press auxiliary input** — Hold for numbers/symbols, drag to select candidates
@@ -44,6 +52,7 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 
 ### Editing
 - **Space-drag cursor** (v1.2) — Drag the space bar left/right to move the cursor
+- **Double-space period** (v1.6) — Tap space twice after a character to insert `. ` (toggleable in Settings → Input Behavior; does not fire right after an abbreviation expansion)
 - **Auto bracket close** — Typing `(`, `[`, `{`, `「` etc. automatically inserts the closing pair
 - **Word-level delete** — Long-press backspace for fast word-by-word deletion
 
@@ -53,6 +62,9 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 - **Last-mode persistence** (v1.4) — Optionally restore the last used Korean/English mode on next launch (Settings → Keyboard → Input Behavior).
 - **Custom themes** — 5 presets + custom colors + background image + key opacity
 - **Unified gesture settings** (v1.2) — Angle, length, direction mapping, and per-column correction managed in one screen
+- **Per-side sector angle tuning** (v1.7) — Adjust the left/right width of each direction sector independently; gaps left by narrowing snap to the nearest direction (toggleable)
+- **4-direction-only mode** (v1.7) — Disable diagonals and recognize only up/down/left/right at 90° each
+- **Multi-stroke sensitivity** (v1.7) — Tune direction-reversal sensitivity for back-and-forth vowels like ㅛ·ㅑ (off/normal/sensitive)
 - **Per-column gesture correction** (v1.3) — Per-column sliders to tune false positives like ㅗ → ㅘ end-curve misreads
 - **Gesture test screen** (v1.4, redesigned) — Test directly on a real keyboard layout; sector canvas shows live input results
 - **Typing practice** (v1.2) — 33 scenarios covering cheonjiin, English, and cursor movement
@@ -175,7 +187,7 @@ moa-plus/
 │   ├── ViewModels/             # Keyboard view model (mode/Shift/cursor management)
 │   ├── Views/                  # Keyboard UI (Korean 7-col, English 10-col, cheonjiin vowel keys)
 │   └── Utilities/              # Settings, metrics, haptics
-├── MoaPlusKeyboardTests/       # Unit tests (HangulComposer, Shift, Cursor, VowelDrag, etc.)
+├── MoaPlusKeyboardTests/       # 16 unit test files (Composer/Gesture/Layout/Snapshot + Cursor·CaretMove·Abbreviation·Period, etc.)
 ├── scripts/                    # Build automation (target membership helpers)
 └── docs/                       # Development docs
 ```
