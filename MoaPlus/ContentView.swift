@@ -129,7 +129,7 @@ struct ContentView: View {
     /// 현재 앱 버전. `NewFeaturesModalView.appVersion` 과 같은 값을 써야 모달이
     /// 닫힌 뒤 재표시되지 않는다.
     private static var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.7"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.7.2"
     }
 }
 
