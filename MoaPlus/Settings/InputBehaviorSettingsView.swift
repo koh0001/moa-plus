@@ -22,8 +22,16 @@ struct InputBehaviorSettingsView: View {
 
             Section {
                 Toggle("스페이스 드래그로 커서 이동", isOn: $settings.cursorMoveBySpaceDragEnabled)
+                if settings.cursorMoveBySpaceDragEnabled {
+                    Picker("연속 이동 속도", selection: $settings.cursorRepeatSpeed) {
+                        Text("느림").tag(0)
+                        Text("보통").tag(1)
+                        Text("빠름").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                }
             } footer: {
-                Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로 이동합니다.")
+                Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로 이동합니다. 바 양쪽 끝(15%)까지 밀고 유지하면 그 방향으로 연속 이동하며, 속도는 위에서 조절합니다.")
             }
 
             Section {

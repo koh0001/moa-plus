@@ -196,6 +196,14 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 `[123/한글] [한/영] [space (drag→커서)] [긋기 펑크] [⏎]`
 - 긋기 펑크: tap=`.`, ←=`?`, →=`!`, ↑=`,`, ↓=`.`
 - Space 드래그: 8pt 임계값, 12pt/step → `moveCursor(by:)` (commitCurrent + abbreviation reset 후 proxy 커서 이동)
+- Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
+- 심볼 모드 전용 행: `[한글/ABC] [한/영] [#+= / 123] [space] [⏎]` — 페이지 토글이 **스페이스 왼쪽**(구 슬롯 B 위치), 긋기 펑크 대신 렌더
+
+### 심볼 키패드 페이지 (2페이지)
+- `KeyboardMetrics.symbolLayout(_:page:)` — page 0 = 숫자 + 상용 문장부호(왼쪽 열 `. , ' "`), page 1 = 괄호/통화/수학/타이포 기호. `symbolPageCount = 2`
+- 상태: `KeyboardViewModel.symbolPage`(Int). `toggleSymbolPage()`가 `% symbolPageCount` 순환. 심볼 진입/이탈(`toggleSymbolMode`/`toggleLetterMode`) 시 항상 0 리셋
+- 페이지 인지 리졸버: `activeLayout(for:layout:symbolPage:)` / `keyContent(...symbolPage:)` — 렌더(`KeyGridView.symbolPage`) + 탭(`handleSymbolModeTap`) + 롱프레스 모두 활성 페이지로 해석. 기존 2-arg 오버로드는 page 0 위임(하위호환)
+- geometry(⌫ 위치/열 수)는 페이지 간 동일, 콘텐츠만 변경. classic11/fullPackage는 wide-⌫로 2셀 적어 `/`를 page 1에 배치(`°`·backtick 생략) — `/` 누락은 회귀이므로 `KeyboardMetricsLayoutTests.testSymbolPages_essentialCharsReachableForEveryPreset` 가드
 
 ### 천지인 합성 규칙
 **단독 키 입력:**
@@ -257,6 +265,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── longPressDelay: Double                  (0.2~1.0초)
 ├── sideKeyWidthRatio: Double               (0.15~1.0, 기본 0.7 정사각)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)
+├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
 ├── wordDeleteEnabled: Bool
 ├── wordDeleteDelay: Double
@@ -330,4 +339,27 @@ Grep is still right for known exact strings, regex, multiline patterns, and
 file globs. The brain auto-syncs incrementally on every gstack skill start.
 Run `/sync-gbrain` to force-refresh, `/sync-gbrain --full` for full reindex.
 
+
+
+## Vault 자동 캡처
+
+Vault 경로: `/Users/koh/vault` (additionalDirectories 등록 필요)
+
+### 기록 조건
+다음이 발생하면 즉시 `vault/inbox/`에 노트를 남길 것:
+- 기술 선택이 확정됐을 때 (A 대신 B를 쓰기로 함 + 이유)
+- 30분 이상 막힌 문제가 해결됐을 때 (증상 → 원인 → 해법)
+- 환경/인프라 사실이 새로 확인됐을 때 (포트, 경로, 제약)
+- 다른 프로젝트에도 적용될 패턴을 발견했을 때
+
+### 기록 방식
+- 파일명: `inbox/YYYY-MM-DD-주제.md`
+- frontmatter에 `source: auto`, `status: draft` 필수
+- 20줄 이내. 결정/원인/해법만. 과정 서술 금지
+- 작성 후 `→ vault 기록: <파일명>` 한 줄만 알리고 작업 계속
+
+### 금지
+- `inbox/` 외의 폴더에 직접 쓰지 말 것
+- 세션당 최대 3개. 초과 시 기존 노트에 병합
+- 확신이 없거나 아직 검증 안 된 것은 기록하지 말 것
 <!-- gstack-gbrain-search-guidance:end -->

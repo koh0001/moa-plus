@@ -33,6 +33,10 @@ class KeyboardViewModel: ObservableObject {
     let popupState = PopupState()
 
     @Published var keyboardMode: KeyboardMode = .korean
+    /// Active symbol-keypad page (0 = 숫자+상용 문장부호, 1 = 나머지 기호).
+    /// Only meaningful while `keyboardMode.isSymbol`; reset to 0 whenever the
+    /// symbol layer is entered/exited so re-entry always starts on page 0.
+    @Published var symbolPage: Int = 0
     @Published var isSpecialCharLayerVisible: Bool = false
     @Published var shiftState: ShiftState = .off
 
@@ -200,7 +204,16 @@ class KeyboardViewModel: ObservableObject {
         if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
+        symbolPage = 0   // 심볼 진입/이탈 시 항상 page 0 에서 시작
         keyboardMode = keyboardMode.toggleSymbol()
+        triggerHapticFeedback()
+    }
+
+    /// Flip the symbol keypad between page 0 and page 1. No-op unless we're
+    /// currently in a symbol mode (the toggle key only renders there).
+    func toggleSymbolPage() {
+        guard keyboardMode.isSymbol else { return }
+        symbolPage = (symbolPage + 1) % KeyboardMetrics.symbolPageCount
         triggerHapticFeedback()
     }
 
@@ -208,6 +221,7 @@ class KeyboardViewModel: ObservableObject {
         if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
+        symbolPage = 0   // 심볼→문자 전환 시 페이지 상태 초기화
         keyboardMode = keyboardMode.toggleLetter()
         // Abbreviation engine applies in both Korean and English; reset the
         // buffer so half-typed triggers don't leak across modes.
@@ -481,7 +495,7 @@ class KeyboardViewModel: ObservableObject {
 
         // Load popup candidates from secondary action
         if let activeRow = activeKey?.row, let activeCol = activeKey?.column {
-            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization)
+            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage)
 
             let keyId: String? = {
                 switch content {
@@ -773,7 +787,7 @@ class KeyboardViewModel: ObservableObject {
         // Vowel primitive keys (ㅣ, ㅡ) use the same resolver as input commit;
         // consonant keys use the 8-direction VowelResolver pattern trie.
         if let key = activeKey,
-           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization) {
+           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage) {
             switch content {
             case .vowelPrimitive(let primitive):
                 previewVowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
@@ -869,7 +883,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func handleSymbolModeTap(row: Int, column: Int) {
-        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization) else { return }
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage) else { return }
 
         switch content {
         case .symbol(let symbol):
@@ -980,7 +994,7 @@ class KeyboardViewModel: ObservableObject {
     /// 자음 키는 8방향 VowelResolver. 통일 안 하면 캔버스가 ㅡ키 ← 를 ㅛ 가 아닌
     /// ㅓ(자음 매핑)로 잘못 표시한다(실제 입력은 ㅛ 인데 미리보기만 ㅓ).
     private func resolvedPreviewVowel(row: Int, column: Int, directions: [GestureDirection]) -> Jungseong? {
-        if let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization),
+        if let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage),
            case .vowelPrimitive(let primitive) = content {
             return resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
         }

@@ -6,6 +6,9 @@ struct KeyGridView: View {
     let totalWidth: CGFloat
     let mode: KeyboardMode
     let layoutCustomization: LayoutCustomization
+    /// Active symbol-keypad page (ignored outside symbol modes). Threaded from
+    /// KeyboardViewModel.symbolPage so page 1 renders its own symbol grid.
+    var symbolPage: Int = 0
     let activeKey: (row: Int, column: Int)?
     let previewVowel: Jungseong?
     var shiftState: ShiftState = .off
@@ -37,7 +40,7 @@ struct KeyGridView: View {
 
     /// Compute total width of a single row (sum of key widths + gaps)
     private func rowWidth(for row: Int) -> CGFloat {
-        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization, symbolPage: symbolPage)
         guard row >= 0 && row < layoutGrid.count else { return 0 }
         let cells = layoutGrid[row]
         var width: CGFloat = 0
@@ -52,11 +55,11 @@ struct KeyGridView: View {
 
     /// Number of rows in the active layout.
     private var rowCount: Int {
-        KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization).count
+        KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization, symbolPage: symbolPage).count
     }
 
     var body: some View {
-        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization, symbolPage: symbolPage)
         VStack(spacing: KeyboardMetrics.keySpacing) {
             ForEach(0..<rowCount, id: \.self) { row in
                 HStack(spacing: KeyboardMetrics.keySpacing) {

@@ -26,6 +26,7 @@ final class KeyboardSettings: ObservableObject {
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
+        static let cursorRepeatSpeed = "cursorRepeatSpeed"
         static let periodOnDoubleSpace = "periodOnDoubleSpace"
         static let abbreviationEnabled = "abbreviationEnabled"
         static let layoutCustomization = "layoutCustomization"
@@ -136,6 +137,11 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(cursorMoveBySpaceDragEnabled, forKey: Keys.cursorMoveBySpaceDragEnabled) }
     }
 
+    /// Space-drag hold-to-repeat cursor speed: 0=slow, 1=normal, 2=fast.
+    @Published var cursorRepeatSpeed: Int = 1 {
+        didSet { guard !isLoading else { return }; writePrimitive(cursorRepeatSpeed, forKey: Keys.cursorRepeatSpeed) }
+    }
+
     /// Double-space inserts a period (iOS-style ". " shortcut, default ON)
     @Published var periodOnDoubleSpaceEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(periodOnDoubleSpaceEnabled, forKey: Keys.periodOnDoubleSpace) }
@@ -179,6 +185,16 @@ final class KeyboardSettings: ObservableObject {
         case 0:  return 0.12
         case 2:  return 0.05
         default: return 0.08
+        }
+    }
+
+    /// Space-drag hold-to-repeat ramp (start interval → floor) from
+    /// `cursorRepeatSpeed`. The repeater accelerates from `initial` toward `min`.
+    var cursorRepeatInterval: (initial: TimeInterval, min: TimeInterval) {
+        switch cursorRepeatSpeed {
+        case 0:  return (0.22, 0.10)    // 느림
+        case 2:  return (0.09, 0.028)   // 빠름
+        default: return (0.14, 0.045)   // 보통
         }
     }
 
@@ -306,6 +322,7 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
         wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5
         cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
+        cursorRepeatSpeed = defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1
         periodOnDoubleSpaceEnabled = defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true
         layoutCustomization = load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization()
         firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
@@ -359,6 +376,7 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true
+        cursorRepeatSpeed = 1
         periodOnDoubleSpaceEnabled = true
         layoutCustomization = LayoutCustomization()
         firstLaunchModalShown = false
