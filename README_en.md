@@ -6,7 +6,9 @@
 
 Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 8-directional gesture combinations.
 
-**New in v1.7.2**: Fixed duplicate insertion of the last composing syllable after tapping to move the caret; suppressed the double-space period misfire right after an abbreviation expansion.
+**New in v1.8.0**: Two-page symbol keypad (page 1 = digits + common punctuation `. , ' "`, page 2 = brackets/currency/math/typographic symbols), and space-bar hold-to-scroll cursor movement (push and hold toward either end to move continuously, with a direction indicator and a speed setting).
+
+**v1.7.2**: Fixed duplicate insertion of the last composing syllable after tapping to move the caret; suppressed the double-space period misfire right after an abbreviation expansion.
 
 **v1.7**: Native iPad support (universal, split landscape layout + dynamic height), consonant-diagonal vowel entry (swipe ㄱ up-right then right = 가), per-side sector angle tuning, 4-direction-only mode, multi-stroke sensitivity, what's-new modal.
 
@@ -46,12 +48,13 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 - **English QWERTY mode** (v1.2) — Switch instantly with the language key. Double-tap Shift for Caps Lock.
 - **Long-press auxiliary input** — Hold for numbers/symbols, drag to select candidates
 - **English number specials** (v1.2) — Long-press number keys in English mode for ! @ # $ % ^ & * ( )
+- **Two-page symbol keypad** (v1.8) — Page 1 holds digits + common punctuation (`.` `,` `'` `"`); page 2 holds brackets, currency, math, and typographic symbols (`[ ] { } ₩ € £ · …`). Switch with the `#+=` / `123` key left of the space bar
 - **Abbreviation expansion** — Type a few consonants to expand into full phrases (e.g. ㅇㅎ → 확인했습니다)
 - **Abbreviation master toggle** (v1.3) — Pause auto-expansion without losing saved phrases; backspace immediately after expansion restores the original input
 - **English QWERTY Caps Lock** (v1.3) — Long-press Shift to toggle Caps Lock
 
 ### Editing
-- **Space-drag cursor** (v1.2) — Drag the space bar left/right to move the cursor
+- **Space-drag cursor** (v1.2 · v1.8 hold-to-scroll) — Drag the space bar left/right to move the cursor. Push and hold into the outer 15% at either end to move continuously in that direction with acceleration (direction arrow shown; toggle on/off and adjust speed in Settings → Input Behavior). Vertical cursor movement is not supported due to iOS keyboard-extension API limits
 - **Double-space period** (v1.6) — Tap space twice after a character to insert `. ` (toggleable in Settings → Input Behavior; does not fire right after an abbreviation expansion)
 - **Auto bracket close** — Typing `(`, `[`, `{`, `「` etc. automatically inserts the closing pair
 - **Word-level delete** — Long-press backspace for fast word-by-word deletion
