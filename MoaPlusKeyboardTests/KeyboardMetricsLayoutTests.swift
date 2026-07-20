@@ -158,6 +158,93 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertEqual(grid[3][5], .backspaceWide)
     }
 
+    // MARK: - Symbol pages
+
+    /// Page 0 must expose the common punctuation the feedback asked for
+    /// (마침표/쉼표/따옴표) while keeping the digit cluster.
+    func testSymbolPage0_containsCommonPunctuationAndDigits() {
+        let grid = KeyboardMetrics.symbolLayout(LayoutCustomization(), page: 0)
+        let flat = grid.flatMap { $0 }
+        for ch in [".", ",", "'", "\""] {
+            XCTAssertTrue(flat.contains(.symbol(ch)), "page 0 must contain \(ch)")
+        }
+        for digit in ["0", "5", "9"] {
+            XCTAssertTrue(flat.contains(.symbol(digit)), "page 0 must keep digit \(digit)")
+        }
+    }
+
+    /// Default `symbolLayout(_:)` (no page arg) resolves to page 0.
+    func testSymbolLayout_defaultsToPage0() {
+        let implicit = KeyboardMetrics.symbolLayout(LayoutCustomization())
+        let explicit = KeyboardMetrics.symbolLayout(LayoutCustomization(), page: 0)
+        XCTAssertEqual(implicit, explicit)
+    }
+
+    /// Page 1 drops the digits and offers a different symbol set.
+    func testSymbolPage1_hasNoDigitsAndDiffersFromPage0() {
+        let page0 = KeyboardMetrics.symbolLayout(LayoutCustomization(), page: 0)
+        let page1 = KeyboardMetrics.symbolLayout(LayoutCustomization(), page: 1)
+        XCTAssertNotEqual(page0, page1)
+        let flat1 = page1.flatMap { $0 }
+        for digit in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] {
+            XCTAssertFalse(flat1.contains(.symbol(digit)), "page 1 must not contain digit \(digit)")
+        }
+        // Bracket / currency symbols only reachable on page 1.
+        for ch in ["[", "]", "{", "}", "₩"] {
+            XCTAssertTrue(flat1.contains(.symbol(ch)), "page 1 must contain \(ch)")
+        }
+    }
+
+    /// Essential characters must stay reachable across the two pages for
+    /// *every* slotA preset — not just the default .vowel layout. Guards the
+    /// classic11/fullPackage wide-⌫ branch, whose narrower grid dropped `/`
+    /// off both pages in an earlier revision (regression from the pre-page
+    /// keypad). Digits + the feedback-requested punctuation must all survive.
+    func testSymbolPages_essentialCharsReachableForEveryPreset() {
+        let essential = [".", ",", "'", "\"", "/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        for preset in [SlotAPreset.vowel, .classic11, .fullPackage] {
+            var layout = LayoutCustomization()
+            layout.slotA = preset
+            let union = Set(
+                (KeyboardMetrics.symbolLayout(layout, page: 0)
+                    + KeyboardMetrics.symbolLayout(layout, page: 1))
+                    .flatMap { $0 }
+                    .compactMap { cell -> String? in
+                        if case .symbol(let s) = cell { return s } else { return nil }
+                    }
+            )
+            for ch in essential {
+                XCTAssertTrue(union.contains(ch), "\(preset): symbol keypad must expose \(ch) on some page")
+            }
+        }
+    }
+
+    /// Both pages must share the exact same geometry (⌫ position / column
+    /// counts) so only the printed characters change when flipping pages.
+    func testSymbolPages_shareGeometryAcrossSlotA() {
+        for preset in [SlotAPreset.vowel, .classic11, .fullPackage] {
+            var layout = LayoutCustomization()
+            layout.slotA = preset
+            let p0 = KeyboardMetrics.symbolLayout(layout, page: 0)
+            let p1 = KeyboardMetrics.symbolLayout(layout, page: 1)
+            XCTAssertEqual(p0.count, p1.count, "\(preset): row count differs")
+            for row in 0..<p0.count {
+                XCTAssertEqual(p0[row].count, p1[row].count, "\(preset) row \(row): column count differs")
+                for col in 0..<p0[row].count {
+                    // Non-symbol control cells (⌫, wide ⌫) must sit at identical positions.
+                    let a = p0[row][col], b = p1[row][col]
+                    let aIsSymbol = { if case .symbol = a { return true } else { return false } }()
+                    let bIsSymbol = { if case .symbol = b { return true } else { return false } }()
+                    XCTAssertEqual(aIsSymbol, bIsSymbol,
+                                   "\(preset) [\(row)][\(col)]: symbol/control kind must match across pages")
+                    if !aIsSymbol {
+                        XCTAssertEqual(a, b, "\(preset) [\(row)][\(col)]: control cell must be identical")
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - English row 3 shift/backspace widths
 
     func testEnglishKeyWidth_shiftAndBackspaceAreWiderOnRow3() {
