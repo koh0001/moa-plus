@@ -28,7 +28,7 @@ moa-plus/
 │   └── Tutorial/                      # 8단계 튜토리얼 (딥블루 테마)
 │
 ├── MoaPlusKeyboard/                   # 키보드 익스텐션
-│   ├── KeyboardViewController.swift   # UIKit 진입점 (260pt 고정 높이)
+│   ├── KeyboardViewController.swift   # UIKit 진입점 (아이폰 260pt × keyboardHeightScale)
 │   ├── Engine/
 │   │   ├── HangulComposer.swift       # 한글 조합 상태머신 (6 cases: empty/choseong/choseongJungseong/complete/standaloneVowel/dotPending)
 │   │   ├── GestureAnalyzer.swift      # 제스처 방향 분석 (설정 연동, 열별 보정)
@@ -193,7 +193,10 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - Shift on/locked 시 letter 키 표시 대문자 (ConsonantKeyView)
 
 ### Function Row
-`[123/한글] [한/영] [space (drag→커서)] [긋기 펑크] [⏎]`
+`[🌐] [123/한글] [한/영] [space (drag→커서)] [긋기 펑크] [⏎]`
+- 지구본(🌐): **iOS 26 아이폰에서는 시스템이 키보드 아래에 지구본 바를 직접 그려 `needsInputModeSwitchKey == false` → 우리 지구본 미표시**(중복 방지, 시뮬레이터 실측). 구버전 iOS/아이패드 등 `true` 인 환경에서만 나타남
+- `showGlobeKey && viewModel.canSwitchInputMode` 일 때만 렌더 → `KeyboardViewModel.switchKeyboard()` → `advanceToNextInputMode()`. `needsInputModeSwitchKey`는 익스텐션만 읽을 수 있어 `KeyboardViewController`가 `viewDidLoad` + **`viewWillAppear` 매회** `viewModel.canSwitchInputMode`에 밀어넣는다(세션 중 키보드 추가 반영, 호스트 앱 미리보기 기본 true). 1회만 캡처하면 익스텐션 프로세스가 살아있는 동안 갱신 안 됨
+- 기능행 4개 바디(default/longSpace/symbol/bimanual) 모두 자식 폭 합 == `effectiveTotalWidth` 여야 ⏎ 가 안 잘림. 자식 추가 시 간격 수도 함께 증가 — 지구본은 `globeReservedWidth`(폭+간격)를 **스페이스바에서만** 차감. 불변식은 `FunctionRowWidthTests` 가드
 - 긋기 펑크: tap=`.`, ←=`?`, →=`!`, ↑=`,`, ↓=`.`
 - Space 드래그: 8pt 임계값, 12pt/step → `moveCursor(by:)` (commitCurrent + abbreviation reset 후 proxy 커서 이동)
 - Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
@@ -264,6 +267,9 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── clickSoundEnabled: Bool                 (독립 저장)
 ├── longPressDelay: Double                  (0.2~1.0초)
 ├── sideKeyWidthRatio: Double               (0.15~1.0, 기본 0.7 정사각)
+├── keyboardHeightScale: Double             (0.85~1.35, 기본 1.0 — 기기 기본 높이에 곱함)
+├── showGlobeKey: Bool                      (기능행 지구본 키, 기본 OFF)
+├── consonantDiagonalDerivationEnabled: Bool (자음 대각선 진입 파생, 기본 OFF=순정 모아키)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)
 ├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
@@ -275,6 +281,18 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── showDetailedHints: Bool
 └── hintSize: Int                           (0=작게, 1=보통, 2=크게)
 ```
+
+### 순정 모아키 입력 스펙 (기준)
+출처: `docs/moakey_ios_custom_docs/assets/03_gesture_angle_reference.png`(실제 삼성 설정, 양손용) + 나무위키.
+- 자음 8방향 단독: `↑=ㅗ ↓=ㅜ →=ㅏ ←=ㅓ`, `↖↗=ㅣ`, `↙↘=ㅡ`
+- 복합모음은 **방향 조합**: `ㅘ=↑→` `ㅝ=↓←` `ㅚ=↑↓` `ㅟ=↓↑` `ㅐ=→←` `ㅔ=←→` `ㅛ=↑↓↑` `ㅠ=↓↑↓` `ㅑ=→←→` `ㅕ=←→←` `ㅙ=↑→←` `ㅞ=↓←→`
+- `VowelPattern.all`(자음 키 트라이)이 이 스펙과 동일 — **변경 시 순정 이탈 주의**
+- `resolveConsonantDiagonalVowel`(대각선 진입 후 천지인 파생)은 v1.7에 추가한 **순정에 없는 확장**. `consonantDiagonalDerivationEnabled`(기본 OFF)로만 활성. 켜면 긋기 끝 흔들림이 ㅡ→ㅗ/ㅢ/ㅘ 로 승격돼 오타가 난다(리뷰 3건)
+- 단독 대각선(↗=ㅣ ↘=ㅡ)은 트라이가 처리하므로 이 설정과 무관 — 클래식/확장형의 유일한 ㅣ/ㅡ 경로라 절대 깨면 안 됨
+
+### 긋기 노이즈 처리 (GestureAnalyzer)
+- `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다
+- 후행 노이즈 트림은 **절대 크기(`edgeNoiseCap`) + 직전 획 대비 비율(`trailingNoiseRatio` 0.4)** 를 함께 보고, 꼬리가 여러 조각일 수 있어 반복 제거. 절대 크기만 쓰면 ㅒ/ㅖ/ㅙ/ㅞ의 짧은 마지막 획이 잘려 얘→야, 왜→와 회귀 발생 (`GestureOverDetectionCharacterizationTests` 가드)
 
 ### 대각선 모음 매핑 (기본값)
 ```
