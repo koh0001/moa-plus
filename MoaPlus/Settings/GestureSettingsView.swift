@@ -46,6 +46,21 @@ struct GestureSettingsView: View {
                 Text("실제 긋기가 어떤 방향/모음으로 인식되는지 손가락으로 직접 그어 확인할 수 있습니다.")
             }
 
+            // 자음 대각선 진입 파생 (순정 모아키 vs 확장)
+            Section {
+                Picker("복합모음 입력", selection: $settings.consonantDiagonalDerivationEnabled) {
+                    Text("순정 모아키").tag(false)
+                    Text("확장 (대각선 진입)").tag(true)
+                }
+                .pickerStyle(.inline)
+            } header: {
+                Text("입력 방식")
+            } footer: {
+                Text(settings.consonantDiagonalDerivationEnabled
+                     ? "자음을 대각선(↗↖ = ㅣ / ↙↘ = ㅡ)으로 그은 뒤 이어서 그으면 천지인 방식으로 복합모음이 만들어집니다. 순정에 없는 확장 기능이라, 긋기 끝의 작은 흔들림이 '으'를 '워'로 바꾸는 오타가 생길 수 있습니다."
+                     : "순정 모아키와 동일하게 동작합니다. 대각선은 ㅣ/ㅡ 그 자체이고, 복합모음은 방향 조합으로 만듭니다 (ㅘ = 위→오른쪽, ㅝ = 아래→왼쪽, ㅙ = 위→오른쪽→왼쪽).")
+            }
+
             // Swipe Angle preset
             Section {
                 Picker("프리셋", selection: profileBinding(\.mode)) {
