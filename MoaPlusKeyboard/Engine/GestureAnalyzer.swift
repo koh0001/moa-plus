@@ -16,6 +16,16 @@ class GestureAnalyzer {
     /// 곧 "turn 지점"이 되어 새 stroke 변위의 측정 기준이 된다. 같은 방향이
     /// 이어질 때마다 최근 점으로 전진한다.
     private var strokeAnchorPoint: CGPoint?
+    /// 현재 stroke가 **시작된** 점. `strokeAnchorPoint` 와 달리 같은 방향이
+    /// 이어져도 전진하지 않는다.
+    ///
+    /// `directionMagnitudes` 는 원래 stroke 가 *등록된 순간의* 변위만 담고 있었다.
+    /// 등록은 임계를 넘자마자 일어나므로, 60pt 를 그은 획도 임계값(≈20pt)으로
+    /// 기록됐다. `normalizeSegments` 의 비율 판정들(jitter 비교, 후행 노이즈)이
+    /// 전부 "직전 획 대비"를 전제하는데 그 기준값이 실제 획 길이가 아니라
+    /// 임계값이었다는 뜻 — 노이즈와 의도적 획을 비율로 구분할 수 없었다.
+    /// 이 점을 기준으로 매 관측마다 magnitude 를 실제 길이로 갱신한다.
+    private var strokeOriginPoint: CGPoint?
 
     private let threshold: CGFloat
     private let reversalThreshold: CGFloat
@@ -58,6 +68,10 @@ class GestureAnalyzer {
 
     /// vowel-primitive(ㅣ/ㅡ) 좁은 키 첫-방향 임계 (keyWidth 대비 ≈ 10pt).
     private static let narrowKeyThresholdRatio: CGFloat = 0.2
+
+    /// 후행 노이즈 판정용 "직전 획 대비" 비율. 실측 분리(노이즈 0.24~0.32 /
+    /// 의도적 마지막 획 0.55)의 중간에 두어 양쪽 모두 여유 마진을 준다.
+    private static let trailingNoiseRatio: CGFloat = 0.4
 
     /// Effective direction-change threshold considering column overrides.
     /// If the analyzer was constructed with a custom `directionChangeThreshold`
@@ -135,6 +149,7 @@ class GestureAnalyzer {
         directionMagnitudes.removeAll(keepingCapacity: true)
         lastDirectionChangePoint = nil
         strokeAnchorPoint = nil
+        strokeOriginPoint = nil
     }
 
     func addPoint(_ point: CGPoint) {
@@ -185,6 +200,12 @@ class GestureAnalyzer {
             if newDirection == lastDirection {
                 // 같은 방향 연장: 다음 turn 측정 기준점(anchor)을 최근 점으로 전진.
                 strokeAnchorPoint = currentPoint
+                // stroke 원점은 그대로 두고 magnitude 만 실제 길이로 갱신한다.
+                if let origin = strokeOriginPoint, !directionMagnitudes.isEmpty {
+                    let ex = currentPoint.x - origin.x
+                    let ey = currentPoint.y - origin.y
+                    directionMagnitudes[directionMagnitudes.count - 1] = sqrt(ex * ex + ey * ey)
+                }
                 return
             }
 
@@ -220,6 +241,7 @@ class GestureAnalyzer {
                 directionMagnitudes.append(displacement)
                 lastDirectionChangePoint = currentPoint
                 strokeAnchorPoint = currentPoint
+                strokeOriginPoint = anchor
             }
         } else {
             // 첫 방향: 시작점부터 누적 변위가 full swipe 임계를 넘어야 등록(탭/짧은
@@ -232,6 +254,7 @@ class GestureAnalyzer {
                 directionMagnitudes.append(displacement)
                 lastDirectionChangePoint = currentPoint
                 strokeAnchorPoint = currentPoint
+                strokeOriginPoint = startPoint
             }
         }
     }
@@ -394,10 +417,32 @@ class GestureAnalyzer {
             }
         }
 
-        if result.count > 1, let last = result.last, let previous = result.dropLast().last {
-            if last.magnitude <= edgeNoiseCap && last.direction.isAdjacentTo(previous.direction) {
-                result.removeLast()
-            }
+        // 후행 노이즈: 인접(≤45°) 조건을 요구하지 않는다.
+        //
+        // 손가락을 떼며 튕기는 꼬리는 방향이 급격한 경우가 더 흔하다 — 실측에서
+        // ↙ 뒤의 ↗(180°)·↑(135°)·↘(90°) 꼬리가 전부 인접이 아니어서 트림을
+        // 빠져나갔고, 그 결과 ㅡ 가 ㅢ/ㅗ/ㅘ 로 승격돼 "'으'가 '워'로" 오타가 났다
+        // (앱스토어 리뷰 3건, `GestureOverDetectionCharacterizationTests` 재현).
+        // 인접 조건은 "완만하게 흘러내린 꼬리"만 잡아 의도와 정반대였다.
+        //
+        // 크기 상한(`edgeNoiseCap`)은 그대로 두므로 의도적으로 그은 마지막 획은
+        // 남는다 — ㅙ(↑→←)/ㅞ(↓←→)의 짧은 마지막 획(실측 25pt)이 회귀 가드다.
+        // 꼬리는 한 획이 아닐 수 있다 — 손을 떼며 그리는 호는 ↑ 후 → 처럼 두
+        // 조각으로 등록된다(실측). 하나만 지우면 남은 조각이 승격을 일으키므로
+        // 조건을 만족하는 동안 반복해서 걷어낸다.
+        //
+        // 판정은 **절대 크기 + 직전 획 대비 비율**을 모두 본다.
+        // 절대 크기만 쓰면 ㅒ(→←→←)/ㅖ/ㅙ/ㅞ 처럼 마지막 획이 짧아지기 쉬운
+        // 의도적 4·3획 모음이 함께 잘린다(실측: 30pt 마지막 획이 사라져 얘→야,
+        // 왜→와). 비율만 쓰면 짧은 진입 획 뒤의 꼬리를 놓친다.
+        // 실측 분리: 노이즈 꼬리 15~20pt / 진입 63pt = 0.24~0.32,
+        //            의도적 마지막 획 30pt / 직전 55pt = 0.55.
+        // 인접(≤45°) 꼬리는 기존대로 비율과 무관하게 제거한다(완만한 흘림).
+        while result.count > 1, let last = result.last, let previous = result.dropLast().last {
+            let isTinyAbsolute = last.magnitude <= edgeNoiseCap
+            let isTinyRelative = last.magnitude < previous.magnitude * Self.trailingNoiseRatio
+            guard isTinyAbsolute && (isTinyRelative || last.direction.isAdjacentTo(previous.direction)) else { break }
+            result.removeLast()
         }
 
         return result
