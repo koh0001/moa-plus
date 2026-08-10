@@ -391,36 +391,51 @@ final class KeyboardSettings: ObservableObject {
 
     // MARK: - Persistence
 
+    /// 값이 **실제로 달라졌을 때만** 대입한다.
+    ///
+    /// `@Published` 는 같은 값을 다시 넣어도 `objectWillChange` 를 발행한다.
+    /// `loadAll()` 은 크로스프로세스 변경 알림마다 도는데, 무조건 재대입하면
+    /// 무관한 설정 하나가 바뀌어도 키보드 트리 전체가 재구성된다. 이 때문에
+    /// 지금까지 구독자마다 `removeDuplicates()` 를 개별로 붙여야 했다
+    /// (`KeyboardViewController.observeHeightScale` 주석 참조).
+    ///
+    /// 대입이 일어나지 않으면 `didSet` 도 안 돌아 색·인덱스 캐시 재빌드가
+    /// 생략되는데, 값이 같으니 재계산할 것도 없다.
+    private func assign<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<KeyboardSettings, T>, _ newValue: T) {
+        guard self[keyPath: keyPath] != newValue else { return }
+        self[keyPath: keyPath] = newValue
+    }
+
     func loadAll() {
         isLoading = true
         defer { isLoading = false }
-        gestureSettings = load(GestureSettings.self, forKey: Keys.gestureSettings) ?? .default
-        themeSettings = load(ThemeSettings.self, forKey: Keys.themeSettings) ?? .default
-        secondaryKeyActions = load([SecondaryKeyAction].self, forKey: Keys.secondaryKeyActions) ?? SecondaryKeyAction.defaults
-        shortcutExpansionStore = load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore()
-        abbreviationEnabled = defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true
-        showGesturePreview = defaults.bool(forKey: Keys.showGesturePreview)
-        showSecondaryHints = defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true
-        hintSize = defaults.object(forKey: Keys.hintSize) as? Int ?? 1
-        sideKeyWidthRatio = defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7
-        keyboardHeightScale = defaults.object(forKey: Keys.keyboardHeightScale) as? Double ?? KeyboardMetrics.defaultKeyboardHeightScale
-        showGlobeKey = defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false
-        consonantDiagonalDerivationEnabled = defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false
-        longPressDelay = defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5
-        clickSoundEnabled = defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false
-        showDetailedHints = defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false
-        autoBracketEnabled = defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true
-        wordDeleteEnabled = defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true
-        backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
-        wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5
-        cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
-        cursorRepeatSpeed = defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1
-        periodOnDoubleSpaceEnabled = defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true
-        layoutCustomization = load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization()
-        firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
-        rememberLastKeyboardMode = defaults.bool(forKey: Keys.rememberLastKeyboardMode)
-        lastKeyboardLetterMode = defaults.string(forKey: Keys.lastKeyboardLetterMode) ?? "korean"
-        lastSeenWhatsNewVersion = defaults.string(forKey: Keys.lastSeenWhatsNewVersion) ?? ""
+        assign(\.gestureSettings, load(GestureSettings.self, forKey: Keys.gestureSettings) ?? .default)
+        assign(\.themeSettings, load(ThemeSettings.self, forKey: Keys.themeSettings) ?? .default)
+        assign(\.secondaryKeyActions, load([SecondaryKeyAction].self, forKey: Keys.secondaryKeyActions) ?? SecondaryKeyAction.defaults)
+        assign(\.shortcutExpansionStore, load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore())
+        assign(\.abbreviationEnabled, defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true)
+        assign(\.showGesturePreview, defaults.bool(forKey: Keys.showGesturePreview))
+        assign(\.showSecondaryHints, defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true)
+        assign(\.hintSize, defaults.object(forKey: Keys.hintSize) as? Int ?? 1)
+        assign(\.sideKeyWidthRatio, defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7)
+        assign(\.keyboardHeightScale, defaults.object(forKey: Keys.keyboardHeightScale) as? Double ?? KeyboardMetrics.defaultKeyboardHeightScale)
+        assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
+        assign(\.consonantDiagonalDerivationEnabled, defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false)
+        assign(\.longPressDelay, defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5)
+        assign(\.clickSoundEnabled, defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false)
+        assign(\.showDetailedHints, defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false)
+        assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
+        assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
+        assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
+        assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
+        assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
+        assign(\.cursorRepeatSpeed, defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1)
+        assign(\.periodOnDoubleSpaceEnabled, defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true)
+        assign(\.layoutCustomization, load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization())
+        assign(\.firstLaunchModalShown, defaults.bool(forKey: Keys.firstLaunchModalShown))
+        assign(\.rememberLastKeyboardMode, defaults.bool(forKey: Keys.rememberLastKeyboardMode))
+        assign(\.lastKeyboardLetterMode, defaults.string(forKey: Keys.lastKeyboardLetterMode) ?? "korean")
+        assign(\.lastSeenWhatsNewVersion, defaults.string(forKey: Keys.lastSeenWhatsNewVersion) ?? "")
     }
 
     private func save<T: Encodable>(_ value: T, forKey key: String) {
