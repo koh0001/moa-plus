@@ -10,7 +10,6 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
     private var keyboardView: UIViewController?
     private let viewModel = KeyboardViewModel()
-    private var feedbackGenerator: UIImpactFeedbackGenerator?
     private var heightConstraint: NSLayoutConstraint?
     /// First viewDidAppear is the cold start — no prior lifecycle to recover
     /// from, so we skip the isUserInteractionEnabled toggle that exists for
@@ -71,7 +70,6 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // viewWillAppear's loadAll() lands.
         KeyboardSettings.shared.loadAll()
         setupKeyboardView()
-        setupHapticFeedback()
         observeHeightScale()
         // Audio session warmup removed: it ignored clickSoundEnabled and
         // played an unconditional click on every keyboard show, audible
@@ -185,11 +183,6 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         ])
 
         keyboardView = hostingController
-    }
-
-    private func setupHapticFeedback() {
-        feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
-        feedbackGenerator?.prepare()
     }
 
     override func textWillChange(_ textInput: UITextInput?) {
