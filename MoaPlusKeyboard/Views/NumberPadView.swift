@@ -30,7 +30,8 @@ struct NumberPadView: View {
 
     @ViewBuilder
     private func keyView(for key: String) -> some View {
-        let theme = settings.themeSettings
+        // 키마다 호출되므로 ThemeSettings 복사 대신 미리 계산된 색 캐시를 읽는다.
+        let theme = settings
         if key == KeyboardMetrics.numberPadBackspaceLabel {
             Text(key)
                 .font(.system(size: 22))

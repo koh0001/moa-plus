@@ -280,7 +280,9 @@ struct KeyView: View {
     }
 
     private var themedBackgroundColor: Color {
-        let ts = KeyboardSettings.shared.themeSettings
+        // 미리 계산된 색 캐시를 읽는다 — ThemeSettings 를 통째로 복사하면 키마다
+        // 구조체 복사(String? 필드 때문에 ARC 발생) + Color 재생성이 일어난다.
+        let ts = KeyboardSettings.shared
         switch content {
         case .consonant:
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
@@ -306,7 +308,7 @@ struct KeyView: View {
     }
 
     private var themedTextColor: Color {
-        return KeyboardSettings.shared.themeSettings.resolvedKeyText
+        return KeyboardSettings.shared.resolvedKeyText
     }
 
     private var isBackspaceKey: Bool {

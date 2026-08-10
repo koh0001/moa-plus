@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI  // 미리 계산한 키 색상(Color) 캐시용
 
 /// Central settings store shared between keyboard extension and container app via App Group
 final class KeyboardSettings: ObservableObject {
@@ -54,7 +55,34 @@ final class KeyboardSettings: ObservableObject {
     // MARK: - Theme Settings
 
     @Published var themeSettings: ThemeSettings = .default {
-        didSet { guard !isLoading else { return }; save(themeSettings, forKey: Keys.themeSettings) }
+        didSet {
+            // 색 캐시는 `isLoading` 가드 앞에서 갱신한다 — 가드는 디스크 재저장만
+            // 막는다. 뒤에 두면 "설정에서 색을 바꿨는데 키보드가 안 변함"이 된다.
+            rebuildResolvedColors()
+            guard !isLoading else { return }
+            save(themeSettings, forKey: Keys.themeSettings)
+        }
+    }
+
+    /// 미리 계산해 둔 키 색상.
+    ///
+    /// `ThemeSettings` 는 값 타입이고 `backgroundImageId: String?` 를 포함해 복사마다
+    /// retain/release 가 발생한다. `resolved*` 는 computed 라 호출마다 Color 를 새로
+    /// 만든다. 뷰들이 키마다 `KeyboardSettings.shared.themeSettings` 를 읽고 있어서
+    /// 그리드 렌더 1회에 구조체 복사 약 56회 + Color 할당 약 56회가 나갔다.
+    /// 테마가 바뀔 때만 다시 계산한다.
+    ///
+    /// CLAUDE.md 가 "매번 직접 읽음"을 제약으로 명시한 것은 `HapticManager` 다
+    /// (키 입력당 1회라 비용이 무시 가능하고, 설정 즉시 반영이 목적) — 렌더 경로에는
+    /// 해당하지 않으므로 `HapticManager` 는 건드리지 않았다.
+    private(set) var resolvedKeyBackground: Color = ThemeSettings.default.resolvedKeyBackground
+    private(set) var resolvedKeyText: Color = ThemeSettings.default.resolvedKeyText
+    private(set) var resolvedFunctionKeyBackground: Color = ThemeSettings.default.resolvedFunctionKeyBackground
+
+    private func rebuildResolvedColors() {
+        resolvedKeyBackground = themeSettings.resolvedKeyBackground
+        resolvedKeyText = themeSettings.resolvedKeyText
+        resolvedFunctionKeyBackground = themeSettings.resolvedFunctionKeyBackground
     }
 
     // MARK: - Secondary Key Actions (Long-press mappings)
