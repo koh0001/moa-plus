@@ -524,8 +524,8 @@ struct PunctuationSwipeKey: View {
 
     private static let dragThreshold: CGFloat = 12
 
-    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
-    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+    private var bg: Color { KeyboardSettings.shared.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.resolvedKeyText }
 
     /// 글자 수에 따라 미리보기 폰트 축소. 1자=16/9, 2자=12/8, 3자+=10/7.
     private func mainFontSize(for text: String) -> CGFloat {
@@ -626,8 +626,8 @@ struct SlotBVowelKey: View {
 
     @State private var isPressed = false
 
-    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
-    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+    private var bg: Color { KeyboardSettings.shared.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.resolvedKeyText }
 
     var body: some View {
         VStack(spacing: 1) {
@@ -747,10 +747,10 @@ struct SpaceKeyView: View {
     private static let edgeZoneFraction: CGFloat = 0.15
 
     private var themeBackgroundColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground
+        KeyboardSettings.shared.resolvedFunctionKeyBackground
     }
     private var themeTextColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedKeyText
+        KeyboardSettings.shared.resolvedKeyText
     }
 
     /// One auto-repeat edge zone: a tint + directional chevron, both derived
@@ -874,11 +874,11 @@ struct FunctionKeyView: View {
     @State private var isPressed = false
 
     private var themeBackgroundColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground
+        KeyboardSettings.shared.resolvedFunctionKeyBackground
     }
 
     private var themeTextColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedKeyText
+        KeyboardSettings.shared.resolvedKeyText
     }
 
     var body: some View {
