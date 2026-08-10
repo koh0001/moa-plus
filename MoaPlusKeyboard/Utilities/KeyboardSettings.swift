@@ -60,7 +60,29 @@ final class KeyboardSettings: ObservableObject {
     // MARK: - Secondary Key Actions (Long-press mappings)
 
     @Published var secondaryKeyActions: [SecondaryKeyAction] = SecondaryKeyAction.defaults {
-        didSet { guard !isLoading else { return }; save(secondaryKeyActions, forKey: Keys.secondaryKeyActions) }
+        didSet {
+            // 인덱스 재빌드는 `isLoading` 가드보다 **앞**에 둔다. 가드는 디스크
+            // 재저장만 막는 것이고, `loadAll()` 로 값이 바뀐 뒤에도 인덱스는 새 값을
+            // 가리켜야 한다. 뒤에 두면 "설정에서 롱프레스 매핑을 고쳤는데 키보드는
+            // 예전 걸 낸다"는 stale 버그가 된다.
+            rebuildSecondaryActionIndex()
+            guard !isLoading else { return }
+            save(secondaryKeyActions, forKey: Keys.secondaryKeyActions)
+        }
+    }
+
+    /// `secondaryKeyActions` 의 keyId → 액션 인덱스.
+    ///
+    /// 원래 조회가 29개 배열 선형 String 탐색이었다. `KeyGridView` 가 키마다 최대
+    /// 2회(영문 숫자 경로 + 일반 경로) 부르므로 그리드 렌더 1회에 최대 812회 String
+    /// 비교가 나갔다. 조회 자체는 O(1) 로 바꾸고 공개 API 시그니처는 그대로 뒀다.
+    private var secondaryActionIndex: [String: SecondaryKeyAction] = Dictionary(
+        SecondaryKeyAction.defaults.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
+
+    private func rebuildSecondaryActionIndex() {
+        // 같은 keyId 가 중복되면 앞선 항목을 남긴다 — `first(where:)` 의 기존 동작과 같다.
+        secondaryActionIndex = Dictionary(
+            secondaryKeyActions.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     // MARK: - Shortcut Expansions
@@ -453,6 +475,6 @@ final class KeyboardSettings: ObservableObject {
 
     /// Get secondary action for a specific key
     func secondaryAction(forKey keyId: String) -> SecondaryKeyAction? {
-        return SecondaryKeyAction.action(forKey: keyId, from: secondaryKeyActions)
+        return secondaryActionIndex[keyId]
     }
 }
