@@ -301,6 +301,60 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 600, screenLong: 900), 320, accuracy: 0.01)
     }
 
+    // MARK: - User height scale (v1.9)
+
+    /// 배율 인자를 생략한 기존 호출부(및 위 6개 테스트)가 배율 도입 전과
+    /// 완전히 동일해야 한다. 기본값 회귀가 나면 모든 사용자 높이가 바뀐다.
+    func testKeyboardHeightScale_defaultMatchesLegacyBehaviour() {
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844, scale: 1.0),
+            KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844),
+            accuracy: 0.01)
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 744, screenLong: 1133, scale: 1.0),
+            KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: true, screenShort: 744, screenLong: 1133),
+            accuracy: 0.01)
+    }
+
+    func testKeyboardHeightScale_iPhoneMultipliesBaseHeight() {
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844, scale: 1.2),
+            260 * 1.2, accuracy: 0.01)
+    }
+
+    /// 아이패드는 화면 파생 높이를 먼저 클램프한 뒤 배율을 곱한다 —
+    /// 즉 사용자는 iPad 상한(400/420) 위로도 키울 수 있어야 한다.
+    func testKeyboardHeightScale_iPadAppliesAfterClamp() {
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: true, isLandscape: false, screenShort: 1024, screenLong: 1366, scale: 1.2),
+            400 * 1.2, accuracy: 0.01)
+    }
+
+    /// 저장값이 손상되거나 UI 밖에서 주입돼도 그리드가 무너지지 않아야 한다.
+    func testKeyboardHeightScale_outOfRangeValuesAreClamped() {
+        let lower = KeyboardMetrics.keyboardHeightScaleRange.lowerBound
+        let upper = KeyboardMetrics.keyboardHeightScaleRange.upperBound
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844, scale: 0.1),
+            260 * lower, accuracy: 0.01)
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844, scale: 9.0),
+            260 * upper, accuracy: 0.01)
+        XCTAssertEqual(
+            KeyboardMetrics.keyboardHeight(isPad: false, isLandscape: false, screenShort: 390, screenLong: 844, scale: .nan),
+            260 * lower, accuracy: 0.01)
+    }
+
+    /// 하한에서도 키 한 행이 실사용 가능한 높이를 유지해야 한다. 리뷰의 원
+    /// 요청은 "작게"였지만, 너무 작아지면 같은 리뷰가 지적한 오타 문제가
+    /// 악화된다. 38pt 밑으로 내려가면 하한을 올려야 한다는 뜻.
+    func testKeyboardHeightScale_minimumStillLeavesUsableKeyHeight() {
+        let minHeight = KeyboardMetrics.keyboardHeight(
+            isPad: false, isLandscape: false, screenShort: 390, screenLong: 844,
+            scale: KeyboardMetrics.keyboardHeightScaleRange.lowerBound)
+        XCTAssertGreaterThanOrEqual(KeyboardMetrics.keyHeight(for: minHeight), 38)
+    }
+
     // MARK: - iPad split decision (T6)
 
     func testIsLandscapeKeyboard_widthIsLongEdge_true() {

@@ -15,6 +15,12 @@ struct FunctionRowView: View {
     /// symbol mode / when the host doesn't wire it.
     var onSymbolPagePressed: (() -> Void)? = nil
     var onLanguageSwitchPressed: (() -> Void)? = nil
+    /// Render the system keyboard-switch (globe) key at the head of the row.
+    /// The host resolves this from `showGlobeKey` **and** iOS's
+    /// `needsInputModeSwitchKey`, so this view never has to guess whether a
+    /// switch target exists. Defaults to `false` so previews and any caller
+    /// that predates the key keep the original 5-key geometry.
+    var showGlobeKey: Bool = false
     var useBimanualLayout: Bool = false
     var layoutCustomization: LayoutCustomization = LayoutCustomization()
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
@@ -45,25 +51,37 @@ struct FunctionRowView: View {
     }
 
     /// 현재 모드에서 긋기 펑크 키를 표시할지. 심볼 모드는 항상 OFF (스코프 밖).
-    private var punctuationEnabledForMode: Bool {
+    var punctuationEnabledForMode: Bool {
         if mode.isSymbol { return false }
         return mode == .korean
             ? layoutCustomization.koreanPunctuationEnabled
             : layoutCustomization.englishPunctuationEnabled
     }
 
+    enum BodyKind { case bimanual, symbol, longSpace, `default` }
+
+    /// Single source of truth for which body renders. `body` and the
+    /// `occupiedWidth` width-invariant seam both read it, so a change to the
+    /// branch conditions can't leave the test agreeing with a stale copy of
+    /// the rules while the real layout clips.
+    var activeBodyKind: BodyKind {
+        if useBimanualLayout { return .bimanual }
+        // 심볼 모드: 비어있던 슬롯 B 자리에 페이지 토글(#+= / 123) 배치.
+        if mode.isSymbol { return .symbol }
+        // 펑크 키 OFF이거나 A3 한글 모드(그리드에 임베드 펑크 있음)면 긴 스페이스.
+        // 영문 모드는 A3여도 그리드 임베드 없으므로 기본 레이아웃 사용.
+        if !punctuationEnabledForMode || (layoutCustomization.slotA == .fullPackage && mode == .korean) {
+            return .longSpace
+        }
+        return .default
+    }
+
     var body: some View {
-        if useBimanualLayout {
-            bimanualLayoutBody
-        } else if mode.isSymbol {
-            // 심볼 모드: 비어있던 슬롯 B 자리에 페이지 토글(#+= / 123) 배치.
-            symbolLayoutBody
-        } else if !punctuationEnabledForMode || (layoutCustomization.slotA == .fullPackage && mode == .korean) {
-            // 펑크 키 OFF이거나 A3 한글 모드(그리드에 임베드 펑크 있음)면 긴 스페이스.
-            // 영문 모드는 A3여도 그리드 임베드 없으므로 기본 레이아웃 사용.
-            longSpaceLayoutBody
-        } else {
-            defaultLayoutBody
+        switch activeBodyKind {
+        case .bimanual:  bimanualLayoutBody
+        case .symbol:    symbolLayoutBody
+        case .longSpace: longSpaceLayoutBody
+        case .default:   defaultLayoutBody
         }
     }
 
@@ -75,6 +93,8 @@ struct FunctionRowView: View {
 
     private var symbolLayoutBody: some View {
         HStack(spacing: spacing) {
+            globeKeyIfEnabled
+
             FunctionKeyView(
                 content: AnyView(
                     Text(symbolToggleLabel)
@@ -116,6 +136,38 @@ struct FunctionRowView: View {
         }
     }
 
+    // MARK: - Globe key (system keyboard switch)
+
+    /// Head-of-row globe key, present in every non-bimanual body. Emits nothing
+    /// when disabled so the surrounding `HStack` keeps its original child and
+    /// gap count (`globeChildCount` mirrors this for the width math).
+    @ViewBuilder
+    private var globeKeyIfEnabled: some View {
+        if showGlobeKey {
+            FunctionKeyView(
+                content: AnyView(
+                    Image(systemName: "globe")
+                        .font(.system(size: 18))
+                ),
+                width: globeWidth,
+                height: height,
+                action: onLanguageSwitchPressed ?? {}
+            )
+        }
+    }
+
+    /// Same narrow width the bimanual layout already uses for its globe.
+    var globeWidth: CGFloat {
+        KeyboardMetrics.centerKeyWidth(for: totalWidth) * KeyboardMetrics.symbolWidthRatio
+    }
+
+    /// Width the globe key removes from the space bar, including its trailing
+    /// gap. Zero when hidden, so every width formula below stays correct for
+    /// both states without branching.
+    var globeReservedWidth: CGFloat {
+        showGlobeKey ? globeWidth + spacing : 0
+    }
+
     /// Symbol-page toggle key (#+= / 123). Narrow slot-B width, so the label
     /// uses a slightly smaller font to fit the 3-character labels.
     private func symbolPageToggleKey(width: CGFloat) -> some View {
@@ -138,6 +190,8 @@ struct FunctionRowView: View {
 
     private var longSpaceLayoutBody: some View {
         HStack(spacing: spacing) {
+            globeKeyIfEnabled
+
             FunctionKeyView(
                 content: AnyView(
                     Text(symbolToggleLabel)
@@ -178,7 +232,7 @@ struct FunctionRowView: View {
     }
 
     /// Space bar absorbs the slot B punctuation key + 1 internal gap.
-    private var longSpaceWidth: CGFloat {
+    var longSpaceWidth: CGFloat {
         spaceWidth + punctuationWidth + spacing
     }
 
@@ -187,6 +241,8 @@ struct FunctionRowView: View {
 
     private var defaultLayoutBody: some View {
         HStack(spacing: spacing) {
+            globeKeyIfEnabled
+
             // Symbol toggle (123/한글)
             FunctionKeyView(
                 content: AnyView(
@@ -269,15 +325,17 @@ struct FunctionRowView: View {
     private var bimanualLayoutBody: some View {
         HStack(spacing: spacing) {
             // Language switch key (globe)
-            FunctionKeyView(
-                content: AnyView(
-                    Image(systemName: "globe")
-                        .font(.system(size: 18))
-                ),
-                width: bimanualGlobeWidth,
-                height: height,
-                action: onLanguageSwitchPressed ?? {}
-            )
+            if showGlobeKey {
+                FunctionKeyView(
+                    content: AnyView(
+                        Image(systemName: "globe")
+                            .font(.system(size: 18))
+                    ),
+                    width: bimanualGlobeWidth,
+                    height: height,
+                    action: onLanguageSwitchPressed ?? {}
+                )
+            }
 
             // Mode toggle (한글/123)
             FunctionKeyView(
@@ -329,6 +387,45 @@ struct FunctionRowView: View {
         }
     }
 
+    // MARK: - Width invariant (test seam)
+
+    /// Total width the active body's children + inter-key gaps occupy.
+    /// Every body sizes its children to sum *exactly* to `effectiveTotalWidth`;
+    /// if this drifts, the rightmost key (return) overflows and is clipped —
+    /// see the `effectiveTotalWidth` comment below. Adding a child to a body
+    /// changes its gap count, which is the easy way to break this, so
+    /// `FunctionRowWidthTests` locks it for every body × globe on/off.
+    var occupiedWidth: CGFloat {
+        let globeChild: CGFloat = showGlobeKey ? 1 : 0
+        let children: CGFloat
+        let content: CGFloat
+        switch activeBodyKind {
+        case .bimanual:
+            children = 5 + globeChild
+            content = (showGlobeKey ? bimanualGlobeWidth : 0)
+                + bimanualToggleWidth + bimanualPunctuationWidth
+                + bimanualSpaceWidth + bimanualPunctuationWidth + returnWidth
+        case .symbol:
+            children = 5 + globeChild
+            content = (showGlobeKey ? globeWidth : 0)
+                + symbolToggleWidth + letterToggleWidth
+                + punctuationWidth + spaceWidth + returnWidth
+        case .longSpace:
+            children = 4 + globeChild
+            content = (showGlobeKey ? globeWidth : 0)
+                + symbolToggleWidth + letterToggleWidth + longSpaceWidth + returnWidth
+        case .default:
+            children = 5 + globeChild
+            content = (showGlobeKey ? globeWidth : 0)
+                + symbolToggleWidth + letterToggleWidth
+                + spaceWidth + punctuationWidth + returnWidth
+        }
+        return content + spacing * (children - 1)
+    }
+
+    /// Exposed alongside `occupiedWidth` so tests can assert the two match.
+    var availableWidth: CGFloat { effectiveTotalWidth }
+
     // MARK: - Default layout widths
 
     /// The KeyboardView wraps its VStack in `.padding(KeyboardMetrics.keySpacing)`,
@@ -337,11 +434,11 @@ struct FunctionRowView: View {
     /// function row's child widths sum *exactly* to `totalWidth`, so without
     /// compensating here the rightmost child (return key) overflows and gets
     /// clipped. Subtract the outer padding once so all downstream math fits.
-    private var effectiveTotalWidth: CGFloat {
+    var effectiveTotalWidth: CGFloat {
         max(0, totalWidth - spacing * 2)
     }
 
-    private var returnWidth: CGFloat {
+    var returnWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         let usesWideBackspace = layoutCustomization.slotA == .fullPackage
             || (mode.isSymbol && layoutCustomization.slotA != .vowel)
@@ -357,52 +454,58 @@ struct FunctionRowView: View {
         return sideWidth + centerKeyWidth + KeyboardMetrics.keySpacing
     }
 
-    private var availableWidthWithoutReturn: CGFloat {
+    var availableWidthWithoutReturn: CGFloat {
         // Default layout: 5 children (toggles + space + punct + return) → 4 internal gaps.
         max(0, effectiveTotalWidth - returnWidth - spacing * 4)
     }
 
-    private var symbolToggleWidth: CGFloat {
+    var symbolToggleWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * KeyboardMetrics.symbolWidthRatio * 1.3
     }
 
-    private var letterToggleWidth: CGFloat {
+    var letterToggleWidth: CGFloat {
         KeyboardMetrics.centerKeyWidth(for: totalWidth)
     }
 
-    private var punctuationWidth: CGFloat {
+    var punctuationWidth: CGFloat {
         availableWidthWithoutReturn * 0.16
     }
 
-    private var spaceWidth: CGFloat {
-        // Default layout: 5 children → 4 internal gaps.
-        let consumedByOthers = symbolToggleWidth + letterToggleWidth + punctuationWidth + returnWidth
+    var spaceWidth: CGFloat {
+        // 5 children → 4 internal gaps; the optional globe key adds a 6th child
+        // and a 5th gap, both folded into `globeReservedWidth`. The space bar
+        // alone absorbs it so the punctuation key keeps its size either way.
+        let consumedByOthers = globeReservedWidth + symbolToggleWidth
+            + letterToggleWidth + punctuationWidth + returnWidth
         return max(0, effectiveTotalWidth - consumedByOthers - spacing * 4)
     }
 
     // MARK: - Bimanual layout widths
 
-    private var bimanualGlobeWidth: CGFloat {
+    var bimanualGlobeWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * KeyboardMetrics.symbolWidthRatio
     }
 
-    private var bimanualToggleWidth: CGFloat {
+    var bimanualToggleWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * 1.2
     }
 
-    private var bimanualPunctuationWidth: CGFloat {
+    var bimanualPunctuationWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * KeyboardMetrics.symbolWidthRatio
     }
 
-    private var bimanualSpaceWidth: CGFloat {
+    var bimanualSpaceWidth: CGFloat {
         // Bimanual layout: 6 children (globe + toggle + letterToggle + space + slotB + return)
-        // → 5 internal gaps. Uses effectiveTotalWidth to compensate for parent padding.
-        let fixedWidths = bimanualGlobeWidth + bimanualToggleWidth + bimanualPunctuationWidth * 2 + returnWidth
-        return max(0, effectiveTotalWidth - fixedWidths - spacing * 5)
+        // → 5 internal gaps, or 5 children / 4 gaps when the globe is hidden.
+        // Uses effectiveTotalWidth to compensate for parent padding.
+        let globeReserved = showGlobeKey ? bimanualGlobeWidth + spacing : 0
+        let fixedWidths = globeReserved + bimanualToggleWidth
+            + bimanualPunctuationWidth * 2 + returnWidth
+        return max(0, effectiveTotalWidth - fixedWidths - spacing * 4)
     }
 }
 

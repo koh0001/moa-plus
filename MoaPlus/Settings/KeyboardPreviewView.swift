@@ -12,6 +12,9 @@ import SwiftUI
 /// silently no-op.
 struct KeyboardPreviewView: View {
     @StateObject private var viewModel = KeyboardViewModel()
+    /// Needed so the preview re-renders while the user drags the height
+    /// slider — `kbAspect` reads `keyboardHeightScale`.
+    @ObservedObject private var settings = KeyboardSettings.shared
 
     /// When set, the preview routes the slot B vowel-key gesture into this
     /// closure (with the resolved Jungseong) so callers can show "what would
@@ -57,8 +60,12 @@ struct KeyboardPreviewView: View {
         liveInputDelegate == nil && isInteractive
     }
 
-    /// Real keyboard aspect ratio (375pt host width / 260pt extension height).
-    private let kbAspect: CGFloat = 375.0 / 260.0
+    /// Real keyboard aspect ratio (375pt host width / 260pt extension height),
+    /// scaled by the user's height setting so the height slider visibly
+    /// changes the preview instead of only the live keyboard.
+    private var kbAspect: CGFloat {
+        375.0 / (KeyboardMetrics.keyboardHeight * KeyboardMetrics.clampedHeightScale(settings.keyboardHeightScale))
+    }
 
     var body: some View {
         KeyboardView(

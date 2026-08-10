@@ -1,6 +1,7 @@
 import UIKit
 import SwiftUI
 import AudioToolbox
+import Combine
 
 class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
@@ -23,6 +24,11 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// "안욥하세욥" bug). Cleared on the next runloop tick after textDidChange
     /// because selectionDidChange arrives synchronously within the same edit.
     private var isProgrammaticTextChange = false
+    /// Keeps the container height in sync while the keyboard is on screen and
+    /// the user drags the height slider in the host app. `viewWillAppear`
+    /// already re-applies on every show; this covers the split-screen /
+    /// side-by-side case where no re-appearance happens.
+    private var heightScaleCancellable: AnyCancellable?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -54,6 +60,11 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         self.heightConstraint = heightConstraint
 
         viewModel.delegate = self
+        // iOS only permits input-mode switching when it says so (e.g. more than
+        // one keyboard installed). Feeding it to the view model keeps the globe
+        // key from ever rendering as a dead button. Re-applied on every
+        // appearance below, since the user can add a keyboard mid-session.
+        viewModel.canSwitchInputMode = needsInputModeSwitchKey
         // Settings must be loaded before SwiftUI hosts the keyboard so the
         // first measure pass sees the user's layout/theme — otherwise the
         // initial frame uses defaults and visibly re-renders once
@@ -61,6 +72,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         KeyboardSettings.shared.loadAll()
         setupKeyboardView()
         setupHapticFeedback()
+        observeHeightScale()
         // Audio session warmup removed: it ignored clickSoundEnabled and
         // played an unconditional click on every keyboard show, audible
         // even to users who disabled sounds and inconsistent with normal
@@ -79,6 +91,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // appearance.
         KeyboardSettings.shared.loadAll()
         heightConstraint?.constant = computedKeyboardHeight()
+        viewModel.canSwitchInputMode = needsInputModeSwitchKey
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -107,7 +120,8 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
             keyboardWidth: width, screenShort: screenShort, screenLong: screenLong)
         return KeyboardMetrics.keyboardHeight(
-            isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong)
+            isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong,
+            scale: KeyboardSettings.shared.keyboardHeightScale)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -121,12 +135,29 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
                 keyboardWidth: size.width, screenShort: screenShort, screenLong: screenLong)
             self.heightConstraint?.constant = KeyboardMetrics.keyboardHeight(
-                isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong)
+                isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong,
+                scale: KeyboardSettings.shared.keyboardHeightScale)
         })
     }
 
+    /// `loadAll()` reassigns every @Published on each cross-process change, so
+    /// `removeDuplicates()` is required or this fires on unrelated edits.
+    private func observeHeightScale() {
+        heightScaleCancellable = KeyboardSettings.shared.$keyboardHeightScale
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.heightConstraint?.constant = self.computedKeyboardHeight()
+            }
+    }
+
     private func setupKeyboardView() {
-        let rootView = KeyboardView(viewModel: viewModel, gestureState: viewModel.gestureState, popupState: viewModel.popupState).ignoresSafeArea(.all)
+        let rootView = KeyboardView(
+            viewModel: viewModel,
+            gestureState: viewModel.gestureState,
+            popupState: viewModel.popupState
+        ).ignoresSafeArea(.all)
         let hostingController = UIHostingController(rootView: rootView)
         hostingController.view.backgroundColor = .clear
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
