@@ -112,34 +112,78 @@ class KeyboardViewModel: ObservableObject {
     @Published var abbreviationCandidate: ShortcutExpansion?
     @Published var abbreviationCandidates: [ShortcutExpansion] = []
 
-    // Forwarding properties for backward compatibility
+    // Forwarding properties for backward compatibility.
+    //
+    // **동일 값 재대입을 여기서 차단한다.** `@Published` 는 값이 같아도
+    // `objectWillChange` 를 발행하고, `KeyboardView` 가 `gestureState` 를 루트에서
+    // `@ObservedObject` 로 관찰하므로 발행 1회 = KeyboardView.body → KeyGridView →
+    // 28개 KeyView → FunctionRowView 전체 재평가다. `gestureMoved` 는 터치 포인트마다
+    // 이 setter 들을 호출하는데 값이 실제로 바뀌는 건 한 번의 긋기에서 2~4회뿐이라,
+    // 120Hz 200ms 긋기 기준 약 24회 리빌드 중 20여 회가 순수 낭비였다.
+    // 메인 스레드가 밀리면 UIKit 이 터치를 코얼레싱/드롭해 GestureAnalyzer 가 받는
+    // 샘플이 성겨지므로, 반전 획이 필요한 ㅛ(↑↓↑)·ㅠ(↓↑↓)·ㅢ 의 인식률까지 같이 나빠진다.
+    //
+    // 가드를 setter 에 두는 이유: 호출부(`gestureMoved` 2곳, `dismissPopup` 4곳,
+    // `resetGestureState` 4곳)마다 붙이면 새 호출부가 생길 때마다 빠뜨린다.
+    //
+    // ⚠️ 이건 **발행 억제가 아니라 중복 제거**다. 값이 실제로 바뀌면 그대로 발행된다.
+    // 억제로 바꾸면(예: 오버레이가 꺼져 있으면 previewVowel 발행 안 함) 키 위
+    // 미리보기 라벨(`ConsonantKeyView:143,171,188`)이 사라진다.
     var activeKey: (row: Int, column: Int)? {
         get { gestureState.activeKey }
-        set { gestureState.activeKey = newValue }
+        set {
+            // 튜플 옵셔널은 `!=` 가 합성되지 않아 직접 편다.
+            switch (gestureState.activeKey, newValue) {
+            case (nil, nil): return
+            case let (old?, new?) where old == new: return
+            default: gestureState.activeKey = newValue
+            }
+        }
     }
     var previewVowel: Jungseong? {
         get { gestureState.previewVowel }
-        set { gestureState.previewVowel = newValue }
+        set {
+            guard gestureState.previewVowel != newValue else { return }
+            gestureState.previewVowel = newValue
+        }
     }
     var gestureDirections: [GestureDirection] {
         get { gestureState.directions }
-        set { gestureState.directions = newValue }
+        set {
+            guard gestureState.directions != newValue else { return }
+            gestureState.directions = newValue
+        }
     }
     var gestureStartPoint: CGPoint? {
         get { gestureState.startPoint }
-        set { gestureState.startPoint = newValue }
+        set {
+            guard gestureState.startPoint != newValue else { return }
+            gestureState.startPoint = newValue
+        }
     }
+    // 위 `gestureState` 포워딩과 같은 이유의 중복 제거. `dismissPopup()` 은 매 제스처
+    // 종료마다 이 셋을 순차 대입하는데 팝업을 띄우지 않은 제스처에서는 셋 다 이미
+    // 기본값이라, 가드가 없으면 손을 뗄 때마다 발행 3회가 그냥 나간다.
     var longPressPopupText: String? {
         get { popupState.text }
-        set { popupState.text = newValue }
+        set {
+            guard popupState.text != newValue else { return }
+            popupState.text = newValue
+        }
     }
     var longPressPopupCandidates: [String] {
         get { popupState.candidates }
-        set { popupState.candidates = newValue }
+        set {
+            guard popupState.candidates != newValue else { return }
+            popupState.candidates = newValue
+        }
     }
     var longPressPopupSelectedIndex: Int {
         get { popupState.selectedIndex }
-        set { popupState.selectedIndex = newValue }
+        set {
+            guard popupState.selectedIndex != newValue else { return }
+            popupState.selectedIndex = newValue
+        }
     }
 
     private let composer = HangulComposer()
