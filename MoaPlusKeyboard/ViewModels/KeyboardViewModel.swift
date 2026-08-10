@@ -1036,6 +1036,13 @@ class KeyboardViewModel: ObservableObject {
     /// ㅡ 진입 후 ㅣ방향(↗/↖) 후속은 ㅢ. 첫 획이 카디널이거나 후속 없는 단독
     /// 대각선이면 nil → 호출부가 기존 `VowelResolver`(ㅣ/ㅡ 단독)로 폴백한다.
     func resolveConsonantDiagonalVowel(_ directions: [GestureDirection]) -> Jungseong? {
+        // 순정 모아키(기본값)에서는 이 경로 자체가 없다. 대각선은 최종 결과
+        // (↖↗=ㅣ, ↙↘=ㅡ)이며, 복합모음은 카디널 조합(ㅘ=↑→ 등)으로만 만든다.
+        // nil 을 돌려주면 호출부 3곳이 모두 `VowelResolver` 트라이로 폴백하는데,
+        // 그 패턴 테이블(`VowelPattern.all`)이 이미 순정 스펙과 동일하다.
+        // 단독 대각선은 어차피 아래 `rest.isEmpty` 가드로 폴백하므로, 이 게이트는
+        // 클래식/확장형 레이아웃의 ㅣ/ㅡ 입력에 영향을 주지 않는다.
+        guard KeyboardSettings.shared.consonantDiagonalDerivationEnabled else { return nil }
         guard let first = directions.first, first.isDiagonal else { return nil }
         let primitive: VowelPrimitiveType = (first == .upRight || first == .upLeft) ? .bar : .dash
         let rest = Array(directions.dropFirst())
