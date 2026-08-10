@@ -49,6 +49,10 @@ struct SettingsEntry: Identifiable {
     /// 사용자 어휘를 포함한 검색어. 제목에 없는 말로도 찾을 수 있어야 한다.
     let keywords: [String]
 
+    /// **알려진 한계 — 버그 아님**: 한글을 타이핑하는 중에는 질의가 아직 조합 중인
+    /// 자모(`ㄱ` → `ㄱㅏ` → `가`)라, 완성된 음절이 되기 전까지 `contains` 가 걸리지
+    /// 않아 결과가 비어 보인다. 음절이 완성되는 순간 정상적으로 나온다.
+    /// 초성 검색(`ㄱㄷ` → `각도`)은 별도 기능이며 여기에 없다.
     func matches(_ query: String) -> Bool {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return false }

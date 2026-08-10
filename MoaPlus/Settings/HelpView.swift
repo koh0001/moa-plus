@@ -32,8 +32,6 @@ struct HelpView: View {
                         .padding(.vertical, 2)
                     }
                 }
-            } header: {
-                Text("이럴 때 어떻게 하나요")
             } footer: {
                 Text("찾는 항목이 없으면 설정 화면 위쪽 검색창에 ‘각도’, ‘지구본’, ‘힌트’처럼 떠오르는 단어를 넣어 보세요.")
             }
@@ -53,7 +51,10 @@ struct HelpView: View {
                 Text("8 단계 튜토리얼 또는 33 개 연습 항목으로 모아키 입력 익히기.")
             }
         }
-        .navigationTitle("도움말")
+        // 설정 루트의 행 레이블과 같은 문구를 쓴다 — 탭했더니 다른 이름의 화면이
+        // 나오면 "여기가 맞나" 싶어 되돌아간다.
+        .navigationTitle("이럴 때 어떻게 하나요")
+        .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $showTutorial) {
             NavigationStack {
                 TutorialContainerView()
