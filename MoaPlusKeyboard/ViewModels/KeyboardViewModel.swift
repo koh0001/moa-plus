@@ -84,6 +84,12 @@ class KeyboardViewModel: ObservableObject {
     /// Raw touch trail captured during a preview-mode consonant gesture so
     /// callers receive the full point list with each `.moved` / `.ended`
     /// phase. Reset on every `.began`.
+    /// 현재 제스처가 시작된 키의 내용. `gestureStarted` 에서 1회 조회해 두고
+    /// `gestureMoved`/`gestureEnded` 는 이 값만 읽는다 — 그러지 않으면 터치
+    /// 포인트마다 레이아웃 배열 전체가 재생성된다. 수명은 제스처 1회이며
+    /// `resetGestureState`/`dismissPopup` 이 비운다.
+    private var activeKeyContent: KeyContent?
+
     private var previewGesturePoints: [CGPoint] = []
     /// Last column id fed to the gesture analyzer during a preview-mode
     /// gesture. Forwarded in every preview phase so the abstract canvas
@@ -633,6 +639,7 @@ class KeyboardViewModel: ObservableObject {
         longPressPopupSelectedIndex = 0
         // Reset gesture visual state so hints restore immediately after popup ends
         activeKey = nil
+        activeKeyContent = nil
         previewVowel = nil
         gestureDirections = []
         gestureStartPoint = nil
@@ -791,10 +798,24 @@ class KeyboardViewModel: ObservableObject {
         gestureStartPoint = point
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        // 활성 키의 내용은 한 제스처 동안 바뀌지 않으므로 여기서 한 번만 조회한다.
+        // `keyContent` 는 캐시가 없어 호출마다 `activeLayout` → `koreanLayout` 을 타고
+        // 4개 행 배열 + leftCol 배열 + KeyContent 28개를 새로 만든다. 이걸
+        // `gestureMoved` 가 터치 포인트마다 반복하고 있었다(120Hz 긋기 1회 = 배열
+        // 약 144개, KeyContent 약 672개의 순수 낭비 할당). 익스텐션 ~30MB 한계에서
+        // 단명 할당은 그대로 allocator 압박이 된다.
+        //
+        // 캐시 수명은 **제스처 1회**다. `gestureStarted` 가 항상 새로 채우고
+        // `resetGestureState`/`dismissPopup` 이 비우므로, 모드나 심볼 페이지가 바뀌어도
+        // 다음 제스처는 반드시 새 값으로 시작한다 — 안 비우면 한/영·123 전환 직후
+        // 첫 제스처가 이전 레이아웃으로 해석된다.
+        let content = KeyboardMetrics.keyContent(
+            at: row, column: column, mode: keyboardMode,
+            layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage)
+        activeKeyContent = content
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
-        if keyboardMode == .korean,
-           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization) {
+        if keyboardMode == .korean, let content {
             switch content {
             case .consonant(let consonant):
                 gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
@@ -839,8 +860,8 @@ class KeyboardViewModel: ObservableObject {
         // Update preview vowel based on active key type so preview matches actual output.
         // Vowel primitive keys (ㅣ, ㅡ) use the same resolver as input commit;
         // consonant keys use the 8-direction VowelResolver pattern trie.
-        if let key = activeKey,
-           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage) {
+        // `gestureStarted` 가 같은 인자로 조회해 둔 값을 쓴다(§ activeKeyContent).
+        if let content = activeKeyContent {
             switch content {
             case .vowelPrimitive(let primitive):
                 previewVowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
@@ -1027,6 +1048,7 @@ class KeyboardViewModel: ObservableObject {
         didHandleShiftLongPressInCurrentGesture = false
         dismissPopup()
         activeKey = nil
+        activeKeyContent = nil
         gestureStartPoint = nil
         gestureDirections = []
         previewVowel = nil
