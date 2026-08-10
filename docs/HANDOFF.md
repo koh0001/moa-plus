@@ -211,12 +211,12 @@ mkdir -p att && xcrun xcresulttool export attachments --path m.xcresult --output
       증상 라우터의 공용 카탈로그다. `keywords` 에는 **앱 용어가 아니라 리뷰에서 관찰된
       사용자 어휘**("진입앵글", "지구봉" 등 오타 표기 포함)를 넣었다 — 이게 이 기능의
       핵심이므로 정리한답시고 앱 용어로 바꾸지 말 것. 저장 키·화면 이동 없음.
-      - ⚠️ **이 조각은 컴파일만 검증됐다.** `MoaPlusTests` 가 스킴에 없어(아래 참조)
-        `xcodebuild test` 는 이 코드를 실행하지 않는다 — 검색 매칭·라우터 이동·렌더는
-        **아직 아무것도 확인되지 않았다.** 커밋 메시지의 "전체 통과"는 스위트가 통과했다는
-        뜻이지 이 코드가 검증됐다는 뜻이 아니다. 실기기/시뮬레이터에서 설정 화면을 열어
-        검색창 노출, `지구본`·`각도` 입력, 증상 행 탭을 직접 확인할 것
-        (§0-2 대로 수동 실행은 **iPhone 17 Pro**, 유닛 테스트는 iPhone 17 로 분리).
+      - **시뮬레이터에서 실제 확인 완료** (iPhone 17 Pro, `SettingsDiscoveryUITests` 8건 통과).
+        검색창 노출 / `지구본`·`각도`·`지구봉` 검색 / 검색 결과 탭 이동 / 증상 라우터 3경로 /
+        행 레이블-화면 제목 일치까지 스크린샷으로 확인했다.
+        스크린샷으로만 잡힌 오류 1건도 같이 고쳤다 — 도움말 footer 가 "설정 화면 **위쪽**
+        검색창"이라 안내했는데 **iOS 26 은 검색 바를 화면 아래쪽에 그린다.** 문구에서
+        위치 표현을 뺐다. 앞으로도 검색창 위치를 문구로 특정하지 말 것.
       - 한글 검색은 **음절이 완성돼야** 걸린다(조합 중 자모는 `contains` 미스). 버그가
         아니라 알려진 한계이며 `SettingsEntry.matches` 주석에 적어 뒀다. 초성 검색
         (`ㄱㄷ`→`각도`)은 별도 기능.
@@ -232,14 +232,22 @@ mkdir -p att && xcrun xcresulttool export attachments --path m.xcresult --output
       실제로 동작하므로 둘을 구분해 표시해야 한다. 4방향 토글 자체도 레이아웃 화면에
       있어 자신이 무력화하는 설정과 다른 화면에 산다.
 
-### 테스트 인프라 — 확인된 공백
-- [ ] **`MoaPlusTests` 타겟이 스킴에 없어 메인 앱 코드는 테스트가 전혀 돌지 않는다.**
+### 테스트 인프라 — 확인된 공백 (CI 미편입, 사용자 결정)
+- [ ] **`MoaPlusTests` 타겟이 스킴에 없어 메인 앱 유닛 테스트가 전혀 돌지 않는다.**
       `MoaPlus.xcscheme` 의 `<Testables>` 에는 `MoaPlusKeyboardTests`(활성)와
       `MoaPlusUITests`(skipped)뿐이다. `MoaPlusTests/ios_moakiTests.swift` 는 존재하지만
-      실행되지 않는다. 그래서 `SettingsCatalog` 검색 매칭 같은 메인 앱 로직에 테스트를
-      붙일 자리가 없다. 스킴 변경은 CI 동작을 바꾸므로 별도 판단 필요.
+      실행되지 않는다.
+- [ ] **`MoaPlusUITests` 타겟의 `TEST_TARGET_NAME` 이 `ios-moaki`** — 포크하며 앱 타겟이
+      `MoaPlus` 로 바뀌었는데 안 따라왔다. 이 타겟이 한 번도 안 돌던 진짜 이유다.
+      고치려면 pbxproj 에서 `MoaPlus` 로 바꿔야 한다. **지금은 커맨드라인 오버라이드로만
+      우회했고 저장소는 안 건드렸다** — 스킴만 활성화하고 이걸 안 고치면 CI 가 깨진다.
+- 위 둘은 사용자 결정에 따라 **CI 에 편입하지 않았다.** `SettingsDiscoveryUITests` 는
+  파일로만 남아 있고, 수동 실행법(스킴 임시 수정 + `TEST_TARGET_NAME=MoaPlus`)은
+  그 파일 헤더 주석에 적어 뒀다.
 - 참고: 신규 테스트 파일은 **타겟에 수동 등록할 필요가 없다** —
       `PBXFileSystemSynchronizedRootGroup`(Xcode 16 폴더 동기화)이라 파일만 넣으면 잡힌다.
+      단 UITests 폴더 이름은 **`MoaPlusUITests ` (끝에 공백)** 이다. 공백 없는 경로에
+      파일을 만들면 타겟에 안 잡힌다.
 
 ### 미착수 — 리뷰 기반 백로그
 - [ ] 키보드 폭 축소 / 좌우·하단 여백 (나가방) — `KeyboardMetrics` 폭 계산 전반, 회귀 위험 큼
