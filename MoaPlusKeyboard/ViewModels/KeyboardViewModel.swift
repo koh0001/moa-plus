@@ -40,6 +40,15 @@ class KeyboardViewModel: ObservableObject {
     @Published var isSpecialCharLayerVisible: Bool = false
     @Published var shiftState: ShiftState = .off
 
+    /// Whether iOS currently permits advancing to another keyboard
+    /// (`UIInputViewController.needsInputModeSwitchKey`). Only the extension
+    /// can read it, so `KeyboardViewController` pushes it here on every
+    /// appearance — the user can enable a second keyboard in Settings while
+    /// our extension process stays alive, and a value captured once at
+    /// `viewDidLoad` would leave the globe key hidden until the process dies.
+    /// Defaults to `true` for the host app's settings preview.
+    @Published var canSwitchInputMode: Bool = true
+
     /// Preview mode flag — when true, the slot B vowel key gesture routes to
     /// `onPreviewVowel` instead of feeding the composer/delegate. Used by the
     /// settings preview (LayoutCustomizationView) so the user can try the

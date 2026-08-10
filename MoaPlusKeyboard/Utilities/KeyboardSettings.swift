@@ -18,6 +18,9 @@ final class KeyboardSettings: ObservableObject {
         static let showSecondaryHints = "showSecondaryHints"
         static let hintSize = "hintSize"
         static let sideKeyWidthRatio = "sideKeyWidthRatio"
+        static let keyboardHeightScale = "keyboardHeightScale"
+        static let showGlobeKey = "showGlobeKey"
+        static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
         static let longPressDelay = "longPressDelay"
         static let clickSoundEnabled = "clickSoundEnabled"
         static let showDetailedHints = "showDetailedHints"
@@ -108,6 +111,42 @@ final class KeyboardSettings: ObservableObject {
     /// Side key width ratio (0.2 ~ 1.0, default 0.7 for square keys)
     @Published var sideKeyWidthRatio: Double = 0.7 {
         didSet { guard !isLoading else { return }; writePrimitive(sideKeyWidthRatio, forKey: Keys.sideKeyWidthRatio) }
+    }
+
+    /// Keyboard container height multiplier applied on top of the per-idiom
+    /// base height (iPhone 260pt / iPad screen-derived). Clamped to
+    /// `KeyboardMetrics.keyboardHeightScaleRange` at the metrics layer so a
+    /// corrupt stored value can never collapse the grid.
+    /// Requested repeatedly in App Store reviews (v1.8.0, 4 separate users).
+    @Published var keyboardHeightScale: Double = KeyboardMetrics.defaultKeyboardHeightScale {
+        didSet { guard !isLoading else { return }; writePrimitive(keyboardHeightScale, forKey: Keys.keyboardHeightScale) }
+    }
+
+    /// Show the system keyboard-switch (globe) key in the function row.
+    /// Only rendered when iOS also reports `needsInputModeSwitchKey`, so it
+    /// can never ship as a dead button when there is nothing to switch to.
+    ///
+    /// 기본 **OFF**. iOS 26 아이폰은 서드파티 키보드 아래에 지구본 바를 시스템이
+    /// 직접 그려주므로(`needsInputModeSwitchKey == false`) 대부분의 사용자에게는
+    /// 어차피 보이지 않고, ON 이면 기능 행에 키가 하나 늘어 스페이스바만 좁아진다.
+    /// 지구본이 필요한 환경(구버전 iOS·아이패드)에서 설정으로 켜는 방식.
+    @Published var showGlobeKey: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(showGlobeKey, forKey: Keys.showGlobeKey) }
+    }
+
+    /// 자음 키에서 **대각선으로 진입**한 뒤 이어 그어 천지인 규칙으로 복합모음을
+    /// 파생시키는 확장 경로(v1.7 도입). 기본 OFF = **순정 모아키 방식**.
+    ///
+    /// 순정 모아키(로즈키 드래그 방식)에서 대각선은 최종 결과(↖↗=ㅣ, ↙↘=ㅡ)이지
+    /// 뒤에 획을 붙여 발전시키는 진입 획이 아니다. 복합모음은 카디널 조합
+    /// (ㅘ=↑→, ㅝ=↓← 등)으로만 만든다 — 이 규칙은 `VowelPattern.all` 이 이미
+    /// 순정과 동일하게 구현하고 있다.
+    ///
+    /// 이 경로를 켜면 ↙ 뒤에 붙은 작은 꼬리 획이 ㅡ 를 ㅗ/ㅢ/ㅘ 로 승격시켜
+    /// "'으'가 '워'로, '이'가 '와'로" 오타가 발생한다(앱스토어 리뷰 3건, 재현 완료 —
+    /// `GestureOverDetectionCharacterizationTests`). 그래서 기본값은 OFF 다.
+    @Published var consonantDiagonalDerivationEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(consonantDiagonalDerivationEnabled, forKey: Keys.consonantDiagonalDerivation) }
     }
 
     /// Long-press delay in seconds (0.2 ~ 1.0, default 0.5)
@@ -314,6 +353,9 @@ final class KeyboardSettings: ObservableObject {
         showSecondaryHints = defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true
         hintSize = defaults.object(forKey: Keys.hintSize) as? Int ?? 1
         sideKeyWidthRatio = defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7
+        keyboardHeightScale = defaults.object(forKey: Keys.keyboardHeightScale) as? Double ?? KeyboardMetrics.defaultKeyboardHeightScale
+        showGlobeKey = defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false
+        consonantDiagonalDerivationEnabled = defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false
         longPressDelay = defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5
         clickSoundEnabled = defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false
         showDetailedHints = defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false
@@ -371,6 +413,9 @@ final class KeyboardSettings: ObservableObject {
         showDetailedHints = false
         clickSoundEnabled = false
         sideKeyWidthRatio = 0.7
+        keyboardHeightScale = KeyboardMetrics.defaultKeyboardHeightScale
+        showGlobeKey = false
+        consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true
         backspaceSpeed = 1

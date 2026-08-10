@@ -65,11 +65,40 @@ enum KeyboardMetrics {
     static let iPadPortraitHeightRange: ClosedRange<CGFloat> = 310...400
     static let iPadLandscapeHeightRange: ClosedRange<CGFloat> = 320...420
 
-    /// 키보드 컨테이너 높이. 아이폰은 항상 260(현행 유지), 아이패드만 화면 실측 기반.
+    // MARK: - User height scale (v1.9)
+    // 앱스토어 리뷰 최다 요청(높이 조절). 기기별 기본 높이 위에 곱해지는 배율.
+
+    static let defaultKeyboardHeightScale: Double = 1.0
+    /// 하한 0.85 = 아이폰 221pt → 키 1행 38.25pt. iOS 기본 키보드(약 42pt)보다
+    /// 낮지만 사용자가 명시적으로 선택한 경우에만 도달한다. 이보다 더 낮추면
+    /// 오타율이 급증해 리뷰의 원 요청("작게")과 반대 결과가 나오므로 여기서 막는다.
+    static let keyboardHeightScaleRange: ClosedRange<Double> = 0.85...1.35
+
+    /// NaN 은 `min`/`max` 비교를 모두 통과해 그대로 전파되고, 그러면 높이
+    /// 제약 constant 가 NaN 이 되어 레이아웃이 통째로 깨진다. 저장값이 손상된
+    /// 경우에도 안전하도록 비교 전에 먼저 걸러낸다.
+    static func clampedHeightScale(_ scale: Double) -> CGFloat {
+        guard scale.isFinite else { return CGFloat(keyboardHeightScaleRange.lowerBound) }
+        return CGFloat(min(max(scale, keyboardHeightScaleRange.lowerBound),
+                           keyboardHeightScaleRange.upperBound))
+    }
+
+    /// 키보드 컨테이너 높이. 아이폰은 260, 아이패드는 화면 실측 기반이며,
+    /// 둘 다 사용자 배율(`scale`)이 마지막에 곱해진다.
     /// `screenShort`/`screenLong` = `UIScreen.main.bounds` 의 min/max (방향 불변).
+    /// `scale` 기본값 1.0 은 배율 도입 이전 호출부(및 기존 테스트)와 동일 동작.
     static func keyboardHeight(isPad: Bool, isLandscape: Bool,
-                               screenShort: CGFloat, screenLong: CGFloat) -> CGFloat {
-        guard isPad else { return keyboardHeight }   // iPhone: 260, 무손상
+                               screenShort: CGFloat, screenLong: CGFloat,
+                               scale: Double = defaultKeyboardHeightScale) -> CGFloat {
+        base(isPad: isPad, isLandscape: isLandscape,
+             screenShort: screenShort, screenLong: screenLong) * clampedHeightScale(scale)
+    }
+
+    /// 배율 적용 전 기기별 기본 높이. 클램프는 기본 높이에만 적용되고 배율은
+    /// 그 뒤에 곱해지므로, 아이패드에서도 사용자가 범위 밖으로 키울 수 있다.
+    private static func base(isPad: Bool, isLandscape: Bool,
+                             screenShort: CGFloat, screenLong: CGFloat) -> CGFloat {
+        guard isPad else { return keyboardHeight }   // iPhone: 260
         if isLandscape {
             let raw = screenShort * iPadLandscapeHeightRatio
             return min(max(raw, iPadLandscapeHeightRange.lowerBound), iPadLandscapeHeightRange.upperBound)
