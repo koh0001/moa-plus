@@ -92,8 +92,12 @@ struct KeyView: View {
                         return
                     }
 
-                    // Cancel long press if user moved significantly (for consonant gesture)
-                    let distance = sqrt(pow(value.translation.width, 2) + pow(value.translation.height, 2))
+                    // Cancel long press if user moved significantly (for consonant gesture).
+                    // 곱셈으로 계산한다 — 터치 포인트마다 도는 자리라 pow(_:2) 를 쓰면
+                    // Double 지수 함수가 포인트당 2회 호출된다(GestureAnalyzer 도 같은
+                    // 계산을 dx*dx+dy*dy 로 한다).
+                    let dx = value.translation.width, dy = value.translation.height
+                    let distance = sqrt(dx * dx + dy * dy)
                     if distance > KeyboardMetrics.gestureThreshold {
                         cancelLongPressTimer()
                     }
