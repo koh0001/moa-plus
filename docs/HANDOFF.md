@@ -206,6 +206,32 @@ mkdir -p att && xcrun xcresulttool export attachments --path m.xcresult --output
       구조체 복사·Color 재생성·리렌더 횟수였고, 그건 위 1~6·9 로 처리했다.
       배경: 리뷰 "반응속도도 조금 느린것같긴해요"(돌양파), 설정이 많아지며 전달력 저하.
 
+### 설정 UX 재설계 — 1단계 완료, 나머지 미착수
+- [x] **설정 검색 + 증상 라우터** (2026-08-10, `4796e16`). `SettingsCatalog` 가 검색과
+      증상 라우터의 공용 카탈로그다. `keywords` 에는 **앱 용어가 아니라 리뷰에서 관찰된
+      사용자 어휘**("진입앵글", "지구봉" 등 오타 표기 포함)를 넣었다 — 이게 이 기능의
+      핵심이므로 정리한답시고 앱 용어로 바꾸지 말 것. 저장 키·화면 이동 없음.
+- [ ] **전체 IA 재편(9섹션)은 미착수.** 착수 전 **What's New 모달 버그를 먼저 고칠 것** —
+      `ContentView.swift:104-113` 이 신규 설치자에게 `lastSeenWhatsNewVersion` 을 미리
+      찍어 모달을 영구히 건너뛰게 한다. IA 를 바꾸면 "설정이 어디로 갔는지" 알릴 채널이
+      필요한데 그 채널이 지금 새고 있다. features 배열도 1.7.2 이후 갱신 안 됨.
+- [ ] 키보드 내 설정 딥링크(`extensionContext.open`, Full Access 불필요) — 오타는 호스트
+      앱 안에서 나는데 거기서 설정으로 가는 문이 없다(실사용 6탭). 미착수.
+- [ ] 4방향 모드에서 무효인 컨트롤이 활성 상태로 남아 있음 —
+      `GestureDirection.swift:72-86` 이 fourWay 분기에서 섹터 폭을 무시한다고 주석까지
+      달아뒀는데 UI 는 슬라이더를 그대로 활성으로 보여준다. 같은 화면의 회전 보정은
+      실제로 동작하므로 둘을 구분해 표시해야 한다. 4방향 토글 자체도 레이아웃 화면에
+      있어 자신이 무력화하는 설정과 다른 화면에 산다.
+
+### 테스트 인프라 — 확인된 공백
+- [ ] **`MoaPlusTests` 타겟이 스킴에 없어 메인 앱 코드는 테스트가 전혀 돌지 않는다.**
+      `MoaPlus.xcscheme` 의 `<Testables>` 에는 `MoaPlusKeyboardTests`(활성)와
+      `MoaPlusUITests`(skipped)뿐이다. `MoaPlusTests/ios_moakiTests.swift` 는 존재하지만
+      실행되지 않는다. 그래서 `SettingsCatalog` 검색 매칭 같은 메인 앱 로직에 테스트를
+      붙일 자리가 없다. 스킴 변경은 CI 동작을 바꾸므로 별도 판단 필요.
+- 참고: 신규 테스트 파일은 **타겟에 수동 등록할 필요가 없다** —
+      `PBXFileSystemSynchronizedRootGroup`(Xcode 16 폴더 동기화)이라 파일만 넣으면 잡힌다.
+
 ### 미착수 — 리뷰 기반 백로그
 - [ ] 키보드 폭 축소 / 좌우·하단 여백 (나가방) — `KeyboardMetrics` 폭 계산 전반, 회귀 위험 큼
 - [ ] 백스페이스를 최상단 행으로 (나가방)
