@@ -110,6 +110,17 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         viewModel.resetGestureState()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // The keyboard can be torn down mid-press — e.g. the host app presents
+        // a photo picker while the finger is still holding backspace. The
+        // repeat timer is driven by a Timer, not by touch events, so nothing
+        // else stops it: it keeps firing deleteBackward() against the proxy of
+        // a field the user can no longer see. Previously this was only cleared
+        // on the *next* viewDidAppear, i.e. after the damage was done.
+        viewModel.resetGestureState()
+    }
+
     private func computedKeyboardHeight() -> CGFloat {
         let bounds = UIScreen.main.bounds
         let screenShort = min(bounds.width, bounds.height)
