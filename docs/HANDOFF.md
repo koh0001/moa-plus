@@ -1,123 +1,193 @@
-# 작업 핸드오프 — 앱스토어 리뷰 대응 + 순정 모아키 전환
+# 작업 핸드오프
 
-> 작성: 2026-08-10 / 갱신: 2026-08-10 (지구본 기본 OFF + 감사 결과 수령) /
-> 브랜치: `feat/symbol-pages-space-scroll` / 마지막 커밋 `b1fdbdb`
-> **전부 미커밋 상태다.** `git status` 로 확인할 것 (수정 18 + 신규 7).
-> 테스트: 전체 스킴 **350개 통과 / 실패 0** (`iPhone 17`, `** TEST SUCCEEDED **` 확인).
->
-> ⚠️ `xcodebuild ... | tail` 로 파이프하면 zsh 파이프라인 exit code 가 `tail` 의 것이라
-> **테스트 실패가 exit 0 으로 보인다.** 로그를 파일로 받고 `TEST SUCCEEDED` 를 직접 grep 할 것.
+> 갱신: 2026-08-10 / 브랜치: `feat/symbol-pages-space-scroll` / **로컬 20 커밋, origin 에 미푸시**
+> 워킹트리 클린. 직전 릴리스는 `b1fdbdb`(v1.8.0 문서화)이고 그 이후가 전부 이번 작업이다.
+> 테스트: `MoaPlusKeyboardTests` 전체 통과 (`iPhone 17`).
+> UI 테스트 `SettingsDiscoveryUITests` 8건 통과 (`iPhone 17 Pro`, CI 미편입).
 
 ---
 
-## 0. 먼저 읽을 것 — 이번 세션의 함정
+## §0. 지금 할 일
 
-### 0-1. 워크플로 에이전트가 작업트리를 수정했다 (실제 발생)
-검증용 Workflow 를 띄우면서 프롬프트로 "저장소 파일 수정 금지"라고만 지시했는데 **지켜지지 않았다.**
+### 1순위 — 순정 모아키 영상 판독 (사용자가 촬영해 옴)
+사용자가 갤럭시에서 순정 모아키 입력을 녹화해 오기로 했다(2026-08-10 합의).
+촬영 목록·설정은 **`docs/MOAKEY_RECORDING_GUIDE.md`** 에 있다.
+
+받으면: `ffmpeg` 로 프레임 추출 → 궤적 판독 → `CLAUDE.md` 의 "순정 모아키 입력 스펙" 표와 대조
+→ 차이 나는 항목을 `drivePath` 하니스(§3)로 재현·고정.
+
+**영상에서 답을 얻으려는 핵심 두 가지:**
+- **2차 입력의 방향 관대함** (가이드 D 섹션) — 사용자 관찰로는 순정이 후속 획 방향에 관대하다.
+  우리는 후속 획에 **엄격**해서 "빨리 치면 인식 안 됨"이 나오고, **관대**하게 하면 손 떼며
+  튕기는 꼬리를 획으로 먹어 '으'→'워'가 난다. 순정이 이 상충을 어떻게 푸는지가 최대 관심사다.
+- **완성 글자 상태에서의 전이** (가이드 G 섹션) — `HangulComposer.complete` 이후 자음/모음
+  입력을 순정이 어떻게 받는지(받침/새 글자/겹받침) 미확인이다.
+
+**⚠️ 입력 스펙 관련 작업은 영상 수령 전까지 보류한다** — ㅐ 매핑(리뷰 호떡애비),
+멀티스트로크 민감도 기본값 0→1, 긋기 임계 조정. 근거 없이 건드리면 되돌리기 어렵다.
+
+판독 한계: 매핑 **규칙**은 영상으로 확정 가능하지만 **수치 임계값은 그대로 베낄 수 없다**
+(좌표계·키 크기가 다름). 관찰은 규칙과 경향까지, 수치는 우리 엔진에서 재튜닝.
+
+### 2순위 — 사용자 답변 대기 중인 결정
+- [ ] **푸시 여부** — 로컬 20 커밋이 origin 에 없다. 이 핸드오프 문서 자체도 아직 로컬에만 있다.
+      (이 브랜치 푸시만으로는 CI 가 돌지 않는다 — CI 는 fork main 으로의 PR 에서만 동작)
+- [ ] **릴리스 범위** — 버전 범프(1.8.0/build 15 → 1.9.0/build 16),
+      `docs/appstore/whats-new-next.md` 가 **1.7.2 기준으로 stale**, PR 생성
+      (`gh pr create --repo koh0001/moa-plus` — 이 저장소는 포크다).
+      영상 작업이 남아 있어 함께 묶을지 미정.
+- [ ] "이번 업데이트" 모달의 3개 슬롯 중 하나를 지구본이 계속 차지한다. 기본 OFF + iOS 26
+      미표시라 대부분 사용자에게 무동작인데 안내는 남아 있다. 문구는 "필요하면 켜세요"로
+      바꿔 뒀으나 항목 자체를 뺄지는 제품 결정.
+- [ ] 리뷰 답변 문구(사용자가 앞뒤를 채울 한 줄):
+      *"설정 → 키보드 → 크기·전환 키에서 '키보드 전환 키 표시'를 켜시면 기능 행 맨 왼쪽에
+      지구본 키가 생겨 애플 기본 키보드 등으로 바로 전환할 수 있습니다."*
+
+### 3순위 — 근거가 없어 막혀 있는 것
+- [ ] **반응속도 실측이 없다.** 감사의 모든 수치는 정적 분석 추정이다.
+      `docs/UX_AND_LATENCY_AUDIT.md` 미해결 질문 3번의 순서(os_signpost → Time Profiler →
+      ㅛ/ㅠ/ㅢ 빠른 입력 재현)를 돌려야 "리뷰의 반응속도 불만 = 렌더 병목" 인과가 확정된다.
+      실기기 익스텐션 프로파일링이 필요하다.
+
+---
+
+## §1. 함정 — 먼저 읽을 것
+
+### 1-1. 워크플로 에이전트가 작업트리를 수정했다 (실제 발생)
+검증용 Workflow 에 프롬프트로만 "저장소 파일 수정 금지"라고 지시했는데 **지켜지지 않았다.**
 `GestureAnalyzer.trailingNoiseRatio` 가 0.4 → 0.75 로 바뀌고(`// EXPERIMENT E4`),
-특성화 테스트 하니스에 `swipeLength = .long` 이 주입됐다(`// E9`).
-그 상태로 측정한 결과를 근거로 잘못된 결론("0.75가 우수")을 낼 뻔했다.
+특성화 하니스에 `swipeLength = .long` 이 주입됐다(`// E9`). 그 상태의 측정값으로 잘못된
+결론("0.75가 우수")을 낼 뻔했다.
 
-**대응 규칙**: 코드를 만지는 Workflow 는 반드시 `isolation: "worktree"` 로 띄우고,
-결과를 받으면 **`git status` 와 실험 마커 grep 을 먼저** 돌린 뒤 해석할 것.
+**규칙**: 코드를 만지는 Workflow 는 `isolation: "worktree"` 로 띄우고, 결과를 받으면
+**해석 전에** 아래를 먼저 돌릴 것.
 ```bash
+git status --short
 grep -rn "EXPERIMENT\|// E[0-9]" --include="*.swift" MoaPlus MoaPlusKeyboard MoaPlusKeyboardTests
 ```
 
-### 0-2. 시뮬레이터에 앱을 띄우면 유닛 테스트가 깨진다
-App Group UserDefaults 를 유닛 테스트와 공유하므로, 앱을 수동 실행한 시뮬레이터에서
+### 1-2. 테스트 결과를 잘못 읽는 두 가지 방법
+- **`xcodebuild ... | tail` 금지.** zsh 파이프라인 exit code 는 `tail` 의 것이라
+  **테스트 실패가 exit 0 으로 보인다.** 로그를 파일로 받고 `TEST SUCCEEDED` 를 직접 grep 할 것.
+- **통과 개수로 판정하지 말 것.** 병렬 clone 출력이 서로 끼어들어 로그 줄이 잘린다
+  (실제 사례: `Test case '...YoVowel()' p` 뒤에 다른 출력이 붙어 " passed" 가 사라짐).
+  `grep -c` 카운트가 실제보다 적게 나온다. **`** TEST SUCCEEDED **` + 실패 0건**이 신뢰할 신호다.
+
+### 1-3. 시뮬레이터에 앱을 띄우면 유닛 테스트가 깨진다
+App Group UserDefaults 를 공유하므로 앱을 수동 실행한 시뮬레이터에서
 `KeyboardViewModelVowelDragTests` 등이 결정적으로 실패한다.
-**유닛 테스트는 `iPhone 17`, 수동 실행은 `iPhone 17 Pro`** 로 분리해 썼다. 이 분리를 유지할 것.
+**유닛 테스트 = `iPhone 17`, 앱 실행/UI 테스트 = `iPhone 17 Pro`** 분리를 유지할 것.
 오염되면 `xcrun simctl shutdown <id> && xcrun simctl erase <id>`.
 
-### 0-3. 시뮬레이터에서 키보드 활성화는 plist 편집으로 안 된다
-`.GlobalPreferences` 의 `AppleKeyboards` 배열에 번들 ID 를 직접 써넣으면
-설정 앱의 카운트만 늘고 **키보드 데몬은 인식하지 않는다**(익스텐션 프로세스가 뜨지 않음).
-게다가 그 가짜 항목이 "새로운 키보드 추가" 목록에서 모아+ 를 숨겨 **정식 추가를 막는다.**
-반드시 설정 UI(설정 → 일반 → 키보드 → 키보드 → 새로운 키보드 추가)로 추가할 것.
+### 1-4. UI 테스트는 그냥 실행되지 않는다 (프로젝트 결함 2개)
+`xcodebuild test` 로는 `MoaPlusUITests` 가 절대 돌지 않는다. 우회 2단계가 필요하다.
+1. 스킴에서 `skipped = "YES"` → `-only-testing:` 으로 **우회되지 않는다**
+   ("isn't a member of the specified test plan or scheme"). 임시로 `"NO"` 로 바꿔야 한다.
+2. UITests 타겟의 `TEST_TARGET_NAME` 이 포크 이전 이름 `ios-moaki` 를 가리켜
+   "UITargetAppPath should be provided" 로 죽는다. `TEST_TARGET_NAME=MoaPlus` 로 오버라이드.
 
-### 0-4. Simulator 창 좌표 변환 (UI 자동화 시)
-Orca `computer click` 은 창 로컬 좌표를 쓴다. iPhone 17 Pro 창(435×929) 기준 실측 변환:
-```
-window_x = 12.6 + device_pt_x * 1.0195
-window_y = 38   + device_pt_y * 1.0195      # 38 = 타이틀바
-# 스크린샷 픽셀 → pt 는 /3 (3x)
-```
-오프셋(12.6, 38)을 빼먹으면 화면 아래쪽으로 갈수록 어긋나 탭이 조용히 빗나간다.
-"클릭 ok=true 인데 화면이 안 바뀐다"면 이걸 의심할 것.
+실행 명령 전문은 `MoaPlusUITests /SettingsDiscoveryUITests.swift` 헤더 주석에 있다.
+첫 실행이 `xctrunner` 런치 실패로 한 번 죽고 재시도에서 붙는 경우가 있다 — 케이스가 전부
+passed 인데 최종 상태만 FAILED 면 그 상황이다.
 
----
+### 1-5. iOS 26 은 검색 바를 화면 **아래**에 그린다
+설정 검색창이 하단에 뜬다(시뮬레이터 실측). 안내 문구에서 **검색창 위치를 특정하지 말 것** —
+실제로 "위쪽 검색창"이라고 썼다가 스크린샷 보고 고쳤다. 컴파일도 단언도 통과하는 종류의 오류다.
 
-## 1. 완료된 작업
+### 1-6. 시뮬레이터 키보드 활성화는 plist 편집으로 안 된다
+`.GlobalPreferences` 의 `AppleKeyboards` 에 번들 ID 를 써넣으면 설정 앱 카운트만 늘고
+**키보드 데몬은 인식하지 않는다.** 게다가 그 가짜 항목이 "새로운 키보드 추가" 목록에서
+모아+ 를 숨겨 정식 추가를 막는다. 반드시 설정 UI 로 추가할 것.
 
-### A. 앱스토어 리뷰 대응 — 높이 조절 + 지구본 키
-| 항목 | 내용 |
-|---|---|
-| 요청 | 키보드 높이 조절(리뷰 4건), 키보드 전환 키(리뷰 2건) |
-| 설정 | `keyboardHeightScale`(0.85~1.35, 기본 1.0), `showGlobeKey`(기본 **OFF** — §4 에서 변경) |
-| UI | `MoaPlus/Settings/KeyboardSizeSettingsView.swift` (신규) — 슬라이더 + 되돌리기 + 실시간 미리보기 |
-| 핵심 | `KeyboardMetrics.keyboardHeight(...scale:)` 기본 인자 1.0 → 기존 호출부 무손상 |
-
-**⚠️ iOS 26 아이폰에서 지구본 키는 표시되지 않는다** (시뮬레이터 실측).
-iOS 26 이 서드파티 키보드 아래에 지구본 바를 직접 그리고, 이때 `needsInputModeSwitchKey == false`
-를 반환한다. 우리 지구본은 이 값에 게이팅돼 있어(중복 방지) 렌더되지 않는다.
-→ **사용자가 "기본 OFF + 설정 유지"로 결정했으나 아직 미구현.** 아래 §4 참조.
-
-### B. 순정 모아키 입력 방식 전환 (핵심)
-**조사 결론**: 우리 자음 키 패턴 테이블(`VowelPattern.all`)은 **이미 순정과 100% 일치**했다.
-불일치는 v1.7 에 우리가 추가한 `resolveConsonantDiagonalVowel`(대각선 진입 후 천지인 파생)
-하나뿐이었고, 그게 리뷰 오타의 원인이었다.
-
-순정 스펙 근거 (독립 2개 자료 일치):
-- `docs/moakey_ios_custom_docs/assets/03_gesture_angle_reference.png` — 실제 삼성 모아키 설정(양손용).
-  8섹터가 `↑=오 ↓=우 →=아 ←=어 ↖↗=이 ↙↘=으` 로 라벨링돼 있다.
-- [나무위키 모아키](https://namu.wiki/w/모아키) — 복합모음은 방향 **조합**:
-  `ㅘ=↑→(↱) ㅝ=↓←(↲) ㅚ=↑↓ ㅟ=↓↑ ㅐ=→← ㅔ=←→ ㅛ=↑↓↑ ㅠ=↓↑↓ ㅑ=→←→ ㅕ=←→← ㅙ=↑→+왕복 ㅞ=↓←+왕복`
-
-**변경**: `consonantDiagonalDerivationEnabled`(기본 **false** = 순정) 신설.
-`KeyboardViewModel.resolveConsonantDiagonalVowel` 진입부에서 게이팅 → 호출 3곳 전부 커버.
-UI 는 `GestureSettingsView` 의 "입력 방식" Picker (`순정 모아키` / `확장 (대각선 진입)`).
-
-단독 대각선(↗=ㅣ, ↘=ㅡ)은 순정과 같으므로 **트라이가 그대로 처리**한다.
-전용 ㅣ/ㅡ 키가 없는 **클래식/확장형 레이아웃의 유일한 ㅣ/ㅡ 경로**라 절대 깨면 안 되고,
-회귀 가드가 `test_moakeyDefault_pipeline_soloDiagonalsStillProduceBarAndDash` 다.
-
-### C. 긋기 엔진 결함 2건 (순정 전환만으로 안 잡히는 잔여를 파다 발견)
-1. **후행 노이즈 트림이 인접(≤45°) 꼬리만 제거**하고 있었다.
-   실제 꼬리는 ↗(180°)·↑(135°)·↘(90°)처럼 급격한 쪽이 더 흔해 전부 빠져나갔다 — 의도와 정반대.
-   → 절대 크기(`edgeNoiseCap`) + 직전 획 대비 비율(`trailingNoiseRatio`) 결합, 꼬리가 여러 조각일 수
-   있어 `while` 반복 제거.
-2. **`directionMagnitudes` 가 획의 실제 길이가 아니었다.** 임계를 넘는 순간의 변위만 기록해
-   60pt 획도 임계값(≈20pt)으로 남았다. `normalizeSegments` 의 모든 비율 판정이 이 값을
-   "직전 획 길이"로 전제하고 있었으므로 노이즈와 의도적 획을 비율로 구분하는 게 불가능했다.
-   → `strokeOriginPoint` 도입, 같은 방향 연장 중 magnitude 를 실제 길이로 갱신.
-
-### D. 프리즈 리포트 조사 (원인 미확정)
-Geumji5 "제미나이에서 사진 첨부하면 키보드 높이가 엄청 늘어나고 멈춥니다" (iPhone 15 Pro).
-**리뷰 원문에 앱/웹 구분은 없다.** 사용자가 웹·앱 양쪽에서 첨부·붙여넣기 모두 시도했으나 **재현 실패.**
-
-조사 중 발견한 별개 실재 결함 2건을 수정했다 (**리포트의 확정 원인 아님, 릴리스 노트에
-"프리즈 수정"으로 쓰지 말 것**):
-- 배경 이미지가 원본 해상도로 디코딩됐다. 12MP 사진 = ARGB 약 48MB 로 익스텐션 한계(~30-60MB)를
-  단독 초과. → 저장 시 긴 변 1536px 축소 + ImageIO 썸네일 디코딩(기존 저장분도 방어).
-- 키보드가 사라져도 백스페이스 반복 타이머가 계속 돌았다(Timer 구동이라 터치 종료와 무관).
-  → `viewWillDisappear` 에서 정리. **단 `resetGestureState()` 를 통째로 부르므로 팝업 해제·약어
-  스토어 재로드까지 함께 일어난다. 테스트가 없는 생명주기 변경이니 재검토 여지 있음.**
-
-함께 보고된 "높이가 엄청 늘어남"은 `KNOWN_ISSUES.md` KI-1 계열로 보이나 트리거가 달라 단정하지 않았다.
+### 1-7. 새 테스트 파일은 타겟 등록이 필요 없다
+`PBXFileSystemSynchronizedRootGroup`(Xcode 16 폴더 동기화)이라 파일만 넣으면 잡힌다.
+단 **UITests 폴더 이름은 `MoaPlusUITests ` — 끝에 공백이 있다.** 공백 없는 경로에 만들면 안 잡힌다.
 
 ---
 
-## 2. 측정 도구 — 이걸 먼저 익힐 것
+## §2. 완료된 작업 (커밋 20개)
 
-`MoaPlusKeyboardTests/GestureOverDetectionCharacterizationTests.swift` 가 이번 작업의 핵심 계측기다.
+### A. 앱스토어 리뷰 대응 — 높이 조절 + 지구본 키 `426eeb2`
+- `keyboardHeightScale`(0.85~1.35, 기본 1.0). 하한에서도 키 행이 38pt 아래로 안 가게 클램프.
+- `showGlobeKey` **기본 OFF**. 켜면 스페이스바만 좁아진다.
+- **iOS 26 아이폰에서는 우리 지구본이 표시되지 않는다**(실측). iOS 26 이 키보드 아래에
+  시스템 지구본 바를 직접 그리며 이때 `needsInputModeSwitchKey == false` 를 반환하고,
+  우리 지구본은 이 값에 게이팅돼 있다(중복 방지). 기본 OFF 인 이유이기도 하다.
+- `FunctionRowWidthTests` 가 기능행 폭 합 불변식을 가드한다(자식 추가 시 ⏎ 잘림 방지).
+
+### B. 순정 모아키 입력 방식 전환 `c87c0c3`
+**조사 결론**: 자음 키 패턴 테이블(`VowelPattern.all`)은 **이미 순정과 100% 일치**했다.
+불일치는 v1.7 에 추가한 `resolveConsonantDiagonalVowel` 하나뿐이었고 그게 리뷰 오타의 원인.
+
+우리가 순정에서 벗어난 지점은 정확히 **"1차 입력이 대각선 + 2차 입력이 있을 때"** 다:
+
+| 1차 입력 | 2차 이후 | 처리 | 순정과 |
+|---|---|---|---|
+| 카디널(↑↓←→) | 무엇이든 | `VowelPattern.all` 트라이 | 동일 |
+| 대각선(↖↗↙↘) | 없음 | 트라이 (↗↖=ㅣ, ↙↘=ㅡ) | 동일 |
+| 대각선 | **있음** | `resolveConsonantDiagonalVowel` | **우리 확장** |
+
+`consonantDiagonalDerivationEnabled`(기본 false = 순정)로 게이팅. UI 는 `GestureSettingsView`
+"입력 방식" Picker. 단독 대각선은 **클래식/확장형 레이아웃의 유일한 ㅣ/ㅡ 경로**라 절대 깨면
+안 되고, 가드가 `test_moakeyDefault_pipeline_soloDiagonalsStillProduceBarAndDash` 다.
+
+### C. 긋기 엔진 결함 2건 `4c4c46b`
+1. 후행 노이즈 트림이 **인접(≤45°) 꼬리만** 제거하고 있었다. 실제 꼬리는 ↗(180°)·↑(135°)처럼
+   급격한 쪽이 더 흔해 전부 빠져나갔다 — 의도와 정반대. → 절대 크기 + 직전 획 대비 비율 결합,
+   꼬리가 여러 조각일 수 있어 `while` 반복 제거.
+2. `directionMagnitudes` 가 획의 **실제 길이가 아니었다**. 임계를 넘는 순간의 변위만 기록해
+   60pt 획도 임계값(≈20pt)으로 남았고, `normalizeSegments` 의 모든 비율 판정이 이 값을
+   "직전 획 길이"로 전제하고 있었다. → `strokeOriginPoint` 도입.
+
+### D. 메모리·생명주기 수정 `744d240`
+"제미나이에서 사진 첨부 시 키보드 멈춤"(Geumji5) 리포트를 조사하다 발견한 **별개** 결함 2건.
+**리포트의 확정 원인이 아니다 — 릴리스 노트에 "프리즈 수정"으로 쓰지 말 것.** 재현 실패했다.
+- 배경 이미지가 원본 해상도로 디코딩됐다(12MP = ARGB 약 48MB, 익스텐션 한계 단독 초과).
+  → 저장 시 긴 변 1536px + ImageIO 썸네일 디코딩.
+- 키보드가 사라져도 백스페이스 반복 Timer 가 계속 돌았다 → `viewWillDisappear` 에서 정리.
+  **단 `resetGestureState()` 를 통째로 부르므로 팝업 해제·약어 스토어 재로드까지 함께 일어난다.
+  테스트 없는 생명주기 변경이라 범위 축소 여지 있음(§5).**
+
+### E. 입력 반응속도 개선 7건 `bb3b4dc` `8ebd730` `ecf3b0e` `c3b0b36` `1e62a50` `03ee130` `abe9a46`
+감사(`docs/UX_AND_LATENCY_AUDIT.md`) 1~6·9번. **항목 하나 적용 → 전체 테스트 → 커밋**을
+반복했다. 효과를 항목에 귀속시키려면 이 순서를 유지할 것.
+- 긋기 한 번에 키보드 전체가 ~24회 리렌더되던 것을 ~3회로(포워딩 setter 에 중복 발행 제거)
+- 터치 포인트마다 4×7 레이아웃 배열을 새로 만들던 것을 제스처 시작 시 1회 조회로
+- 렌더당 레이아웃 재구축 6→1회, 롱프레스 매핑 조회 O(n)→O(1), 키 색상 캐시
+- `loadAll()` 이 무관한 설정까지 전부 재발행하던 것을 값이 바뀐 항목만 대입으로
+- 죽은 `feedbackGenerator` 제거, `pow()` → 곱셈
+
+**검증 상태: 커밋됨 + 테스트 통과. 실측 없음.** 체감 개선은 미확인이다(§0 3순위).
+긋기 인식 동작은 안 바뀌었다(특성화 테스트로 확인).
+`KeyboardSettingsCacheTests` `fedea21` 가 색상·인덱스 캐시의 무효화 배선을 고정한다 —
+스냅샷 테스트는 정적 렌더 1회만 보므로 런타임 설정 변경 경로를 덮지 못한다.
+
+### F. 설정 UX 1단계 — 검색 + 증상 라우터 `4796e16` `900cd53` `8bd10c8`
+리뷰 7건 중 5건이 "기능이 없다"가 아니라 **있는 기능을 못 찾은** 경우였다.
+- `SettingsCatalog` — 검색과 증상 라우터의 공용 카탈로그. `keywords` 에 **앱 용어가 아니라
+  리뷰에서 관찰된 사용자 어휘**("진입앵글", 오타 표기 "지구봉" 포함)를 넣었다.
+  **이게 이 기능의 핵심이므로 정리한답시고 앱 용어로 바꾸지 말 것.**
+- 설정 루트 `.searchable`, 결과에 탐색 경로 표시. HelpView → 증상 라우터 8항목.
+- "반응" → "소리 · 진동" 개명(네이밍 트랩: 내용은 사운드·햅틱뿐인데 "반응속도가 느리다"는
+  사용자를 끌어들이고 있었다). 행 레이블과 화면 제목을 일치시켰다.
+- 저장 키 변경·화면 이동 없음.
+
+**검증 상태**: UI 테스트 8건 통과(iPhone 17 Pro) + 스크린샷 육안 확인.
+**단 한글 IME 경로는 미검증** — `typeText` 는 IME 를 우회해 문자열을 직접 넣는다.
+한글 검색은 **음절이 완성돼야** 걸린다(조합 중 자모는 `contains` 미스). 버그가 아니라
+알려진 한계이며 `SettingsEntry.matches` 주석에 적어 뒀다. 초성 검색은 별도 기능.
+
+---
+
+## §3. 계측 도구 — 긋기를 건드리기 전에 익힐 것
+
+`MoaPlusKeyboardTests/GestureOverDetectionCharacterizationTests.swift`
 
 - **`drivePath(row:column:segments:stepsPerSegment:)`** — 다구간 폴리라인 하니스.
   기존 `driveKeyGesture` 는 단일 직선(dx/dy)만 가능해 꺾인 궤적을 **구조적으로 재현할 수 없었다.**
-- **경로 × 민감도(0/1/2) 매트릭스**를 `.xcresult` 첨부로 남긴다. 3개 섹션:
-  자음 대각선 진입 / ㅡ 전용 키(진입 분열·과소 인식·ㅙㅞ 가드) / 자음 키 의도적 복합모음(트림 회귀 가드).
+  영상 판독 결과를 테스트로 고정할 때 이걸 쓴다.
+- 경로 × 민감도(0/1/2) 매트릭스를 `.xcresult` 첨부로 남긴다.
 
-### 매트릭스 뽑는 법
 ```bash
 SS=/tmp/moa && mkdir -p $SS && cd $SS
 xcodebuild test -project /Users/ockhyunkim/GitHub/moa-plus/MoaPlus.xcodeproj -scheme MoaPlus \
@@ -125,17 +195,15 @@ xcodebuild test -project /Users/ockhyunkim/GitHub/moa-plus/MoaPlus.xcodeproj -sc
   -only-testing:MoaPlusKeyboardTests/GestureOverDetectionCharacterizationTests/test_characterize_matrix_attachesReport \
   -resultBundlePath m.xcresult >/dev/null 2>&1
 mkdir -p att && xcrun xcresulttool export attachments --path m.xcresult --output-path att
-# att/manifest.json 에서 suggestedHumanReadableName 이 b1_gesture_matrix* 인 파일을 읽으면 된다
+# att/manifest.json 에서 suggestedHumanReadableName 이 b1_gesture_matrix* 인 파일
 ```
 
-### 하니스를 건드릴 때 주의
-`withSensitivity` 안에서 `swipeLength` 같은 다른 설정을 바꾸면 **모든 임계가 함께 스케일되어
-측정 조건이 오염된다.** 실제로 이 오염 때문에 잘못된 결론을 낼 뻔했다(§0-1).
-상수 튜닝을 비교할 때는 **상수 하나만** 바꾸고 나머지는 고정할 것.
+**하니스 주의**: `withSensitivity` 안에서 `swipeLength` 같은 다른 설정을 바꾸면 모든 임계가
+함께 스케일되어 측정 조건이 오염된다(§1-1 에서 실제 발생). 상수 비교는 **하나만** 바꿀 것.
 
 ---
 
-## 3. 확정된 기준선 (기본 설정, `trailingNoiseRatio = 0.4`)
+## §4. 확정된 기준선 (기본 설정, `trailingNoiseRatio = 0.4`)
 
 | 경로 (의도: 으) | sens0 | sens1 | sens2 |
 |---|---|---|---|
@@ -149,157 +217,88 @@ mkdir -p att && xcrun xcresulttool export attachments --path m.xcresult --output
 **리뷰가 지적한 심각한 오타(이→와, 으→워, 오→와)는 전 민감도에서 사라졌다.**
 
 ### 알려진 잔여 (테스트로 고정돼 있음)
-- 기본 민감도(0)에서 ↙ 뒤 15~20pt 흔들림이 아직 **ㅢ** 로 승격. ㅢ 는 순정에도 있는 조합(↙↗)이라
-  논리적으로 도달 가능하고, 와/워 대비 경미하다.
+- 기본 민감도에서 ↙ 뒤 15~20pt 흔들림이 아직 **ㅢ** 로 승격. ㅢ 는 순정에도 있는 조합(↙↗)이라
+  논리적으로 도달 가능하고 와/워 대비 경미하다.
 - 진입 획이 짧을 때(30pt) 꼬리(18pt)가 그 61% 라 비율로도 노이즈 판정 불가 —
   의도적인 짧은 ㅢ 왕복과 구분되지 않는다.
-- **더 좁히려면 등록 임계를 건드려야 하는데, 그러면 리뷰의 다른 갈래("빨리 치면 인식 안 됨",
-  모아키가 최고·dawnboy!)가 악화된다.** 이 트레이드오프를 모르고 임계를 낮추지 말 것.
+- **더 좁히려면 등록 임계를 건드려야 하는데 그러면 "빨리 치면 인식 안 됨" 갈래가 악화된다.**
+  이 트레이드오프를 모르고 임계를 낮추지 말 것. → 영상(§0)이 이 판단의 근거가 된다.
 
-### `trailingNoiseRatio` 값에 대한 결론
-0.4 와 0.75 를 **하니스 고정 상태에서** 비교한 결과 **37개 경로 전부 동일**(차이 0건).
+### `trailingNoiseRatio` 결론
+0.4 와 0.75 를 하니스 고정 상태에서 비교한 결과 **37개 경로 전부 동일**(차이 0건).
 `isTinyAbsolute && (isTinyRelative || isAdjacent)` 구조에서 절대 상한이 먼저 지배하기 때문이다.
-비율은 좁은 구간에서만 작동하는 2차 필터다. 근거가 없어 더 보수적인 **0.4 유지**.
+근거가 없어 더 보수적인 **0.4 유지**.
 
 ---
 
-## 4. 다음 할 일 (우선순위)
+## §5. 미착수 백로그
 
-### 즉시 — 사용자가 결정했으나 미구현
-- [x] **지구본 키 기본값 ON → OFF** (2026-08-10 완료). 편집한 곳은 6군데다 —
-      `KeyboardSettings.swift` 3곳(`@Published` 기본값 + `loadAll` 의 `?? false` + `resetAll`),
-      `NewFeaturesModalView`(문구를 "설정에서 켜세요"로), `CHANGELOG`("기존 사용자 레이아웃 변경
-      주의" 항목을 "기본 OFF" 로 대체 + 새 기능 항목에도 기본 OFF 명시), `CLAUDE.md` 설정 표.
-      `KeyboardSizeSettingsView` footer 도 보강했다(이제 이 화면이 유일한 진입점이라,
-      켜도 iOS 26 에서는 시스템 바가 대신 뜬다는 설명이 필요해졌다).
-      **마이그레이션 불필요** — 지구본은 아직 미출시(Unreleased) 기능이라 저장된 값을 가진
-      사용자가 없다. `?? false` 로 전원 OFF 가 맞다.
-      테스트 영향 없음: 기본값을 단정하는 테스트가 없다(`KeyboardSnapshotTests` 는 값을 저장·복원
-      후 명시 대입, `FunctionRowWidthTests` 는 파라미터로 주입, `GlobeKeySwitchTests` 는
-      `canSwitchInputMode` 만 본다). 그러므로 이 변경 후 테스트가 깨지면 **픽스처 갱신 대상이
-      아니라 다른 문제의 신호**다.
-- [ ] 리뷰 답변 문구(사용자가 앞뒤를 채울 한 줄):
-      *"설정 → 키보드 → 크기·전환 키에서 '키보드 전환 키 표시'를 켜시면 기능 행 맨 왼쪽에
-      지구본 키가 생겨 애플 기본 키보드 등으로 바로 전환할 수 있습니다."*
-- [ ] (판단 필요) "이번 업데이트" 모달의 3개 슬롯 중 하나를 지구본이 계속 차지한다.
-      기본 OFF + iOS 26 미표시라 대부분 사용자에게 무동작인데 안내는 남아 있다.
-      문구는 "필요하면 켜세요"로 바꿔 뒀으나, 항목 자체를 뺄지는 사용자 결정 사항.
-
-### 조사 워크플로 — **결과 수령 완료** (2026-08-10)
-- [x] **설정 UX 재설계** + **입력 반응속도 근본 원인** 5개 렌즈 병렬 감사 (`wf_1789e35f-f0b`).
-      결과를 **`docs/UX_AND_LATENCY_AUDIT.md` 에 저장했다** — 원본은 세션 임시 디렉토리에만
-      있어 사라진다. 수령 직후 §0-1 검증 절차를 돌려 **작업트리 오염 없음**을 확인했다
-      (실험 마커 0건, `trailingNoiseRatio` 0.4 유지, 수정 파일은 지구본 작업분뿐).
-      내용: UX 진단 6가지 구조적 원인 + 9섹션 IA 재설계안, 반응속도 12건 우선순위 계획,
-      미해결 질문 6건. **전부 정적 분석 기반 추정이고 Instruments 실측이 아니다.**
-- [x] **반응속도 1~6·9 구현 완료** (2026-08-10, 커밋 `bb3b4dc`~`abe9a46`).
-      항목별로 하나씩 적용 → 전체 테스트 → 커밋을 반복했다. 효과를 항목에 귀속시키려면
-      이 순서를 유지할 것. 상세는 `docs/UX_AND_LATENCY_AUDIT.md` §2 진행 상황 표.
-- [ ] **실측이 아직 없다.** 감사의 모든 수치는 정적 분석 추정이다. 미해결 질문 3번의 순서
-      (os_signpost → Time Profiler → ㅛ/ㅠ/ㅢ 빠른 입력 재현)를 돌려야 "리뷰의 반응속도
-      불만 = 렌더 병목" 인과가 확정된다. 실기기 익스텐션 프로파일링이 필요하다.
+### 감사에서 나왔으나 손대지 않은 것
 - [ ] **반응속도 7번은 손대지 말 것** — 감사가 유일하게 "인식률에 직접 닿는 경로"로 표시했고
-      전제(임계값·섹터 폭이 제스처 중 불변)가 미검증이다. 10·11·12 는 미착수.
-- [ ] 멀티스트로크 민감도 기본값 0→1 은 **보류**. 위 실측 후 판단해야 성능 개선 효과와
-      구분된다. 지금 바꾸면 기존 사용자 전원의 입력 특성이 말없이 바뀐다.
-- [ ] "KeyboardSettings 를 캐싱하자"는 **틀린 방향**(hot path 에 디스크 I/O 없음). 실제 비용은
-      구조체 복사·Color 재생성·리렌더 횟수였고, 그건 위 1~6·9 로 처리했다.
-      배경: 리뷰 "반응속도도 조금 느린것같긴해요"(돌양파), 설정이 많아지며 전달력 저하.
+      전제(임계값·섹터 폭이 제스처 중 불변)가 미검증이다. 10·11·12 도 미착수.
+- [ ] "KeyboardSettings 를 캐싱하자"는 **틀린 방향**(hot path 에 디스크 I/O 없음).
+      실제 비용은 구조체 복사·Color 재생성·리렌더 횟수였고 §2-E 로 처리했다.
+- [ ] **전체 IA 재편(9섹션)** — 착수 전 **What's New 모달 버그를 먼저 고칠 것.**
+      `ContentView.swift:104-113` 이 신규 설치자에게 `lastSeenWhatsNewVersion` 을 미리 찍어
+      모달을 영구히 건너뛰게 한다. IA 를 바꾸면 "설정이 어디로 갔는지" 알릴 채널이 필요한데
+      그 채널이 새고 있다. features 배열도 1.7.2 이후 갱신 안 됨.
+- [ ] 키보드 내 설정 딥링크(`extensionContext.open`, Full Access 불필요) — 오타는 호스트 앱
+      안에서 나는데 거기서 설정으로 가는 문이 없다(실사용 6탭).
+- [ ] 4방향 모드에서 **무효인 컨트롤이 활성 상태로 남아 있다** —
+      `GestureDirection.swift:72-86` 이 fourWay 분기에서 섹터 폭을 무시한다고 주석까지 달아뒀는데
+      UI 는 슬라이더를 활성으로 보여준다. 같은 화면의 회전 보정은 실제로 동작하므로 둘을
+      구분해 표시해야 한다. 4방향 토글 자체도 자신이 무력화하는 설정과 다른 화면에 있다.
 
-### 설정 UX 재설계 — 1단계 완료, 나머지 미착수
-- [x] **설정 검색 + 증상 라우터** (2026-08-10, `4796e16`). `SettingsCatalog` 가 검색과
-      증상 라우터의 공용 카탈로그다. `keywords` 에는 **앱 용어가 아니라 리뷰에서 관찰된
-      사용자 어휘**("진입앵글", "지구봉" 등 오타 표기 포함)를 넣었다 — 이게 이 기능의
-      핵심이므로 정리한답시고 앱 용어로 바꾸지 말 것. 저장 키·화면 이동 없음.
-      - **시뮬레이터에서 실제 확인 완료** (iPhone 17 Pro, `SettingsDiscoveryUITests` 8건 통과).
-        검색창 노출 / `지구본`·`각도`·`지구봉` 검색 / 검색 결과 탭 이동 / 증상 라우터 3경로 /
-        행 레이블-화면 제목 일치까지 스크린샷으로 확인했다.
-        스크린샷으로만 잡힌 오류 1건도 같이 고쳤다 — 도움말 footer 가 "설정 화면 **위쪽**
-        검색창"이라 안내했는데 **iOS 26 은 검색 바를 화면 아래쪽에 그린다.** 문구에서
-        위치 표현을 뺐다. 앞으로도 검색창 위치를 문구로 특정하지 말 것.
-      - 한글 검색은 **음절이 완성돼야** 걸린다(조합 중 자모는 `contains` 미스). 버그가
-        아니라 알려진 한계이며 `SettingsEntry.matches` 주석에 적어 뒀다. 초성 검색
-        (`ㄱㄷ`→`각도`)은 별도 기능.
-- [ ] **전체 IA 재편(9섹션)은 미착수.** 착수 전 **What's New 모달 버그를 먼저 고칠 것** —
-      `ContentView.swift:104-113` 이 신규 설치자에게 `lastSeenWhatsNewVersion` 을 미리
-      찍어 모달을 영구히 건너뛰게 한다. IA 를 바꾸면 "설정이 어디로 갔는지" 알릴 채널이
-      필요한데 그 채널이 지금 새고 있다. features 배열도 1.7.2 이후 갱신 안 됨.
-- [ ] 키보드 내 설정 딥링크(`extensionContext.open`, Full Access 불필요) — 오타는 호스트
-      앱 안에서 나는데 거기서 설정으로 가는 문이 없다(실사용 6탭). 미착수.
-- [ ] 4방향 모드에서 무효인 컨트롤이 활성 상태로 남아 있음 —
-      `GestureDirection.swift:72-86` 이 fourWay 분기에서 섹터 폭을 무시한다고 주석까지
-      달아뒀는데 UI 는 슬라이더를 그대로 활성으로 보여준다. 같은 화면의 회전 보정은
-      실제로 동작하므로 둘을 구분해 표시해야 한다. 4방향 토글 자체도 레이아웃 화면에
-      있어 자신이 무력화하는 설정과 다른 화면에 산다.
+### 테스트 인프라 (CI 미편입 — 사용자 결정)
+- [ ] `MoaPlusTests` 타겟이 스킴에 없어 **메인 앱 유닛 테스트가 전혀 돌지 않는다.**
+      `MoaPlusTests/ios_moakiTests.swift` 는 존재하지만 실행되지 않는다.
+- [ ] `MoaPlusUITests` 의 `TEST_TARGET_NAME` 이 `ios-moaki`(§1-4). 고치려면 pbxproj 수정.
+      **스킴만 활성화하고 이걸 안 고치면 CI 가 깨진다.**
 
-### 테스트 인프라 — 확인된 공백 (CI 미편입, 사용자 결정)
-- [ ] **`MoaPlusTests` 타겟이 스킴에 없어 메인 앱 유닛 테스트가 전혀 돌지 않는다.**
-      `MoaPlus.xcscheme` 의 `<Testables>` 에는 `MoaPlusKeyboardTests`(활성)와
-      `MoaPlusUITests`(skipped)뿐이다. `MoaPlusTests/ios_moakiTests.swift` 는 존재하지만
-      실행되지 않는다.
-- [ ] **`MoaPlusUITests` 타겟의 `TEST_TARGET_NAME` 이 `ios-moaki`** — 포크하며 앱 타겟이
-      `MoaPlus` 로 바뀌었는데 안 따라왔다. 이 타겟이 한 번도 안 돌던 진짜 이유다.
-      고치려면 pbxproj 에서 `MoaPlus` 로 바꿔야 한다. **지금은 커맨드라인 오버라이드로만
-      우회했고 저장소는 안 건드렸다** — 스킴만 활성화하고 이걸 안 고치면 CI 가 깨진다.
-- 위 둘은 사용자 결정에 따라 **CI 에 편입하지 않았다.** `SettingsDiscoveryUITests` 는
-  파일로만 남아 있고, 수동 실행법(스킴 임시 수정 + `TEST_TARGET_NAME=MoaPlus`)은
-  그 파일 헤더 주석에 적어 뒀다.
-- 참고: 신규 테스트 파일은 **타겟에 수동 등록할 필요가 없다** —
-      `PBXFileSystemSynchronizedRootGroup`(Xcode 16 폴더 동기화)이라 파일만 넣으면 잡힌다.
-      단 UITests 폴더 이름은 **`MoaPlusUITests ` (끝에 공백)** 이다. 공백 없는 경로에
-      파일을 만들면 타겟에 안 잡힌다.
+### 리뷰 기반 백로그
+- [ ] **ㅐ 입력 방향이 순정과 다름**(호떡애비) — 매핑 스펙 결정 필요. **영상 대기 중**(§0).
+- [ ] 키보드 폭 축소 / 좌우·하단 여백(나가방) — `KeyboardMetrics` 폭 계산 전반, 회귀 위험 큼
+- [ ] 백스페이스를 최상단 행으로(나가방)
+- [ ] 세로 줄이고 남는 공간에 숫자열(콩픈패스) — 높이 조절과 조합
+- [ ] 특수문자 키패드 프리셋 커스터마이즈(쪼꼬파이원츄) — 1.8.0 2페이지로 문자 부족은 해소,
+      편집 기능 미반영
+- [ ] `viewWillDisappear` → `resetGestureState()` 범위 축소 검토(§2-D)
 
-### 미착수 — 리뷰 기반 백로그
-- [ ] 키보드 폭 축소 / 좌우·하단 여백 (나가방) — `KeyboardMetrics` 폭 계산 전반, 회귀 위험 큼
-- [ ] 백스페이스를 최상단 행으로 (나가방)
-- [ ] 세로 줄이고 남는 공간에 숫자열 (콩픈패스) — 높이 조절과 조합
-- [ ] 특수문자 키패드 프리셋 커스터마이즈 (쪼꼬파이원츄) — 1.8.0 2페이지로 문자 부족은 해소, 편집 기능 미반영
-- [ ] ㅐ 입력 방향이 순정과 다름 (호떡애비) — 임계가 아니라 매핑 스펙 결정 필요.
-      **사용자가 갤럭시 순정 모아키 입력을 녹화해 오기로 했다**(2026-08-10 합의).
-      촬영 목록은 `docs/MOAKEY_RECORDING_GUIDE.md`. 영상을 받으면 ffmpeg 로 프레임을
-      뽑아 궤적을 판독하고, `CLAUDE.md` 의 순정 스펙 표와 대조한 뒤 차이 나는 항목을
-      `drivePath` 하니스로 재현·고정한다.
-      **입력 스펙 관련 작업(ㅐ 매핑, 멀티스트로크 민감도 기본값 등)은 영상 수령 후로 보류.**
-      영상에서 확인할 핵심 두 가지:
-      - **2차 입력의 방향 관대함** — 사용자 관찰로는 순정이 후속 획 방향에 관대하다.
-        우리는 후속 획에 엄격해서 "빨리 치면 인식 안 됨"이 나오고, 관대하게 하면 꼬리
-        노이즈를 먹어 '으'→'워'가 난다. 순정이 이 상충을 어떻게 푸는지가 최대 관심사.
-      - **완성 글자 상태에서의 전이** — `HangulComposer.complete` 이후 자음/모음 입력을
-        순정이 어떻게 받는지(받침/새 글자/겹받침) 미확인.
-- [ ] `viewWillDisappear` → `resetGestureState()` 범위 축소 검토 (§1-D)
-- [ ] `SpecialCharSettingsView.swift:31` 문구가 **존재하지 않는 동작**을 설명한다 —
+### 문구 오류
+- [ ] `SpecialCharSettingsView.swift:31` 이 **존재하지 않는 동작**을 설명한다 —
       "언어 변환 키(🌐)를 짧게 탭하면 특수문자 레이어가 열리고". 그런 동작은 없다.
-      이 화면은 어디서도 도달할 수 없는 고아 화면이라 급하진 않으나, IA 재설계에서
-      '특수문자 구성' 진입점으로 되살릴 때 내용을 반드시 다시 쓸 것
-      (`docs/UX_AND_LATENCY_AUDIT.md` §1 참조).
-      **주의**: `ContentView.swift:156`, `TypingPracticeView.swift:92`,
-      `TutorialPracticeView.swift:88` 의 "🌐 버튼으로 전환"은 **시스템 키보드의 지구본**
-      (애플 기본 키보드에서 모아+ 로 들어오는 경로)이라 우리 `showGlobeKey` 와 무관하고
-      iOS 26 에서도 정확하다 — 감사 문서가 이 셋을 오류로 지목했으나 과잉 지적이다. 고치지 말 것.
-
-### 릴리스 준비
-- [ ] 버전 범프 (1.8.0/build 15 → 1.9.0/build 16)
-- [ ] `docs/appstore/whats-new-next.md` 가 **1.7.2 기준으로 stale** — 갱신 필요
-- [ ] 커밋/PR (`gh pr create --repo koh0001/moa-plus` — 이 저장소는 포크다)
+      도달 불가능한 고아 화면이라 급하진 않으나, IA 재설계에서 '특수문자 구성' 진입점으로
+      되살릴 때 반드시 다시 쓸 것.
+- **고치지 말 것**: `ContentView.swift:156`, `TypingPracticeView.swift:92`,
+  `TutorialPracticeView.swift:88` 의 "🌐 버튼으로 전환"은 **시스템 키보드의 지구본**
+  (애플 기본 키보드에서 모아+ 로 들어오는 경로)이라 우리 `showGlobeKey` 와 무관하고
+  iOS 26 에서도 정확하다. 감사 문서가 이 셋을 오류로 지목했으나 과잉 지적이다.
 
 ---
 
-## 5. 신규/변경 파일 지도
+## §6. 파일 지도
 
-**신규**
-- `docs/UX_AND_LATENCY_AUDIT.md` — 설정 UX 재설계안 + 반응속도 12건 계획 (워크플로 결과 보존)
-- `MoaPlus/Settings/KeyboardSizeSettingsView.swift` — 높이 슬라이더 + 지구본 토글
-- `MoaPlusKeyboardTests/GestureOverDetectionCharacterizationTests.swift` — 계측기 (§2)
-- `MoaPlusKeyboardTests/FunctionRowWidthTests.swift` — 기능행 폭 합 불변식 (자식 추가 시 ⏎ 잘림 방지)
-- `MoaPlusKeyboardTests/GlobeKeySwitchTests.swift` — 지구본 배선
-- `MoaPlusKeyboardTests/BackgroundImageMemoryTests.swift` — 배경 이미지 메모리 상한
+### 이번 작업의 신규 파일
+| 파일 | 용도 |
+|---|---|
+| `docs/MOAKEY_RECORDING_GUIDE.md` | **영상 촬영 목록** (§0 1순위) |
+| `docs/UX_AND_LATENCY_AUDIT.md` | UX 재설계안 + 반응속도 12건 계획 (워크플로 결과 보존) |
+| `MoaPlus/Settings/SettingsCatalog.swift` | 검색 인덱스 + 증상 라우터 공용 카탈로그 |
+| `MoaPlus/Settings/KeyboardSizeSettingsView.swift` | 높이 슬라이더 + 지구본 토글 |
+| `MoaPlusKeyboardTests/GestureOverDetectionCharacterizationTests.swift` | 긋기 계측기 (§3) |
+| `MoaPlusKeyboardTests/KeyboardSettingsCacheTests.swift` | 파생 캐시 무효화 배선 |
+| `MoaPlusKeyboardTests/FunctionRowWidthTests.swift` | 기능행 폭 합 불변식 |
+| `MoaPlusKeyboardTests/GlobeKeySwitchTests.swift` | 지구본 배선 |
+| `MoaPlusKeyboardTests/BackgroundImageMemoryTests.swift` | 배경 이미지 메모리 상한 |
+| `MoaPlusUITests /SettingsDiscoveryUITests.swift` | 설정 검색·라우터 (CI 미편입, §1-4) |
 
-**엔진 변경 (주의해서 읽을 것)**
+### 주의해서 읽을 엔진 파일
 - `MoaPlusKeyboard/Engine/GestureAnalyzer.swift` — `strokeOriginPoint`, 후행 트림 재작성
-- `MoaPlusKeyboard/ViewModels/KeyboardViewModel.swift` — `resolveConsonantDiagonalVowel` 게이트
-- `MoaPlusKeyboard/Utilities/KeyboardSettings.swift` — 신규 옵션 3개
-  (`keyboardHeightScale`, `showGlobeKey`, `consonantDiagonalDerivationEnabled`)
+- `MoaPlusKeyboard/ViewModels/KeyboardViewModel.swift` — 순정 게이트, 제스처 상태 dedupe,
+  `activeKeyContent` 캐시(수명 = 제스처 1회, `resetGestureState`/`dismissPopup` 이 비운다)
+- `MoaPlusKeyboard/Utilities/KeyboardSettings.swift` — 신규 옵션 3개 + 파생 캐시 2개
+  (색상 3종, 롱프레스 인덱스). 캐시 재빌드는 **`isLoading` 가드보다 앞**에 있어야 한다.
   → 새 옵션 추가 시 **Keys / @Published / loadAll / resetAll 4곳** 전부 필요 (CLAUDE.md 체크리스트)
 
-`CLAUDE.md` 에 "순정 모아키 입력 스펙(기준)"과 "긋기 노이즈 처리" 절을 추가해 뒀다.
+`CLAUDE.md` 에 "순정 모아키 입력 스펙(기준)"과 "긋기 노이즈 처리" 절이 있다.
 스펙을 바꾸려면 거기부터 볼 것.

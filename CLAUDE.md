@@ -13,14 +13,21 @@ moa-plus/
 │   ├── MoaPlusApp.swift               # @main 진입점
 │   ├── ContentView.swift              # 홈 화면 (딥블루 그라디언트)
 │   ├── Settings/
-│   │   ├── SettingsMainView.swift
-│   │   ├── InputSettingsView.swift           # 레이아웃/커서 제어/긋기 진입점
-│   │   ├── GestureSettingsView.swift         # 긋기 통합 설정 (각도/길이/방향/열별 보정)
+│   │   ├── SettingsMainView.swift            # 설정 루트 + .searchable (검색)
+│   │   ├── SettingsCatalog.swift             # 검색 인덱스 + 증상 라우터 공용 카탈로그
+│   │   ├── HelpView.swift                    # "이럴 때 어떻게 하나요" — 증상 → 설정 라우터
+│   │   ├── KeyboardSettingsView.swift        # 키보드 설정 묶음 진입점
+│   │   ├── LayoutCustomizationView.swift     # 레이아웃 프리셋/슬롯/4방향 모드/키 폭
+│   │   ├── KeyboardSizeSettingsView.swift    # 높이 배율 + 지구본 토글 + 실시간 미리보기
+│   │   ├── GestureSettingsView.swift         # 긋기 통합 설정 (입력 방식/각도/길이/열별 보정)
 │   │   ├── GestureTestView.swift             # 라이브 시각화 테스트 (production resolver 사용)
-│   │   ├── SecondaryInputSettingsView.swift  # 롱프레스 매핑 편집/힌트/딜레이
+│   │   ├── LongPressSettingsView.swift       # 롱프레스 매핑 편집/힌트/딜레이
+│   │   ├── BackspaceSettingsView.swift       # 백스페이스 속도/단어 단위 삭제
+│   │   ├── InputBehaviorSettingsView.swift   # 괄호 자동닫기/마침표/커서 드래그/모드 기억
 │   │   ├── AbbreviationSettingsView.swift    # 단축어 CRUD
 │   │   ├── AppearanceSettingsView.swift      # 테마/커스텀 색상/배경 이미지/키 투명도
-│   │   ├── FeedbackSettingsView.swift        # 햅틱/사운드/백스페이스 속도/단어 삭제
+│   │   ├── FeedbackSettingsView.swift        # 소리 · 진동 (햅틱/클릭 사운드)
+│   │   ├── SpecialCharSettingsView.swift     # ⚠️ 도달 불가 고아 화면 + 문구 오류 (HANDOFF §5)
 │   │   └── AboutView.swift                   # 크레딧/라이선스/링크
 │   ├── Practice/
 │   │   ├── TypingPracticeView.swift          # 타이핑 연습 화면
@@ -61,7 +68,8 @@ moa-plus/
 │       ├── HapticManager.swift        # 설정을 매번 직접 읽음 (캐시 없음)
 │       └── BackgroundImageManager.swift
 │
-├── MoaPlusKeyboardTests/             # 유닛 테스트 16파일 (Composer/Gesture/Layout/Snapshot + ViewModel: Cursor·CaretMove·Shift·VowelDrag·Abbreviation·Period·LongPress 등)
+├── MoaPlusKeyboardTests/             # 유닛 테스트 23파일 (Composer/Gesture/Layout/Snapshot/SettingsCache + ViewModel: Cursor·CaretMove·Shift·VowelDrag·Abbreviation·Period·LongPress 등)
+├── "MoaPlusUITests /"                # ⚠️ 폴더명 끝에 공백. CI 미편입 — 실행하려면 우회 필요 (HANDOFF §1-4)
 ├── scripts/
 │   └── add_target_membership.rb       # xcodeproj 자동 멤버십 추가 (메인 앱 ↔ 익스텐션)
 └── docs/                             # 개발 문서
@@ -312,7 +320,9 @@ func moveCursor(by offset: Int) {
 
 ### 신규 입력 추가 시 체크리스트
 1. `HangulComposer.State` 또는 `KeyContent` 새 케이스 추가했나? → 모든 `switch` exhaustive 점검
-2. `KeyboardSettings`에 새 옵션 추가했나? → `isLoading` 가드 + `loadAll()` 로드 라인 + 디스크 저장 키 모두 추가
+2. `KeyboardSettings`에 새 옵션 추가했나? → `isLoading` 가드 + `loadAll()` 로드 라인 + 디스크 저장 키 모두 추가.
+   **`loadAll()` 에서는 직접 대입하지 말고 `assign(\.foo, ...)` 헬퍼를 쓸 것** — 값이 같은데도
+   재대입하면 `@Published` 가 발행돼 무관한 설정 하나에 키보드 트리 전체가 재구성된다
 3. `Jungseong` 새 멤버 추가했나? → `Jungseong.allCases` 영향, `HangulConstants.composeSyllable` 가드 확인
 4. 메인 앱(GestureTestView 등)에서 익스텐션 코드 사용? → `scripts/add_target_membership.rb`로 타겟 멤버십 추가
 5. SwiftUI View가 무거운 클래스 인스턴스 보관? → `ObservableObject` wrapper + `@StateObject` 패턴 권장
