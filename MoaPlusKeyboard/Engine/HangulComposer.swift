@@ -311,8 +311,11 @@ class HangulComposer {
             state = .empty
             return .update
 
-        case .choseongJungseong:
-            state = .empty
+        case .choseongJungseong(let cho, _):
+            // 순정 모아키 실측(영상 G5/H·I 판독): 백스페이스는 자소 단위 —
+            // 받침 없는 완성 글자에서 중성만 지우고 초성을 남긴다 (가→ㄱ).
+            // 중성은 천지인 획 되감기 없이 통째로 지워진다 (개→ㄱ, ㅐ→ㅏ 아님).
+            state = .choseong(cho)
             return .update
 
         case .complete(let cho, let jung, let jong):
@@ -369,6 +372,10 @@ class HangulComposer {
         case (.ㅓ, .ㆍ): return .ㅕ
         case (.ㅗ, .ㆍ): return .ㅛ
         case (.ㅜ, .ㆍ): return .ㅠ
+        // 순정 모아키 실측(영상 H2 판독): ㆍ 를 더 누르면 ㅗ↔ㅛ / ㅜ↔ㅠ 가
+        // 무한 토글한다. 없으면 ㆍ 연타 시 조합이 끊겨 별개 클러스터로 떨어진다.
+        case (.ㅛ, .ㆍ): return .ㅗ
+        case (.ㅠ, .ㆍ): return .ㅜ
         default: return nil
         }
     }
