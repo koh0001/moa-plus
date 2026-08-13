@@ -85,26 +85,26 @@ enum TutorialContent {
             tip: "자유롭게 본인 이름도 입력해 보세요!"
         ),
 
-        // Stage 3: Consonant diagonal entry → derived vowels (v1.7)
+        // Stage 3: Diagonal round-trip vowels (v2.0 — 순정 실측 검증 경로.
+        // 영상 판독: C 섹션 4/4 ㅐ, A8#6 ㅔ, B3 4/4 ㅢ. docs/MOAKEY_VIDEO_FINDINGS.md)
         TutorialStage(
             id: 3,
-            title: "자음에서 바로 모음 (대각선 진입)",
-            description: "ㅣ/ㅡ를 대각선으로 시작한 뒤 멈추지 않고 이어 그으면 모음이 완성됩니다.\n↗→ = ㅏ, ↙↑ = ㅗ",
+            title: "대각선 왕복 — ㅐ·ㅔ·ㅢ",
+            description: "대각선으로 나갔다가 반대 방향으로 되돌아오면 또 다른 모음이 됩니다.\n↗↙ = ㅐ, ↖↘ = ㅔ, ↙↗ = ㅢ",
             vowelGestures: [
-                VowelGesture(vowel: "ㅏ", directions: ["↗", "→"], label: "오른쪽위→오른쪽 (ㅣ 진입 후 →)"),
-                VowelGesture(vowel: "ㅓ", directions: ["↖", "←"], label: "왼쪽위→왼쪽 (ㅣ 진입 후 ←)"),
-                VowelGesture(vowel: "ㅗ", directions: ["↙", "↑"], label: "왼쪽아래→위 (ㅡ 진입 후 ↑)"),
-                VowelGesture(vowel: "ㅜ", directions: ["↙", "↓"], label: "왼쪽아래→아래 (ㅡ 진입 후 ↓)"),
-                VowelGesture(vowel: "ㅘ", directions: ["↙", "↑", "→"], label: "ㅡ 진입→위→오른쪽"),
-                VowelGesture(vowel: "ㅟ", directions: ["↙", "↓", "→"], label: "ㅡ 진입→아래→오른쪽"),
+                VowelGesture(vowel: "ㅐ", directions: ["↗", "↙"], label: "오른쪽 위로 나갔다 되돌아오기"),
+                VowelGesture(vowel: "ㅔ", directions: ["↖", "↘"], label: "왼쪽 위로 나갔다 되돌아오기"),
+                VowelGesture(vowel: "ㅢ", directions: ["↙", "↗"], label: "왼쪽 아래로 나갔다 되돌아오기"),
             ],
             practiceLines: [
-                "가거고구",
-                "고기",
-                "거기",
-                "과자",
+                "개",
+                "게",
+                "의",
+                "개미",
+                "가게",
+                "의자",
             ],
-            tip: "대각선으로 시작해도 괜찮아요 — ㅣ/ㅡ 방향으로 떠난 뒤 원하는 모음 방향으로 자연스럽게 이어 그으면 됩니다."
+            tip: "삼성 모아키와 같은 방식이에요. 되돌아오는 획은 시작점을 지나쳐도 괜찮습니다."
         ),
 
         // Stage 4: Y-Vowels
@@ -159,8 +159,8 @@ enum TutorialContent {
                 VowelGesture(vowel: "ㅒ", directions: ["→", "←", "→", "←"], label: "오른쪽-왼쪽 두 번"),
                 VowelGesture(vowel: "ㅖ", directions: ["←", "→", "←", "→"], label: "왼쪽-오른쪽 두 번"),
                 VowelGesture(vowel: "ㅙ", directions: ["↑", "→", "←"], label: "위-오른쪽-왼쪽"),
-                VowelGesture(vowel: "ㅞ", directions: ["↓", "→", "←"], label: "아래-오른쪽-왼쪽"),
-                VowelGesture(vowel: "ㅢ", directions: ["↘", "↖"], label: "오른쪽아래-왼쪽위"),
+                VowelGesture(vowel: "ㅞ", directions: ["↓", "←", "→"], label: "아래-왼쪽-오른쪽"),
+                VowelGesture(vowel: "ㅢ", directions: ["↘", "↖"], label: "오른쪽아래-왼쪽위", altDirections: ["↙", "↗"], altLabel: "왼쪽아래-오른쪽위"),
             ],
             practiceLines: [
                 "예의",
@@ -174,7 +174,7 @@ enum TutorialContent {
         TutorialStage(
             id: 7,
             title: "보조 입력 — 숫자, 커서, 단축어",
-            description: "자음 키를 길게 누르면 숫자와 기호가 입력됩니다. 그대로 드래그하면 다른 후보를 선택할 수 있어요.\n\n스페이스바를 좌우로 드래그하면 커서가 한 글자씩 이동합니다.\n\n설정에서 단축어를 등록하면 자음 몇 개로 긴 문장을 입력할 수 있어요. 같은 글자로 시작하는 단축어가 여러 개면 후보 바에서 골라 쓸 수 있고, 입력 직후 백스페이스를 한 번 누르면 원래 글자로 되돌립니다.",
+            description: "자음 키를 길게 누르면 숫자와 기호가 입력됩니다. 그대로 드래그하면 다른 후보를 선택할 수 있어요.\n\n스페이스바를 좌우로 드래그하면 커서가 한 글자씩 이동합니다.\n\n백스페이스는 삼성 모아키처럼 받침 → 모음 → 자음 순으로 한 자소씩 지웁니다.\n\n설정에서 단축어를 등록하면 자음 몇 개로 긴 문장을 입력할 수 있어요. 같은 글자로 시작하는 단축어가 여러 개면 후보 바에서 골라 쓸 수 있고, 입력 직후 백스페이스를 한 번 누르면 원래 글자로 되돌립니다.",
             practiceLines: [
                 "12345",
                 "67890",

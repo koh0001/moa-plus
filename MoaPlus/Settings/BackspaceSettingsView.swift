@@ -35,7 +35,7 @@ struct BackspaceSettingsView: View {
                 if settings.wordDeleteEnabled {
                     Text("백스페이스를 \(settings.wordDeleteDelay, specifier: "%.1f")초 이상 누르면 공백 단위로 빠르게 삭제합니다.")
                 } else {
-                    Text("백스페이스를 길게 눌러도 한 글자씩만 삭제합니다.")
+                    Text("백스페이스를 길게 눌러도 한 자소씩(받침 → 모음 → 자음) 삭제합니다.")
                 }
             }
 

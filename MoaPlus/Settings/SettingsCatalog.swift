@@ -94,7 +94,7 @@ enum SettingsCatalog {
             title: "복합모음 입력 방식",
             icon: "character.textbox",
             destination: .gesture,
-            keywords: ["순정", "모아키", "복합모음", "대각선", "확장", "ㅘ", "ㅝ", "와", "워"]
+            keywords: ["순정", "모아키", "복합모음", "대각선", "확장", "ㅘ", "ㅝ", "와", "워", "ㅐ", "ㅔ", "ㅢ", "애", "에", "의", "왕복"]
         ),
         SettingsEntry(
             title: "멀티스트로크 민감도",
@@ -163,7 +163,7 @@ enum SettingsCatalog {
             title: "백스페이스 속도 · 단어 삭제",
             icon: "delete.left",
             destination: .backspace,
-            keywords: ["백스페이스", "지우기", "삭제", "속도", "단어"]
+            keywords: ["백스페이스", "지우기", "삭제", "속도", "단어", "자소", "받침"]
         ),
         SettingsEntry(
             title: "스페이스 드래그 커서 이동",
