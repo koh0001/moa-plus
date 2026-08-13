@@ -92,21 +92,33 @@ final class HangulComposerTests: XCTestCase {
         _ = composer.inputChoseong(.ㄱ)
         _ = composer.inputJungseong(.ㅏ)
         _ = composer.deleteBackward()
-        // NEW BEHAVIOR: 받침 없는 글자에서 ⌫ → 글자 전체 삭제
-        XCTAssertEqual(composer.state, .empty)
-        XCTAssertNil(composer.currentComposingCharacter)
+        // 순정 모아키 실측(영상 G5): 자소 단위 삭제 — 중성만 지우고 초성을 남긴다 (가→ㄱ)
+        XCTAssertEqual(composer.state, .choseong(.ㄱ))
+        XCTAssertEqual(composer.currentComposingCharacter, "ㄱ")
     }
 
     // MARK: - Backspace Behavior Tests (PR A)
 
-    func test_backspace_choseongJungseong_clearsState() {
+    func test_backspace_choseongJungseong_leavesChoseong() {
         _ = composer.inputChoseong(.ㅇ)
         _ = composer.inputJungseong(.ㅣ)
         XCTAssertEqual(composer.currentComposingCharacter, "이")
         let action = composer.deleteBackward()
         XCTAssertEqual(action, .update)
-        XCTAssertNil(composer.currentComposingCharacter)
-        XCTAssertEqual(composer.state, .empty)
+        // 순정 모아키 실측(영상 G5): 이 → ㅇ (자소 단위)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅇ")
+        XCTAssertEqual(composer.state, .choseong(.ㅇ))
+    }
+
+    /// 순정 실측(영상 G5): 중성은 천지인 획 되감기 없이 통째로 지워진다 —
+    /// 개→ㄱ (ㅐ가 ㅏ로 되돌아가지 않음).
+    func test_backspace_compoundJungseong_deletesWholeVowel() {
+        _ = composer.inputChoseong(.ㄱ)
+        _ = composer.inputJungseong(.ㅏ)
+        _ = composer.inputJungseong(.ㅣ)   // ㅏ+ㅣ=ㅐ
+        XCTAssertEqual(composer.currentComposingCharacter, "개")
+        _ = composer.deleteBackward()
+        XCTAssertEqual(composer.state, .choseong(.ㄱ))
     }
 
     func test_backspace_completeWithJongseong_removesJongseong() {
@@ -126,14 +138,17 @@ final class HangulComposerTests: XCTestCase {
         XCTAssertNil(composer.currentComposingCharacter)
     }
 
-    func test_backspace_choseongJungseongCompound_clearsState() {
+    func test_backspace_choseongJungseongCompound_leavesChoseong() {
         _ = composer.inputChoseong(.ㄱ)
         _ = composer.inputJungseong(.ㅗ)
         _ = composer.inputJungseong(.ㅏ)  // ㅘ
         XCTAssertEqual(composer.currentComposingCharacter, "과")
         let action = composer.deleteBackward()
         XCTAssertEqual(action, .update)
-        XCTAssertNil(composer.currentComposingCharacter)
+        // 순정 모아키 실측(영상 G3: 걔괴 →⌫ 걔ㄱ): 복합 중성도 통째로 지우고
+        // 초성을 남긴다 — ㅘ→ㅗ 획 되감기 없음.
+        XCTAssertEqual(composer.currentComposingCharacter, "ㄱ")
+        XCTAssertEqual(composer.state, .choseong(.ㄱ))
     }
 
     func testDeleteJongseong() {
