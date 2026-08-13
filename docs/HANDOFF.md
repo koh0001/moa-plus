@@ -1,9 +1,10 @@
 # 작업 핸드오프
 
-> 갱신: 2026-08-10 / 브랜치: `feat/symbol-pages-space-scroll` / **로컬 20 커밋, origin 에 미푸시**
+> 갱신: 2026-08-13 / 브랜치: `feat/symbol-pages-space-scroll` / **origin 푸시 완료**
 > 워킹트리 클린. 직전 릴리스는 `b1fdbdb`(v1.8.0 문서화)이고 그 이후가 전부 이번 작업이다.
 > 테스트: `MoaPlusKeyboardTests` 전체 통과 (`iPhone 17`).
 > UI 테스트 `SettingsDiscoveryUITests` 8건 통과 (`iPhone 17 Pro`, CI 미편입).
+> **인증**: 이 저장소는 `koh0001` 전용이다 — 새 머신에서는 §1-7 설정을 먼저 할 것.
 
 ---
 
@@ -30,8 +31,6 @@
 (좌표계·키 크기가 다름). 관찰은 규칙과 경향까지, 수치는 우리 엔진에서 재튜닝.
 
 ### 2순위 — 사용자 답변 대기 중인 결정
-- [ ] **푸시 여부** — 로컬 20 커밋이 origin 에 없다. 이 핸드오프 문서 자체도 아직 로컬에만 있다.
-      (이 브랜치 푸시만으로는 CI 가 돌지 않는다 — CI 는 fork main 으로의 PR 에서만 동작)
 - [ ] **릴리스 범위** — 버전 범프(1.8.0/build 15 → 1.9.0/build 16),
       `docs/appstore/whats-new-next.md` 가 **1.7.2 기준으로 stale**, PR 생성
       (`gh pr create --repo koh0001/moa-plus` — 이 저장소는 포크다).
@@ -99,7 +98,33 @@ passed 인데 최종 상태만 FAILED 면 그 상황이다.
 **키보드 데몬은 인식하지 않는다.** 게다가 그 가짜 항목이 "새로운 키보드 추가" 목록에서
 모아+ 를 숨겨 정식 추가를 막는다. 반드시 설정 UI 로 추가할 것.
 
-### 1-7. 새 테스트 파일은 타겟 등록이 필요 없다
+### 1-7. 이 저장소는 `koh0001` 계정 전용이다 (다른 머신에서 클론하면 재설정 필요)
+사용자는 GitHub 계정을 용도별로 나눠 쓴다 — **이 프로젝트 = `koh0001`, 업무 = 별도 계정.**
+`git config --local` 은 **클론을 따라가지 않으므로** 새 머신에서는 아래를 다시 해야 한다.
+
+```bash
+git config --local user.name koh0001
+git config --local user.email "29946122+koh0001@users.noreply.github.com"
+git remote set-url origin https://koh0001@github.com/koh0001/moa-plus.git
+# gh helper 는 "활성 계정"만 지원해 다른 계정을 요청하면 빈 응답을 준다.
+# 그래서 이 저장소에서만 gh helper 를 끄고 osxkeychain 을 쓴다.
+git config --local --replace-all "credential.https://github.com.helper" ""
+git config --local --add "credential.https://github.com.helper" osxkeychain
+TOKEN=$(gh auth token -u koh0001 -h github.com)
+printf 'protocol=https\nhost=github.com\nusername=koh0001\npassword=%s\n\n' "$TOKEN" \
+  | git credential-osxkeychain store
+unset TOKEN
+```
+
+**증상**: 이 설정이 없으면 `git push` 가 `403 Permission denied` 로 죽는다
+(전역 활성 계정이 `koh0001` 이 아니기 때문). `gh auth switch` 로 전역을 바꾸는 방법도
+있지만 그러면 업무 저장소 작업이 영향을 받으므로 위 저장소별 고정을 쓸 것.
+검증은 `git push --dry-run origin <branch>` — 인증이 통과하면 `Everything up-to-date`.
+
+> 커밋 `beb3911` 까지 21개는 author 가 `ockhyun-kim` 으로 올라가 있다(설정 이전).
+> 되돌리지 않았다 — 이미 푸시됐고 기능상 문제가 없다. 이후 커밋부터 `koh0001` 이다.
+
+### 1-8. 새 테스트 파일은 타겟 등록이 필요 없다
 `PBXFileSystemSynchronizedRootGroup`(Xcode 16 폴더 동기화)이라 파일만 넣으면 잡힌다.
 단 **UITests 폴더 이름은 `MoaPlusUITests ` — 끝에 공백이 있다.** 공백 없는 경로에 만들면 안 잡힌다.
 
