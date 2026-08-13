@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI  // 미리 계산한 키 색상(Color) 캐시용
 
 /// Central settings store shared between keyboard extension and container app via App Group
 final class KeyboardSettings: ObservableObject {
@@ -18,6 +19,9 @@ final class KeyboardSettings: ObservableObject {
         static let showSecondaryHints = "showSecondaryHints"
         static let hintSize = "hintSize"
         static let sideKeyWidthRatio = "sideKeyWidthRatio"
+        static let keyboardHeightScale = "keyboardHeightScale"
+        static let showGlobeKey = "showGlobeKey"
+        static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
         static let longPressDelay = "longPressDelay"
         static let clickSoundEnabled = "clickSoundEnabled"
         static let showDetailedHints = "showDetailedHints"
@@ -26,6 +30,7 @@ final class KeyboardSettings: ObservableObject {
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
+        static let cursorRepeatSpeed = "cursorRepeatSpeed"
         static let periodOnDoubleSpace = "periodOnDoubleSpace"
         static let abbreviationEnabled = "abbreviationEnabled"
         static let layoutCustomization = "layoutCustomization"
@@ -50,13 +55,62 @@ final class KeyboardSettings: ObservableObject {
     // MARK: - Theme Settings
 
     @Published var themeSettings: ThemeSettings = .default {
-        didSet { guard !isLoading else { return }; save(themeSettings, forKey: Keys.themeSettings) }
+        didSet {
+            // 색 캐시는 `isLoading` 가드 앞에서 갱신한다 — 가드는 디스크 재저장만
+            // 막는다. 뒤에 두면 "설정에서 색을 바꿨는데 키보드가 안 변함"이 된다.
+            rebuildResolvedColors()
+            guard !isLoading else { return }
+            save(themeSettings, forKey: Keys.themeSettings)
+        }
+    }
+
+    /// 미리 계산해 둔 키 색상.
+    ///
+    /// `ThemeSettings` 는 값 타입이고 `backgroundImageId: String?` 를 포함해 복사마다
+    /// retain/release 가 발생한다. `resolved*` 는 computed 라 호출마다 Color 를 새로
+    /// 만든다. 뷰들이 키마다 `KeyboardSettings.shared.themeSettings` 를 읽고 있어서
+    /// 그리드 렌더 1회에 구조체 복사 약 56회 + Color 할당 약 56회가 나갔다.
+    /// 테마가 바뀔 때만 다시 계산한다.
+    ///
+    /// CLAUDE.md 가 "매번 직접 읽음"을 제약으로 명시한 것은 `HapticManager` 다
+    /// (키 입력당 1회라 비용이 무시 가능하고, 설정 즉시 반영이 목적) — 렌더 경로에는
+    /// 해당하지 않으므로 `HapticManager` 는 건드리지 않았다.
+    private(set) var resolvedKeyBackground: Color = ThemeSettings.default.resolvedKeyBackground
+    private(set) var resolvedKeyText: Color = ThemeSettings.default.resolvedKeyText
+    private(set) var resolvedFunctionKeyBackground: Color = ThemeSettings.default.resolvedFunctionKeyBackground
+
+    private func rebuildResolvedColors() {
+        resolvedKeyBackground = themeSettings.resolvedKeyBackground
+        resolvedKeyText = themeSettings.resolvedKeyText
+        resolvedFunctionKeyBackground = themeSettings.resolvedFunctionKeyBackground
     }
 
     // MARK: - Secondary Key Actions (Long-press mappings)
 
     @Published var secondaryKeyActions: [SecondaryKeyAction] = SecondaryKeyAction.defaults {
-        didSet { guard !isLoading else { return }; save(secondaryKeyActions, forKey: Keys.secondaryKeyActions) }
+        didSet {
+            // 인덱스 재빌드는 `isLoading` 가드보다 **앞**에 둔다. 가드는 디스크
+            // 재저장만 막는 것이고, `loadAll()` 로 값이 바뀐 뒤에도 인덱스는 새 값을
+            // 가리켜야 한다. 뒤에 두면 "설정에서 롱프레스 매핑을 고쳤는데 키보드는
+            // 예전 걸 낸다"는 stale 버그가 된다.
+            rebuildSecondaryActionIndex()
+            guard !isLoading else { return }
+            save(secondaryKeyActions, forKey: Keys.secondaryKeyActions)
+        }
+    }
+
+    /// `secondaryKeyActions` 의 keyId → 액션 인덱스.
+    ///
+    /// 원래 조회가 29개 배열 선형 String 탐색이었다. `KeyGridView` 가 키마다 최대
+    /// 2회(영문 숫자 경로 + 일반 경로) 부르므로 그리드 렌더 1회에 최대 812회 String
+    /// 비교가 나갔다. 조회 자체는 O(1) 로 바꾸고 공개 API 시그니처는 그대로 뒀다.
+    private var secondaryActionIndex: [String: SecondaryKeyAction] = Dictionary(
+        SecondaryKeyAction.defaults.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
+
+    private func rebuildSecondaryActionIndex() {
+        // 같은 keyId 가 중복되면 앞선 항목을 남긴다 — `first(where:)` 의 기존 동작과 같다.
+        secondaryActionIndex = Dictionary(
+            secondaryKeyActions.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     // MARK: - Shortcut Expansions
@@ -109,6 +163,42 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(sideKeyWidthRatio, forKey: Keys.sideKeyWidthRatio) }
     }
 
+    /// Keyboard container height multiplier applied on top of the per-idiom
+    /// base height (iPhone 260pt / iPad screen-derived). Clamped to
+    /// `KeyboardMetrics.keyboardHeightScaleRange` at the metrics layer so a
+    /// corrupt stored value can never collapse the grid.
+    /// Requested repeatedly in App Store reviews (v1.8.0, 4 separate users).
+    @Published var keyboardHeightScale: Double = KeyboardMetrics.defaultKeyboardHeightScale {
+        didSet { guard !isLoading else { return }; writePrimitive(keyboardHeightScale, forKey: Keys.keyboardHeightScale) }
+    }
+
+    /// Show the system keyboard-switch (globe) key in the function row.
+    /// Only rendered when iOS also reports `needsInputModeSwitchKey`, so it
+    /// can never ship as a dead button when there is nothing to switch to.
+    ///
+    /// 기본 **OFF**. iOS 26 아이폰은 서드파티 키보드 아래에 지구본 바를 시스템이
+    /// 직접 그려주므로(`needsInputModeSwitchKey == false`) 대부분의 사용자에게는
+    /// 어차피 보이지 않고, ON 이면 기능 행에 키가 하나 늘어 스페이스바만 좁아진다.
+    /// 지구본이 필요한 환경(구버전 iOS·아이패드)에서 설정으로 켜는 방식.
+    @Published var showGlobeKey: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(showGlobeKey, forKey: Keys.showGlobeKey) }
+    }
+
+    /// 자음 키에서 **대각선으로 진입**한 뒤 이어 그어 천지인 규칙으로 복합모음을
+    /// 파생시키는 확장 경로(v1.7 도입). 기본 OFF = **순정 모아키 방식**.
+    ///
+    /// 순정 모아키(로즈키 드래그 방식)에서 대각선은 최종 결과(↖↗=ㅣ, ↙↘=ㅡ)이지
+    /// 뒤에 획을 붙여 발전시키는 진입 획이 아니다. 복합모음은 카디널 조합
+    /// (ㅘ=↑→, ㅝ=↓← 등)으로만 만든다 — 이 규칙은 `VowelPattern.all` 이 이미
+    /// 순정과 동일하게 구현하고 있다.
+    ///
+    /// 이 경로를 켜면 ↙ 뒤에 붙은 작은 꼬리 획이 ㅡ 를 ㅗ/ㅢ/ㅘ 로 승격시켜
+    /// "'으'가 '워'로, '이'가 '와'로" 오타가 발생한다(앱스토어 리뷰 3건, 재현 완료 —
+    /// `GestureOverDetectionCharacterizationTests`). 그래서 기본값은 OFF 다.
+    @Published var consonantDiagonalDerivationEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(consonantDiagonalDerivationEnabled, forKey: Keys.consonantDiagonalDerivation) }
+    }
+
     /// Long-press delay in seconds (0.2 ~ 1.0, default 0.5)
     @Published var longPressDelay: Double = 0.5 {
         didSet { guard !isLoading else { return }; writePrimitive(longPressDelay, forKey: Keys.longPressDelay) }
@@ -134,6 +224,11 @@ final class KeyboardSettings: ObservableObject {
     /// Space-bar drag moves the cursor (default ON)
     @Published var cursorMoveBySpaceDragEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(cursorMoveBySpaceDragEnabled, forKey: Keys.cursorMoveBySpaceDragEnabled) }
+    }
+
+    /// Space-drag hold-to-repeat cursor speed: 0=slow, 1=normal, 2=fast.
+    @Published var cursorRepeatSpeed: Int = 1 {
+        didSet { guard !isLoading else { return }; writePrimitive(cursorRepeatSpeed, forKey: Keys.cursorRepeatSpeed) }
     }
 
     /// Double-space inserts a period (iOS-style ". " shortcut, default ON)
@@ -179,6 +274,16 @@ final class KeyboardSettings: ObservableObject {
         case 0:  return 0.12
         case 2:  return 0.05
         default: return 0.08
+        }
+    }
+
+    /// Space-drag hold-to-repeat ramp (start interval → floor) from
+    /// `cursorRepeatSpeed`. The repeater accelerates from `initial` toward `min`.
+    var cursorRepeatInterval: (initial: TimeInterval, min: TimeInterval) {
+        switch cursorRepeatSpeed {
+        case 0:  return (0.22, 0.10)    // 느림
+        case 2:  return (0.09, 0.028)   // 빠름
+        default: return (0.14, 0.045)   // 보통
         }
     }
 
@@ -286,32 +391,51 @@ final class KeyboardSettings: ObservableObject {
 
     // MARK: - Persistence
 
+    /// 값이 **실제로 달라졌을 때만** 대입한다.
+    ///
+    /// `@Published` 는 같은 값을 다시 넣어도 `objectWillChange` 를 발행한다.
+    /// `loadAll()` 은 크로스프로세스 변경 알림마다 도는데, 무조건 재대입하면
+    /// 무관한 설정 하나가 바뀌어도 키보드 트리 전체가 재구성된다. 이 때문에
+    /// 지금까지 구독자마다 `removeDuplicates()` 를 개별로 붙여야 했다
+    /// (`KeyboardViewController.observeHeightScale` 주석 참조).
+    ///
+    /// 대입이 일어나지 않으면 `didSet` 도 안 돌아 색·인덱스 캐시 재빌드가
+    /// 생략되는데, 값이 같으니 재계산할 것도 없다.
+    private func assign<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<KeyboardSettings, T>, _ newValue: T) {
+        guard self[keyPath: keyPath] != newValue else { return }
+        self[keyPath: keyPath] = newValue
+    }
+
     func loadAll() {
         isLoading = true
         defer { isLoading = false }
-        gestureSettings = load(GestureSettings.self, forKey: Keys.gestureSettings) ?? .default
-        themeSettings = load(ThemeSettings.self, forKey: Keys.themeSettings) ?? .default
-        secondaryKeyActions = load([SecondaryKeyAction].self, forKey: Keys.secondaryKeyActions) ?? SecondaryKeyAction.defaults
-        shortcutExpansionStore = load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore()
-        abbreviationEnabled = defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true
-        showGesturePreview = defaults.bool(forKey: Keys.showGesturePreview)
-        showSecondaryHints = defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true
-        hintSize = defaults.object(forKey: Keys.hintSize) as? Int ?? 1
-        sideKeyWidthRatio = defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7
-        longPressDelay = defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5
-        clickSoundEnabled = defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false
-        showDetailedHints = defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false
-        autoBracketEnabled = defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true
-        wordDeleteEnabled = defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true
-        backspaceSpeed = defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1
-        wordDeleteDelay = defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5
-        cursorMoveBySpaceDragEnabled = defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true
-        periodOnDoubleSpaceEnabled = defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true
-        layoutCustomization = load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization()
-        firstLaunchModalShown = defaults.bool(forKey: Keys.firstLaunchModalShown)
-        rememberLastKeyboardMode = defaults.bool(forKey: Keys.rememberLastKeyboardMode)
-        lastKeyboardLetterMode = defaults.string(forKey: Keys.lastKeyboardLetterMode) ?? "korean"
-        lastSeenWhatsNewVersion = defaults.string(forKey: Keys.lastSeenWhatsNewVersion) ?? ""
+        assign(\.gestureSettings, load(GestureSettings.self, forKey: Keys.gestureSettings) ?? .default)
+        assign(\.themeSettings, load(ThemeSettings.self, forKey: Keys.themeSettings) ?? .default)
+        assign(\.secondaryKeyActions, load([SecondaryKeyAction].self, forKey: Keys.secondaryKeyActions) ?? SecondaryKeyAction.defaults)
+        assign(\.shortcutExpansionStore, load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore())
+        assign(\.abbreviationEnabled, defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true)
+        assign(\.showGesturePreview, defaults.bool(forKey: Keys.showGesturePreview))
+        assign(\.showSecondaryHints, defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true)
+        assign(\.hintSize, defaults.object(forKey: Keys.hintSize) as? Int ?? 1)
+        assign(\.sideKeyWidthRatio, defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7)
+        assign(\.keyboardHeightScale, defaults.object(forKey: Keys.keyboardHeightScale) as? Double ?? KeyboardMetrics.defaultKeyboardHeightScale)
+        assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
+        assign(\.consonantDiagonalDerivationEnabled, defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false)
+        assign(\.longPressDelay, defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5)
+        assign(\.clickSoundEnabled, defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false)
+        assign(\.showDetailedHints, defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false)
+        assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
+        assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
+        assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
+        assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
+        assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
+        assign(\.cursorRepeatSpeed, defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1)
+        assign(\.periodOnDoubleSpaceEnabled, defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true)
+        assign(\.layoutCustomization, load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization())
+        assign(\.firstLaunchModalShown, defaults.bool(forKey: Keys.firstLaunchModalShown))
+        assign(\.rememberLastKeyboardMode, defaults.bool(forKey: Keys.rememberLastKeyboardMode))
+        assign(\.lastKeyboardLetterMode, defaults.string(forKey: Keys.lastKeyboardLetterMode) ?? "korean")
+        assign(\.lastSeenWhatsNewVersion, defaults.string(forKey: Keys.lastSeenWhatsNewVersion) ?? "")
     }
 
     private func save<T: Encodable>(_ value: T, forKey key: String) {
@@ -354,11 +478,15 @@ final class KeyboardSettings: ObservableObject {
         showDetailedHints = false
         clickSoundEnabled = false
         sideKeyWidthRatio = 0.7
+        keyboardHeightScale = KeyboardMetrics.defaultKeyboardHeightScale
+        showGlobeKey = false
+        consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true
+        cursorRepeatSpeed = 1
         periodOnDoubleSpaceEnabled = true
         layoutCustomization = LayoutCustomization()
         firstLaunchModalShown = false
@@ -390,6 +518,6 @@ final class KeyboardSettings: ObservableObject {
 
     /// Get secondary action for a specific key
     func secondaryAction(forKey keyId: String) -> SecondaryKeyAction? {
-        return SecondaryKeyAction.action(forKey: keyId, from: secondaryKeyActions)
+        return secondaryActionIndex[keyId]
     }
 }

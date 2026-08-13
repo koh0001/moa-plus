@@ -13,14 +13,21 @@ moa-plus/
 │   ├── MoaPlusApp.swift               # @main 진입점
 │   ├── ContentView.swift              # 홈 화면 (딥블루 그라디언트)
 │   ├── Settings/
-│   │   ├── SettingsMainView.swift
-│   │   ├── InputSettingsView.swift           # 레이아웃/커서 제어/긋기 진입점
-│   │   ├── GestureSettingsView.swift         # 긋기 통합 설정 (각도/길이/방향/열별 보정)
+│   │   ├── SettingsMainView.swift            # 설정 루트 + .searchable (검색)
+│   │   ├── SettingsCatalog.swift             # 검색 인덱스 + 증상 라우터 공용 카탈로그
+│   │   ├── HelpView.swift                    # "이럴 때 어떻게 하나요" — 증상 → 설정 라우터
+│   │   ├── KeyboardSettingsView.swift        # 키보드 설정 묶음 진입점
+│   │   ├── LayoutCustomizationView.swift     # 레이아웃 프리셋/슬롯/4방향 모드/키 폭
+│   │   ├── KeyboardSizeSettingsView.swift    # 높이 배율 + 지구본 토글 + 실시간 미리보기
+│   │   ├── GestureSettingsView.swift         # 긋기 통합 설정 (입력 방식/각도/길이/열별 보정)
 │   │   ├── GestureTestView.swift             # 라이브 시각화 테스트 (production resolver 사용)
-│   │   ├── SecondaryInputSettingsView.swift  # 롱프레스 매핑 편집/힌트/딜레이
+│   │   ├── LongPressSettingsView.swift       # 롱프레스 매핑 편집/힌트/딜레이
+│   │   ├── BackspaceSettingsView.swift       # 백스페이스 속도/단어 단위 삭제
+│   │   ├── InputBehaviorSettingsView.swift   # 괄호 자동닫기/마침표/커서 드래그/모드 기억
 │   │   ├── AbbreviationSettingsView.swift    # 단축어 CRUD
 │   │   ├── AppearanceSettingsView.swift      # 테마/커스텀 색상/배경 이미지/키 투명도
-│   │   ├── FeedbackSettingsView.swift        # 햅틱/사운드/백스페이스 속도/단어 삭제
+│   │   ├── FeedbackSettingsView.swift        # 소리 · 진동 (햅틱/클릭 사운드)
+│   │   ├── SpecialCharSettingsView.swift     # ⚠️ 도달 불가 고아 화면 + 문구 오류 (HANDOFF §5)
 │   │   └── AboutView.swift                   # 크레딧/라이선스/링크
 │   ├── Practice/
 │   │   ├── TypingPracticeView.swift          # 타이핑 연습 화면
@@ -28,7 +35,7 @@ moa-plus/
 │   └── Tutorial/                      # 8단계 튜토리얼 (딥블루 테마)
 │
 ├── MoaPlusKeyboard/                   # 키보드 익스텐션
-│   ├── KeyboardViewController.swift   # UIKit 진입점 (260pt 고정 높이)
+│   ├── KeyboardViewController.swift   # UIKit 진입점 (아이폰 260pt × keyboardHeightScale)
 │   ├── Engine/
 │   │   ├── HangulComposer.swift       # 한글 조합 상태머신 (6 cases: empty/choseong/choseongJungseong/complete/standaloneVowel/dotPending)
 │   │   ├── GestureAnalyzer.swift      # 제스처 방향 분석 (설정 연동, 열별 보정)
@@ -61,7 +68,8 @@ moa-plus/
 │       ├── HapticManager.swift        # 설정을 매번 직접 읽음 (캐시 없음)
 │       └── BackgroundImageManager.swift
 │
-├── MoaPlusKeyboardTests/             # 유닛 테스트 16파일 (Composer/Gesture/Layout/Snapshot + ViewModel: Cursor·CaretMove·Shift·VowelDrag·Abbreviation·Period·LongPress 등)
+├── MoaPlusKeyboardTests/             # 유닛 테스트 23파일 (Composer/Gesture/Layout/Snapshot/SettingsCache + ViewModel: Cursor·CaretMove·Shift·VowelDrag·Abbreviation·Period·LongPress 등)
+├── "MoaPlusUITests /"                # ⚠️ 폴더명 끝에 공백. CI 미편입 — 실행하려면 우회 필요 (HANDOFF §1-4)
 ├── scripts/
 │   └── add_target_membership.rb       # xcodeproj 자동 멤버십 추가 (메인 앱 ↔ 익스텐션)
 └── docs/                             # 개발 문서
@@ -193,9 +201,20 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - Shift on/locked 시 letter 키 표시 대문자 (ConsonantKeyView)
 
 ### Function Row
-`[123/한글] [한/영] [space (drag→커서)] [긋기 펑크] [⏎]`
+`[🌐] [123/한글] [한/영] [space (drag→커서)] [긋기 펑크] [⏎]`
+- 지구본(🌐): **iOS 26 아이폰에서는 시스템이 키보드 아래에 지구본 바를 직접 그려 `needsInputModeSwitchKey == false` → 우리 지구본 미표시**(중복 방지, 시뮬레이터 실측). 구버전 iOS/아이패드 등 `true` 인 환경에서만 나타남
+- `showGlobeKey && viewModel.canSwitchInputMode` 일 때만 렌더 → `KeyboardViewModel.switchKeyboard()` → `advanceToNextInputMode()`. `needsInputModeSwitchKey`는 익스텐션만 읽을 수 있어 `KeyboardViewController`가 `viewDidLoad` + **`viewWillAppear` 매회** `viewModel.canSwitchInputMode`에 밀어넣는다(세션 중 키보드 추가 반영, 호스트 앱 미리보기 기본 true). 1회만 캡처하면 익스텐션 프로세스가 살아있는 동안 갱신 안 됨
+- 기능행 4개 바디(default/longSpace/symbol/bimanual) 모두 자식 폭 합 == `effectiveTotalWidth` 여야 ⏎ 가 안 잘림. 자식 추가 시 간격 수도 함께 증가 — 지구본은 `globeReservedWidth`(폭+간격)를 **스페이스바에서만** 차감. 불변식은 `FunctionRowWidthTests` 가드
 - 긋기 펑크: tap=`.`, ←=`?`, →=`!`, ↑=`,`, ↓=`.`
 - Space 드래그: 8pt 임계값, 12pt/step → `moveCursor(by:)` (commitCurrent + abbreviation reset 후 proxy 커서 이동)
+- Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
+- 심볼 모드 전용 행: `[한글/ABC] [한/영] [#+= / 123] [space] [⏎]` — 페이지 토글이 **스페이스 왼쪽**(구 슬롯 B 위치), 긋기 펑크 대신 렌더
+
+### 심볼 키패드 페이지 (2페이지)
+- `KeyboardMetrics.symbolLayout(_:page:)` — page 0 = 숫자 + 상용 문장부호(왼쪽 열 `. , ' "`), page 1 = 괄호/통화/수학/타이포 기호. `symbolPageCount = 2`
+- 상태: `KeyboardViewModel.symbolPage`(Int). `toggleSymbolPage()`가 `% symbolPageCount` 순환. 심볼 진입/이탈(`toggleSymbolMode`/`toggleLetterMode`) 시 항상 0 리셋
+- 페이지 인지 리졸버: `activeLayout(for:layout:symbolPage:)` / `keyContent(...symbolPage:)` — 렌더(`KeyGridView.symbolPage`) + 탭(`handleSymbolModeTap`) + 롱프레스 모두 활성 페이지로 해석. 기존 2-arg 오버로드는 page 0 위임(하위호환)
+- geometry(⌫ 위치/열 수)는 페이지 간 동일, 콘텐츠만 변경. classic11/fullPackage는 wide-⌫로 2셀 적어 `/`를 page 1에 배치(`°`·backtick 생략) — `/` 누락은 회귀이므로 `KeyboardMetricsLayoutTests.testSymbolPages_essentialCharsReachableForEveryPreset` 가드
 
 ### 천지인 합성 규칙
 **단독 키 입력:**
@@ -256,7 +275,11 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── clickSoundEnabled: Bool                 (독립 저장)
 ├── longPressDelay: Double                  (0.2~1.0초)
 ├── sideKeyWidthRatio: Double               (0.15~1.0, 기본 0.7 정사각)
+├── keyboardHeightScale: Double             (0.85~1.35, 기본 1.0 — 기기 기본 높이에 곱함)
+├── showGlobeKey: Bool                      (기능행 지구본 키, 기본 OFF)
+├── consonantDiagonalDerivationEnabled: Bool (자음 대각선 진입 파생, 기본 OFF=순정 모아키)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)
+├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
 ├── wordDeleteEnabled: Bool
 ├── wordDeleteDelay: Double
@@ -266,6 +289,18 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── showDetailedHints: Bool
 └── hintSize: Int                           (0=작게, 1=보통, 2=크게)
 ```
+
+### 순정 모아키 입력 스펙 (기준)
+출처: `docs/moakey_ios_custom_docs/assets/03_gesture_angle_reference.png`(실제 삼성 설정, 양손용) + 나무위키.
+- 자음 8방향 단독: `↑=ㅗ ↓=ㅜ →=ㅏ ←=ㅓ`, `↖↗=ㅣ`, `↙↘=ㅡ`
+- 복합모음은 **방향 조합**: `ㅘ=↑→` `ㅝ=↓←` `ㅚ=↑↓` `ㅟ=↓↑` `ㅐ=→←` `ㅔ=←→` `ㅛ=↑↓↑` `ㅠ=↓↑↓` `ㅑ=→←→` `ㅕ=←→←` `ㅙ=↑→←` `ㅞ=↓←→`
+- `VowelPattern.all`(자음 키 트라이)이 이 스펙과 동일 — **변경 시 순정 이탈 주의**
+- `resolveConsonantDiagonalVowel`(대각선 진입 후 천지인 파생)은 v1.7에 추가한 **순정에 없는 확장**. `consonantDiagonalDerivationEnabled`(기본 OFF)로만 활성. 켜면 긋기 끝 흔들림이 ㅡ→ㅗ/ㅢ/ㅘ 로 승격돼 오타가 난다(리뷰 3건)
+- 단독 대각선(↗=ㅣ ↘=ㅡ)은 트라이가 처리하므로 이 설정과 무관 — 클래식/확장형의 유일한 ㅣ/ㅡ 경로라 절대 깨면 안 됨
+
+### 긋기 노이즈 처리 (GestureAnalyzer)
+- `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다
+- 후행 노이즈 트림은 **절대 크기(`edgeNoiseCap`) + 직전 획 대비 비율(`trailingNoiseRatio` 0.4)** 를 함께 보고, 꼬리가 여러 조각일 수 있어 반복 제거. 절대 크기만 쓰면 ㅒ/ㅖ/ㅙ/ㅞ의 짧은 마지막 획이 잘려 얘→야, 왜→와 회귀 발생 (`GestureOverDetectionCharacterizationTests` 가드)
 
 ### 대각선 모음 매핑 (기본값)
 ```
@@ -285,7 +320,9 @@ func moveCursor(by offset: Int) {
 
 ### 신규 입력 추가 시 체크리스트
 1. `HangulComposer.State` 또는 `KeyContent` 새 케이스 추가했나? → 모든 `switch` exhaustive 점검
-2. `KeyboardSettings`에 새 옵션 추가했나? → `isLoading` 가드 + `loadAll()` 로드 라인 + 디스크 저장 키 모두 추가
+2. `KeyboardSettings`에 새 옵션 추가했나? → `isLoading` 가드 + `loadAll()` 로드 라인 + 디스크 저장 키 모두 추가.
+   **`loadAll()` 에서는 직접 대입하지 말고 `assign(\.foo, ...)` 헬퍼를 쓸 것** — 값이 같은데도
+   재대입하면 `@Published` 가 발행돼 무관한 설정 하나에 키보드 트리 전체가 재구성된다
 3. `Jungseong` 새 멤버 추가했나? → `Jungseong.allCases` 영향, `HangulConstants.composeSyllable` 가드 확인
 4. 메인 앱(GestureTestView 등)에서 익스텐션 코드 사용? → `scripts/add_target_membership.rb`로 타겟 멤버십 추가
 5. SwiftUI View가 무거운 클래스 인스턴스 보관? → `ObservableObject` wrapper + `@StateObject` 패턴 권장
@@ -330,4 +367,27 @@ Grep is still right for known exact strings, regex, multiline patterns, and
 file globs. The brain auto-syncs incrementally on every gstack skill start.
 Run `/sync-gbrain` to force-refresh, `/sync-gbrain --full` for full reindex.
 
+
+
+## Vault 자동 캡처
+
+Vault 경로: `/Users/koh/vault` (additionalDirectories 등록 필요)
+
+### 기록 조건
+다음이 발생하면 즉시 `vault/inbox/`에 노트를 남길 것:
+- 기술 선택이 확정됐을 때 (A 대신 B를 쓰기로 함 + 이유)
+- 30분 이상 막힌 문제가 해결됐을 때 (증상 → 원인 → 해법)
+- 환경/인프라 사실이 새로 확인됐을 때 (포트, 경로, 제약)
+- 다른 프로젝트에도 적용될 패턴을 발견했을 때
+
+### 기록 방식
+- 파일명: `inbox/YYYY-MM-DD-주제.md`
+- frontmatter에 `source: auto`, `status: draft` 필수
+- 20줄 이내. 결정/원인/해법만. 과정 서술 금지
+- 작성 후 `→ vault 기록: <파일명>` 한 줄만 알리고 작업 계속
+
+### 금지
+- `inbox/` 외의 폴더에 직접 쓰지 말 것
+- 세션당 최대 3개. 초과 시 기존 노트에 병합
+- 확신이 없거나 아직 검증 안 된 것은 기록하지 말 것
 <!-- gstack-gbrain-search-guidance:end -->

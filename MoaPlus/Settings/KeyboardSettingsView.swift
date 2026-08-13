@@ -13,6 +13,13 @@ struct KeyboardSettingsView: View {
                         Text(layoutSummary).font(.caption).foregroundColor(.secondary)
                     }
                 }
+                NavigationLink(destination: KeyboardSizeSettingsView()) {
+                    HStack {
+                        Label("크기 · 전환 키", systemImage: "arrow.up.and.down.and.arrow.left.and.right")
+                        Spacer()
+                        Text(sizeSummary).font(.caption).foregroundColor(.secondary)
+                    }
+                }
                 NavigationLink(destination: GestureSettingsView()) {
                     HStack {
                         Label("제스처 (긋기)", systemImage: "hand.draw")
@@ -46,6 +53,11 @@ struct KeyboardSettingsView: View {
         case .classic11: return "클래식"
         case .fullPackage: return "확장형"
         }
+    }
+
+    private var sizeSummary: String {
+        let percent = Int(settings.keyboardHeightScale * 100)
+        return settings.showGlobeKey ? "높이 \(percent)% · 지구본" : "높이 \(percent)%"
     }
 
     private var gestureSummary: String {

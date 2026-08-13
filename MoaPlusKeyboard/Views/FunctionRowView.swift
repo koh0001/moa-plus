@@ -9,7 +9,18 @@ struct FunctionRowView: View {
     let onPunctuation: (String) -> Void
     let onReturnPressed: () -> Void
     var onCursorMoveDelta: ((Int) -> Void)? = nil
+    /// Active symbol-keypad page. Drives the page-toggle key label (#+= / 123).
+    var symbolPage: Int = 0
+    /// Fired by the symbol-mode page-toggle key (slot B position). nil outside
+    /// symbol mode / when the host doesn't wire it.
+    var onSymbolPagePressed: (() -> Void)? = nil
     var onLanguageSwitchPressed: (() -> Void)? = nil
+    /// Render the system keyboard-switch (globe) key at the head of the row.
+    /// The host resolves this from `showGlobeKey` **and** iOS's
+    /// `needsInputModeSwitchKey`, so this view never has to guess whether a
+    /// switch target exists. Defaults to `false` so previews and any caller
+    /// that predates the key keep the original 5-key geometry.
+    var showGlobeKey: Bool = false
     var useBimanualLayout: Bool = false
     var layoutCustomization: LayoutCustomization = LayoutCustomization()
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
@@ -33,24 +44,144 @@ struct FunctionRowView: View {
         mode.letterMode == .korean ? "ABC" : "한"
     }
 
+    /// Label for the symbol-page toggle — shows the *target* page (iOS 관례).
+    /// Page 0 (숫자판) → "#+=", page 1 (기호판) → "123".
+    private var symbolPageToggleLabel: String {
+        symbolPage == 0 ? "#+=" : "123"
+    }
+
     /// 현재 모드에서 긋기 펑크 키를 표시할지. 심볼 모드는 항상 OFF (스코프 밖).
-    private var punctuationEnabledForMode: Bool {
+    var punctuationEnabledForMode: Bool {
         if mode.isSymbol { return false }
         return mode == .korean
             ? layoutCustomization.koreanPunctuationEnabled
             : layoutCustomization.englishPunctuationEnabled
     }
 
-    var body: some View {
-        if useBimanualLayout {
-            bimanualLayoutBody
-        } else if !punctuationEnabledForMode || (layoutCustomization.slotA == .fullPackage && mode == .korean) {
-            // 펑크 키 OFF이거나 A3 한글 모드(그리드에 임베드 펑크 있음)면 긴 스페이스.
-            // 영문 모드는 A3여도 그리드 임베드 없으므로 기본 레이아웃 사용.
-            longSpaceLayoutBody
-        } else {
-            defaultLayoutBody
+    enum BodyKind { case bimanual, symbol, longSpace, `default` }
+
+    /// Single source of truth for which body renders. `body` and the
+    /// `occupiedWidth` width-invariant seam both read it, so a change to the
+    /// branch conditions can't leave the test agreeing with a stale copy of
+    /// the rules while the real layout clips.
+    var activeBodyKind: BodyKind {
+        if useBimanualLayout { return .bimanual }
+        // 심볼 모드: 비어있던 슬롯 B 자리에 페이지 토글(#+= / 123) 배치.
+        if mode.isSymbol { return .symbol }
+        // 펑크 키 OFF이거나 A3 한글 모드(그리드에 임베드 펑크 있음)면 긴 스페이스.
+        // 영문 모드는 A3여도 그리드 임베드 없으므로 기본 레이아웃 사용.
+        if !punctuationEnabledForMode || (layoutCustomization.slotA == .fullPackage && mode == .korean) {
+            return .longSpace
         }
+        return .default
+    }
+
+    var body: some View {
+        switch activeBodyKind {
+        case .bimanual:  bimanualLayoutBody
+        case .symbol:    symbolLayoutBody
+        case .longSpace: longSpaceLayoutBody
+        case .default:   defaultLayoutBody
+        }
+    }
+
+    // MARK: - Symbol layout
+    // Same geometry as the default layout, but the slot B position (now placed
+    // to the LEFT of the space bar, iOS-style) holds the symbol-page toggle
+    // (#+= / 123) instead of the punctuation swipe key.
+    // [한글/ABC] [한/영] [#+=/123] [   space   ] [return]
+
+    private var symbolLayoutBody: some View {
+        HStack(spacing: spacing) {
+            globeKeyIfEnabled
+
+            FunctionKeyView(
+                content: AnyView(
+                    Text(symbolToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
+                ),
+                width: symbolToggleWidth,
+                height: height,
+                action: onToggleSymbolPressed
+            )
+
+            FunctionKeyView(
+                content: AnyView(
+                    Text(letterToggleLabel)
+                        .font(.system(size: 16, weight: .medium))
+                ),
+                width: letterToggleWidth,
+                height: height,
+                action: onToggleLetterPressed
+            )
+
+            symbolPageToggleKey(width: punctuationWidth)
+
+            SpaceKeyView(
+                width: spaceWidth,
+                height: height,
+                onTap: onSpacePressed,
+                onCursorMove: onCursorMoveDelta ?? { _ in }
+            )
+
+            FunctionKeyView(
+                content: AnyView(
+                    Image(systemName: "return")
+                        .font(.system(size: 20))
+                ),
+                width: returnWidth,
+                height: height,
+                action: onReturnPressed
+            )
+        }
+    }
+
+    // MARK: - Globe key (system keyboard switch)
+
+    /// Head-of-row globe key, present in every non-bimanual body. Emits nothing
+    /// when disabled so the surrounding `HStack` keeps its original child and
+    /// gap count (`globeChildCount` mirrors this for the width math).
+    @ViewBuilder
+    private var globeKeyIfEnabled: some View {
+        if showGlobeKey {
+            FunctionKeyView(
+                content: AnyView(
+                    Image(systemName: "globe")
+                        .font(.system(size: 18))
+                ),
+                width: globeWidth,
+                height: height,
+                action: onLanguageSwitchPressed ?? {}
+            )
+        }
+    }
+
+    /// Same narrow width the bimanual layout already uses for its globe.
+    var globeWidth: CGFloat {
+        KeyboardMetrics.centerKeyWidth(for: totalWidth) * KeyboardMetrics.symbolWidthRatio
+    }
+
+    /// Width the globe key removes from the space bar, including its trailing
+    /// gap. Zero when hidden, so every width formula below stays correct for
+    /// both states without branching.
+    var globeReservedWidth: CGFloat {
+        showGlobeKey ? globeWidth + spacing : 0
+    }
+
+    /// Symbol-page toggle key (#+= / 123). Narrow slot-B width, so the label
+    /// uses a slightly smaller font to fit the 3-character labels.
+    private func symbolPageToggleKey(width: CGFloat) -> some View {
+        FunctionKeyView(
+            content: AnyView(
+                Text(symbolPageToggleLabel)
+                    .font(.system(size: 15, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            ),
+            width: width,
+            height: height,
+            action: onSymbolPagePressed ?? {}
+        )
     }
 
     // MARK: - Long-space layout (A3 .fullPackage + non-Korean modes)
@@ -59,6 +190,8 @@ struct FunctionRowView: View {
 
     private var longSpaceLayoutBody: some View {
         HStack(spacing: spacing) {
+            globeKeyIfEnabled
+
             FunctionKeyView(
                 content: AnyView(
                     Text(symbolToggleLabel)
@@ -99,7 +232,7 @@ struct FunctionRowView: View {
     }
 
     /// Space bar absorbs the slot B punctuation key + 1 internal gap.
-    private var longSpaceWidth: CGFloat {
+    var longSpaceWidth: CGFloat {
         spaceWidth + punctuationWidth + spacing
     }
 
@@ -108,6 +241,8 @@ struct FunctionRowView: View {
 
     private var defaultLayoutBody: some View {
         HStack(spacing: spacing) {
+            globeKeyIfEnabled
+
             // Symbol toggle (123/한글)
             FunctionKeyView(
                 content: AnyView(
@@ -190,15 +325,17 @@ struct FunctionRowView: View {
     private var bimanualLayoutBody: some View {
         HStack(spacing: spacing) {
             // Language switch key (globe)
-            FunctionKeyView(
-                content: AnyView(
-                    Image(systemName: "globe")
-                        .font(.system(size: 18))
-                ),
-                width: bimanualGlobeWidth,
-                height: height,
-                action: onLanguageSwitchPressed ?? {}
-            )
+            if showGlobeKey {
+                FunctionKeyView(
+                    content: AnyView(
+                        Image(systemName: "globe")
+                            .font(.system(size: 18))
+                    ),
+                    width: bimanualGlobeWidth,
+                    height: height,
+                    action: onLanguageSwitchPressed ?? {}
+                )
+            }
 
             // Mode toggle (한글/123)
             FunctionKeyView(
@@ -230,8 +367,12 @@ struct FunctionRowView: View {
                 onCursorMove: onCursorMoveDelta ?? { _ in }
             )
 
-            // Slot B — punctuation (B2) or vowel key (B1) per layout customization.
-            slotBKey(width: bimanualPunctuationWidth)
+            // Slot B — symbol-page toggle in symbol mode, else punctuation/vowel per customization.
+            if mode.isSymbol {
+                symbolPageToggleKey(width: bimanualPunctuationWidth)
+            } else {
+                slotBKey(width: bimanualPunctuationWidth)
+            }
 
             // Return key
             FunctionKeyView(
@@ -246,6 +387,45 @@ struct FunctionRowView: View {
         }
     }
 
+    // MARK: - Width invariant (test seam)
+
+    /// Total width the active body's children + inter-key gaps occupy.
+    /// Every body sizes its children to sum *exactly* to `effectiveTotalWidth`;
+    /// if this drifts, the rightmost key (return) overflows and is clipped —
+    /// see the `effectiveTotalWidth` comment below. Adding a child to a body
+    /// changes its gap count, which is the easy way to break this, so
+    /// `FunctionRowWidthTests` locks it for every body × globe on/off.
+    var occupiedWidth: CGFloat {
+        let globeChild: CGFloat = showGlobeKey ? 1 : 0
+        let children: CGFloat
+        let content: CGFloat
+        switch activeBodyKind {
+        case .bimanual:
+            children = 5 + globeChild
+            content = (showGlobeKey ? bimanualGlobeWidth : 0)
+                + bimanualToggleWidth + bimanualPunctuationWidth
+                + bimanualSpaceWidth + bimanualPunctuationWidth + returnWidth
+        case .symbol:
+            children = 5 + globeChild
+            content = (showGlobeKey ? globeWidth : 0)
+                + symbolToggleWidth + letterToggleWidth
+                + punctuationWidth + spaceWidth + returnWidth
+        case .longSpace:
+            children = 4 + globeChild
+            content = (showGlobeKey ? globeWidth : 0)
+                + symbolToggleWidth + letterToggleWidth + longSpaceWidth + returnWidth
+        case .default:
+            children = 5 + globeChild
+            content = (showGlobeKey ? globeWidth : 0)
+                + symbolToggleWidth + letterToggleWidth
+                + spaceWidth + punctuationWidth + returnWidth
+        }
+        return content + spacing * (children - 1)
+    }
+
+    /// Exposed alongside `occupiedWidth` so tests can assert the two match.
+    var availableWidth: CGFloat { effectiveTotalWidth }
+
     // MARK: - Default layout widths
 
     /// The KeyboardView wraps its VStack in `.padding(KeyboardMetrics.keySpacing)`,
@@ -254,11 +434,11 @@ struct FunctionRowView: View {
     /// function row's child widths sum *exactly* to `totalWidth`, so without
     /// compensating here the rightmost child (return key) overflows and gets
     /// clipped. Subtract the outer padding once so all downstream math fits.
-    private var effectiveTotalWidth: CGFloat {
+    var effectiveTotalWidth: CGFloat {
         max(0, totalWidth - spacing * 2)
     }
 
-    private var returnWidth: CGFloat {
+    var returnWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         let usesWideBackspace = layoutCustomization.slotA == .fullPackage
             || (mode.isSymbol && layoutCustomization.slotA != .vowel)
@@ -274,52 +454,58 @@ struct FunctionRowView: View {
         return sideWidth + centerKeyWidth + KeyboardMetrics.keySpacing
     }
 
-    private var availableWidthWithoutReturn: CGFloat {
+    var availableWidthWithoutReturn: CGFloat {
         // Default layout: 5 children (toggles + space + punct + return) → 4 internal gaps.
         max(0, effectiveTotalWidth - returnWidth - spacing * 4)
     }
 
-    private var symbolToggleWidth: CGFloat {
+    var symbolToggleWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * KeyboardMetrics.symbolWidthRatio * 1.3
     }
 
-    private var letterToggleWidth: CGFloat {
+    var letterToggleWidth: CGFloat {
         KeyboardMetrics.centerKeyWidth(for: totalWidth)
     }
 
-    private var punctuationWidth: CGFloat {
+    var punctuationWidth: CGFloat {
         availableWidthWithoutReturn * 0.16
     }
 
-    private var spaceWidth: CGFloat {
-        // Default layout: 5 children → 4 internal gaps.
-        let consumedByOthers = symbolToggleWidth + letterToggleWidth + punctuationWidth + returnWidth
+    var spaceWidth: CGFloat {
+        // 5 children → 4 internal gaps; the optional globe key adds a 6th child
+        // and a 5th gap, both folded into `globeReservedWidth`. The space bar
+        // alone absorbs it so the punctuation key keeps its size either way.
+        let consumedByOthers = globeReservedWidth + symbolToggleWidth
+            + letterToggleWidth + punctuationWidth + returnWidth
         return max(0, effectiveTotalWidth - consumedByOthers - spacing * 4)
     }
 
     // MARK: - Bimanual layout widths
 
-    private var bimanualGlobeWidth: CGFloat {
+    var bimanualGlobeWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * KeyboardMetrics.symbolWidthRatio
     }
 
-    private var bimanualToggleWidth: CGFloat {
+    var bimanualToggleWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * 1.2
     }
 
-    private var bimanualPunctuationWidth: CGFloat {
+    var bimanualPunctuationWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         return centerKeyWidth * KeyboardMetrics.symbolWidthRatio
     }
 
-    private var bimanualSpaceWidth: CGFloat {
+    var bimanualSpaceWidth: CGFloat {
         // Bimanual layout: 6 children (globe + toggle + letterToggle + space + slotB + return)
-        // → 5 internal gaps. Uses effectiveTotalWidth to compensate for parent padding.
-        let fixedWidths = bimanualGlobeWidth + bimanualToggleWidth + bimanualPunctuationWidth * 2 + returnWidth
-        return max(0, effectiveTotalWidth - fixedWidths - spacing * 5)
+        // → 5 internal gaps, or 5 children / 4 gaps when the globe is hidden.
+        // Uses effectiveTotalWidth to compensate for parent padding.
+        let globeReserved = showGlobeKey ? bimanualGlobeWidth + spacing : 0
+        let fixedWidths = globeReserved + bimanualToggleWidth
+            + bimanualPunctuationWidth * 2 + returnWidth
+        return max(0, effectiveTotalWidth - fixedWidths - spacing * 4)
     }
 }
 
@@ -338,8 +524,8 @@ struct PunctuationSwipeKey: View {
 
     private static let dragThreshold: CGFloat = 12
 
-    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
-    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+    private var bg: Color { KeyboardSettings.shared.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.resolvedKeyText }
 
     /// 글자 수에 따라 미리보기 폰트 축소. 1자=16/9, 2자=12/8, 3자+=10/7.
     private func mainFontSize(for text: String) -> CGFloat {
@@ -440,8 +626,8 @@ struct SlotBVowelKey: View {
 
     @State private var isPressed = false
 
-    private var bg: Color { KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground }
-    private var fg: Color { KeyboardSettings.shared.themeSettings.resolvedKeyText }
+    private var bg: Color { KeyboardSettings.shared.resolvedFunctionKeyBackground }
+    private var fg: Color { KeyboardSettings.shared.resolvedKeyText }
 
     var body: some View {
         VStack(spacing: 1) {
@@ -481,6 +667,63 @@ struct SlotBVowelKey: View {
     }
 }
 
+/// Drives continuous cursor movement while the space bar is held pushed in one
+/// direction. `DragGesture.onChanged` only fires while the finger *moves*, so a
+/// held-still finger produces no events — a repeating timer is required to keep
+/// the cursor moving. The repeat accelerates the longer the direction is held.
+///
+/// Timer follows the project rule (CLAUDE.md): `[weak self]` capture and
+/// `RunLoop.main.add(forMode: .common)` so it keeps firing during UI tracking
+/// and can't retain the view. Held by SpaceKeyView via `@State` (a plain
+/// reference type — it drives no view updates, so no ObservableObject needed).
+final class SpaceCursorRepeater {
+    /// Called on each repeat tick with the direction (+1 forward / -1 back).
+    var onStep: ((Int) -> Void)?
+
+    private var timer: Timer?
+    private var direction: Int = 0
+    private var interval: TimeInterval = 0.14
+    private var minInterval: TimeInterval = 0.045
+
+    private static let accelerationFactor: TimeInterval = 0.85
+
+    /// Begin (or redirect) continuous movement. No-op if already repeating in
+    /// the same direction, so repeated onChanged calls don't restart the ramp.
+    /// The ramp (start interval → floor) comes from the user's
+    /// `cursorRepeatSpeed` setting, read fresh on each start.
+    func start(direction dir: Int) {
+        guard dir != 0 else { stop(); return }
+        if timer != nil && direction == dir { return }
+        stop()
+        direction = dir
+        let ramp = KeyboardSettings.shared.cursorRepeatInterval
+        interval = ramp.initial
+        minInterval = ramp.min
+        scheduleNext()
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        direction = 0
+    }
+
+    var isRunning: Bool { timer != nil }
+
+    private func scheduleNext() {
+        let t = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.onStep?(self.direction)
+            self.interval = max(self.minInterval, self.interval * Self.accelerationFactor)
+            self.scheduleNext()
+        }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    deinit { stop() }
+}
+
 struct SpaceKeyView: View {
     let width: CGFloat
     let height: CGFloat
@@ -490,15 +733,47 @@ struct SpaceKeyView: View {
     @State private var isPressed = false
     @State private var didDrag = false
     @State private var lastReportedOffset: CGFloat = 0
+    @State private var repeater = SpaceCursorRepeater()
+    /// Which edge zone is currently driving auto-repeat (0 = none, -1 left,
+    /// +1 right). Drives the edge-zone highlight so the user sees when the
+    /// space bar has flipped into continuous-scroll mode.
+    @State private var activeRepeatDirection: Int = 0
 
     private static let dragThreshold: CGFloat = 8
     private static let pixelsPerStep: CGFloat = 12
+    /// Fraction of the space-bar width at each end that acts as the auto-repeat
+    /// zone. Proportional (not absolute pt) so it scales to small phones —
+    /// holding the finger in the outer 15% of the bar repeats in that direction.
+    private static let edgeZoneFraction: CGFloat = 0.15
 
     private var themeBackgroundColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground
+        KeyboardSettings.shared.resolvedFunctionKeyBackground
     }
     private var themeTextColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedKeyText
+        KeyboardSettings.shared.resolvedKeyText
+    }
+
+    /// One auto-repeat edge zone: a tint + directional chevron, both derived
+    /// from the theme text color (`resolvedKeyText`) so they track theme/custom
+    /// color changes and always contrast with the space-bar background — no
+    /// hardcoded accent. Dim when idle, bright when the finger is inside it
+    /// (continuous-scroll active).
+    @ViewBuilder
+    private func edgeZone(side: Int) -> some View {
+        let active = activeRepeatDirection == side
+        ZStack {
+            // Very light zone wash just to delineate the region; the chevron is
+            // the real indicator. Both derive from the theme text color.
+            Rectangle()
+                .fill(themeTextColor.opacity(active ? 0.18 : 0.06))
+            // Chevron in the theme text color as-is: full opacity when the
+            // finger is in this zone (continuous-scroll on), dimmed otherwise
+            // so both zones stay discoverable while dragging.
+            Image(systemName: side < 0 ? "chevron.left" : "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(themeTextColor.opacity(active ? 1.0 : 0.4))
+        }
+        .frame(width: width * Self.edgeZoneFraction)
     }
 
     var body: some View {
@@ -507,8 +782,25 @@ struct SpaceKeyView: View {
             .foregroundColor(themeTextColor.opacity(0.6))
             .frame(width: width, height: height)
             .background(
-                RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
-                    .fill(isPressed ? themeBackgroundColor.opacity(0.7) : themeBackgroundColor)
+                ZStack {
+                    RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
+                        .fill(isPressed ? themeBackgroundColor.opacity(0.7) : themeBackgroundColor)
+                    // While dragging for cursor movement, reveal BOTH edge zones
+                    // so the user can see where to aim before reaching one — the
+                    // zones are invisible at rest. Each zone shows a chevron in
+                    // the theme text color (guaranteed contrast, unlike accent);
+                    // the active zone (finger inside) brightens to confirm
+                    // continuous-scroll is engaged. Only shows once a drag starts,
+                    // so a plain space tap never flashes.
+                    if didDrag {
+                        HStack(spacing: 0) {
+                            edgeZone(side: -1)
+                            Spacer(minLength: 0)
+                            edgeZone(side: 1)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius))
+                    }
+                }
             )
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -523,19 +815,46 @@ struct SpaceKeyView: View {
                         if !didDrag && abs(dx) >= Self.dragThreshold {
                             didDrag = true
                             lastReportedOffset = 0
+                            repeater.onStep = { onCursorMove($0) }
                         }
                         if didDrag {
-                            let totalSteps = Int(dx / Self.pixelsPerStep)
-                            let lastSteps = Int(lastReportedOffset / Self.pixelsPerStep)
-                            let delta = totalSteps - lastSteps
-                            if delta != 0 {
-                                onCursorMove(delta)
-                                lastReportedOffset = dx
+                            // Auto-repeat zone is defined by finger POSITION within
+                            // the bar (outer 15% each end), not absolute drag
+                            // distance — so it scales to any bar width. location.x
+                            // is in the key's local space and can run past the
+                            // edges when the finger leaves the bar.
+                            let locX = value.location.x
+                            let leftEdge = width * Self.edgeZoneFraction
+                            let rightEdge = width * (1 - Self.edgeZoneFraction)
+                            if locX <= leftEdge {
+                                repeater.start(direction: -1)
+                                if activeRepeatDirection != -1 { activeRepeatDirection = -1 }
+                            } else if locX >= rightEdge {
+                                repeater.start(direction: 1)
+                                if activeRepeatDirection != 1 { activeRepeatDirection = 1 }
+                            } else {
+                                // Middle: precise distance-based stepping. Stop any
+                                // active repeat and re-baseline so returning to the
+                                // middle doesn't produce a jump.
+                                if repeater.isRunning {
+                                    repeater.stop()
+                                    lastReportedOffset = dx
+                                }
+                                if activeRepeatDirection != 0 { activeRepeatDirection = 0 }
+                                let totalSteps = Int(dx / Self.pixelsPerStep)
+                                let lastSteps = Int(lastReportedOffset / Self.pixelsPerStep)
+                                let delta = totalSteps - lastSteps
+                                if delta != 0 {
+                                    onCursorMove(delta)
+                                    lastReportedOffset = dx
+                                }
                             }
                         }
                     }
                     .onEnded { _ in
                         isPressed = false
+                        repeater.stop()
+                        activeRepeatDirection = 0
                         if !didDrag {
                             onTap()
                         }
@@ -555,11 +874,11 @@ struct FunctionKeyView: View {
     @State private var isPressed = false
 
     private var themeBackgroundColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedFunctionKeyBackground
+        KeyboardSettings.shared.resolvedFunctionKeyBackground
     }
 
     private var themeTextColor: Color {
-        KeyboardSettings.shared.themeSettings.resolvedKeyText
+        KeyboardSettings.shared.resolvedKeyText
     }
 
     var body: some View {

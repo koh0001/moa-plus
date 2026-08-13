@@ -60,6 +60,8 @@ struct FeedbackSettingsView: View {
             }
 
         }
-        .navigationTitle("반응")
+        // 제목이 "반응"이면 "반응속도가 느리다"는 사용자를 사운드·햅틱 화면으로
+        // 끌어들여 빈손으로 돌려보낸다. 설정 루트의 행 레이블과 맞춘다.
+        .navigationTitle("소리 · 진동")
     }
 }

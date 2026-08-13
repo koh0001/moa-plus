@@ -92,8 +92,12 @@ struct KeyView: View {
                         return
                     }
 
-                    // Cancel long press if user moved significantly (for consonant gesture)
-                    let distance = sqrt(pow(value.translation.width, 2) + pow(value.translation.height, 2))
+                    // Cancel long press if user moved significantly (for consonant gesture).
+                    // 곱셈으로 계산한다 — 터치 포인트마다 도는 자리라 pow(_:2) 를 쓰면
+                    // Double 지수 함수가 포인트당 2회 호출된다(GestureAnalyzer 도 같은
+                    // 계산을 dx*dx+dy*dy 로 한다).
+                    let dx = value.translation.width, dy = value.translation.height
+                    let distance = sqrt(dx * dx + dy * dy)
                     if distance > KeyboardMetrics.gestureThreshold {
                         cancelLongPressTimer()
                     }
@@ -280,7 +284,9 @@ struct KeyView: View {
     }
 
     private var themedBackgroundColor: Color {
-        let ts = KeyboardSettings.shared.themeSettings
+        // 미리 계산된 색 캐시를 읽는다 — ThemeSettings 를 통째로 복사하면 키마다
+        // 구조체 복사(String? 필드 때문에 ARC 발생) + Color 재생성이 일어난다.
+        let ts = KeyboardSettings.shared
         switch content {
         case .consonant:
             return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
@@ -306,7 +312,7 @@ struct KeyView: View {
     }
 
     private var themedTextColor: Color {
-        return KeyboardSettings.shared.themeSettings.resolvedKeyText
+        return KeyboardSettings.shared.resolvedKeyText
     }
 
     private var isBackspaceKey: Bool {

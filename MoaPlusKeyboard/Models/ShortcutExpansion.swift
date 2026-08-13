@@ -45,7 +45,11 @@ struct ShortcutExpansion: Codable, Equatable, Identifiable {
 }
 
 /// Container for managing all shortcut expansions
-struct ShortcutExpansionStore: Codable {
+///
+/// `Equatable` 은 `KeyboardSettings.loadAll()` 이 값이 실제로 바뀐 항목만
+/// 대입하기 위해 필요하다 — 무조건 재대입하면 @Published 가 매번 발행돼
+/// 무관한 설정 하나에도 키보드 트리 전체가 재구성된다.
+struct ShortcutExpansionStore: Codable, Equatable {
     var expansions: [ShortcutExpansion] = []
 
     /// Find matching expansion for a given trigger

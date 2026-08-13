@@ -65,11 +65,40 @@ enum KeyboardMetrics {
     static let iPadPortraitHeightRange: ClosedRange<CGFloat> = 310...400
     static let iPadLandscapeHeightRange: ClosedRange<CGFloat> = 320...420
 
-    /// 키보드 컨테이너 높이. 아이폰은 항상 260(현행 유지), 아이패드만 화면 실측 기반.
+    // MARK: - User height scale (v1.9)
+    // 앱스토어 리뷰 최다 요청(높이 조절). 기기별 기본 높이 위에 곱해지는 배율.
+
+    static let defaultKeyboardHeightScale: Double = 1.0
+    /// 하한 0.85 = 아이폰 221pt → 키 1행 38.25pt. iOS 기본 키보드(약 42pt)보다
+    /// 낮지만 사용자가 명시적으로 선택한 경우에만 도달한다. 이보다 더 낮추면
+    /// 오타율이 급증해 리뷰의 원 요청("작게")과 반대 결과가 나오므로 여기서 막는다.
+    static let keyboardHeightScaleRange: ClosedRange<Double> = 0.85...1.35
+
+    /// NaN 은 `min`/`max` 비교를 모두 통과해 그대로 전파되고, 그러면 높이
+    /// 제약 constant 가 NaN 이 되어 레이아웃이 통째로 깨진다. 저장값이 손상된
+    /// 경우에도 안전하도록 비교 전에 먼저 걸러낸다.
+    static func clampedHeightScale(_ scale: Double) -> CGFloat {
+        guard scale.isFinite else { return CGFloat(keyboardHeightScaleRange.lowerBound) }
+        return CGFloat(min(max(scale, keyboardHeightScaleRange.lowerBound),
+                           keyboardHeightScaleRange.upperBound))
+    }
+
+    /// 키보드 컨테이너 높이. 아이폰은 260, 아이패드는 화면 실측 기반이며,
+    /// 둘 다 사용자 배율(`scale`)이 마지막에 곱해진다.
     /// `screenShort`/`screenLong` = `UIScreen.main.bounds` 의 min/max (방향 불변).
+    /// `scale` 기본값 1.0 은 배율 도입 이전 호출부(및 기존 테스트)와 동일 동작.
     static func keyboardHeight(isPad: Bool, isLandscape: Bool,
-                               screenShort: CGFloat, screenLong: CGFloat) -> CGFloat {
-        guard isPad else { return keyboardHeight }   // iPhone: 260, 무손상
+                               screenShort: CGFloat, screenLong: CGFloat,
+                               scale: Double = defaultKeyboardHeightScale) -> CGFloat {
+        base(isPad: isPad, isLandscape: isLandscape,
+             screenShort: screenShort, screenLong: screenLong) * clampedHeightScale(scale)
+    }
+
+    /// 배율 적용 전 기기별 기본 높이. 클램프는 기본 높이에만 적용되고 배율은
+    /// 그 뒤에 곱해지므로, 아이패드에서도 사용자가 범위 밖으로 키울 수 있다.
+    private static func base(isPad: Bool, isLandscape: Bool,
+                             screenShort: CGFloat, screenLong: CGFloat) -> CGFloat {
+        guard isPad else { return keyboardHeight }   // iPhone: 260
         if isLandscape {
             let raw = screenShort * iPadLandscapeHeightRatio
             return min(max(raw, iPadLandscapeHeightRange.lowerBound), iPadLandscapeHeightRange.upperBound)
@@ -209,10 +238,18 @@ enum KeyboardMetrics {
     /// and Symbol modes (so the symbol keypad's backspace position mirrors
     /// the Korean layout). English mode is unaffected.
     static func activeLayout(for mode: KeyboardMode, layout: LayoutCustomization) -> [[KeyContent]] {
+        activeLayout(for: mode, layout: layout, symbolPage: 0)
+    }
+
+    /// Page-aware overload. `symbolPage` only affects symbol modes; letter
+    /// modes ignore it. Callers that render or resolve symbol taps must thread
+    /// the active `KeyboardViewModel.symbolPage` through here so page 1 keys
+    /// aren't resolved against the page 0 grid.
+    static func activeLayout(for mode: KeyboardMode, layout: LayoutCustomization, symbolPage: Int) -> [[KeyContent]] {
         switch mode {
         case .korean: return koreanLayout(layout)
         case .english: return englishLayout
-        case .symbolFromKorean, .symbolFromEnglish: return symbolLayout(layout)
+        case .symbolFromKorean, .symbolFromEnglish: return symbolLayout(layout, page: symbolPage)
         }
     }
 
@@ -269,46 +306,84 @@ enum KeyboardMetrics {
         [.symbol("*"), .consonant(.ㅋ), .consonant(.ㅌ), .consonant(.ㅊ), .consonant(.ㅍ), .vowelPrimitive(.dash), .vowelPrimitive(.dot)],
     ]
 
+    /// Number of symbol pages. Page 0 = 숫자 + 상용 문장부호(. , ' " 등),
+    /// page 1 = 나머지 기호(괄호/수학/통화 등). 전환은 function row 의
+    /// 페이지 토글 키(#+= / 123)로 이뤄지며 KeyboardViewModel.symbolPage 가 상태.
+    static let symbolPageCount = 2
+
     // Symbol mode layout (legacy, layout-agnostic).
     // Backspace at row 1 col 6 — kept for older callers that pre-date
     // LayoutCustomization. Mode-aware call sites should use
-    // `symbolLayout(_:)` so the symbol keypad's backspace position mirrors
-    // the user's Korean layout choice.
+    // `symbolLayout(_:page:)` so the symbol keypad's backspace position
+    // mirrors the user's Korean layout choice. Content mirrors page 0.
     static let symbolLayout: [[KeyContent]] = [
-        [.symbol("~"), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("@"), .symbol("$")],
-        [.symbol("%"), .symbol("^"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("&"), .backspace],
-        [.symbol("="), .symbol("-"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol("+"), .symbol(")")],
-        [.symbol("/"), .symbol("?"), .symbol("*"), .symbol("0"), .symbol("#"), .symbol(":"), .symbol("(")],
+        [.symbol("."), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("&"), .symbol("%")],
+        [.symbol(","), .symbol("?"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("+"), .backspace],
+        [.symbol("'"), .symbol("@"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol(":"), .symbol(")")],
+        [.symbol("\""), .symbol("-"), .symbol("*"), .symbol("0"), .symbol("#"), .symbol("/"), .symbol("(")],
     ]
 
-    /// Layout-aware symbol grid. The symbol keypad's backspace position
-    /// follows the user's Korean layout so muscle memory transfers between
-    /// modes:
+    /// Layout-aware symbol grid for the given page. The symbol keypad's
+    /// backspace position follows the user's Korean layout so muscle memory
+    /// transfers between modes:
     /// - A1 (.vowel, no swap): wide-cell ⌫ at row 1 col 6.
     /// - A1 (.vowel, swap on): wide-cell ⌫ at row 3 col 6.
     /// - A2 (.classic11) / A3 (.fullPackage): wide ⌫ spanning row 3 col 5+6.
-    static func symbolLayout(_ layout: LayoutCustomization) -> [[KeyContent]] {
+    ///
+    /// Page geometry (열 수 / ⌫ 위치 / wide-⌫ 스켈레톤) is identical across
+    /// pages — only the symbol *content* differs. Page 0 keeps the digit
+    /// cluster (center 3 cols); page 1 drops digits for more symbols.
+    static func symbolLayout(_ layout: LayoutCustomization, page: Int = 0) -> [[KeyContent]] {
+        page == 0 ? symbolPage0(layout) : symbolPage1(layout)
+    }
+
+    /// Page 0 — 숫자 + 상용 문장부호. 왼쪽 열에 . , ' " 를 배치해
+    /// 접근성을 높이고, 마침표 키가 생기면서 더블스페이스 우회가 불필요해진다.
+    private static func symbolPage0(_ layout: LayoutCustomization) -> [[KeyContent]] {
         switch layout.slotA {
         case .vowel:
-            // A1 mirrors v1.3 symbol layout. Swap toggle moves ⌫ between
-            // row 1 and row 3 of col 6 — the displaced cell takes the
-            // backspace's old slot's symbol.
             let row1Right: KeyContent = layout.slotABackspaceSwap ? .symbol("(") : .backspace
             let row3Right: KeyContent = layout.slotABackspaceSwap ? .backspace : .symbol("(")
             return [
-                [.symbol("~"), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("@"), .symbol("$")],
-                [.symbol("%"), .symbol("^"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("&"), row1Right],
-                [.symbol("="), .symbol("-"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol("+"), .symbol(")")],
-                [.symbol("/"), .symbol("?"), .symbol("*"), .symbol("0"), .symbol("#"), .symbol(":"), row3Right],
+                [.symbol("."), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("&"), .symbol("%")],
+                [.symbol(","), .symbol("?"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("+"), row1Right],
+                [.symbol("'"), .symbol("@"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol(":"), .symbol(")")],
+                [.symbol("\""), .symbol("-"), .symbol("*"), .symbol("0"), .symbol("#"), .symbol("/"), row3Right],
             ]
         case .classic11, .fullPackage:
-            // Wide ⌫ at row 3 col 5+6 matches Korean's classic/full-package
-            // backspace position. Row 3 has 6 cells (last cell is wide).
             return [
-                [.symbol("~"), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("@"), .symbol("$")],
-                [.symbol("%"), .symbol("^"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("&"), .symbol("(")],
-                [.symbol("="), .symbol("-"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol("+"), .symbol(")")],
-                [.symbol("/"), .symbol("?"), .symbol("*"), .symbol("0"), .symbol("#"), .backspaceWide],
+                [.symbol("."), .symbol("!"), .symbol("1"), .symbol("2"), .symbol("3"), .symbol("&"), .symbol("%")],
+                [.symbol(","), .symbol("?"), .symbol("4"), .symbol("5"), .symbol("6"), .symbol("+"), .symbol("(")],
+                [.symbol("'"), .symbol("@"), .symbol("7"), .symbol("8"), .symbol("9"), .symbol(":"), .symbol(")")],
+                [.symbol("\""), .symbol("-"), .symbol("*"), .symbol("0"), .symbol("#"), .backspaceWide],
+            ]
+        }
+    }
+
+    /// Page 1 — 괄호/수학/통화/기타 기호. 숫자를 두지 않아 가운데 열까지
+    /// 기호로 채워 입력 가능한 문자 종류를 늘린다.
+    private static func symbolPage1(_ layout: LayoutCustomization) -> [[KeyContent]] {
+        switch layout.slotA {
+        case .vowel:
+            let row1Right: KeyContent = layout.slotABackspaceSwap ? .symbol("§") : .backspace
+            let row3Right: KeyContent = layout.slotABackspaceSwap ? .backspace : .symbol("§")
+            return [
+                [.symbol("["), .symbol("]"), .symbol("{"), .symbol("}"), .symbol("<"), .symbol(">"), .symbol("^")],
+                [.symbol("\\"), .symbol("|"), .symbol("="), .symbol("_"), .symbol("~"), .symbol("`"), row1Right],
+                [.symbol("$"), .symbol("€"), .symbol("₩"), .symbol("¥"), .symbol("£"), .symbol("·"), .symbol("•")],
+                [.symbol("—"), .symbol("…"), .symbol("©"), .symbol("®"), .symbol("™"), .symbol("°"), row3Right],
+            ]
+        case .classic11, .fullPackage:
+            // Wide ⌫ eats 2 cells/row-3, so this branch holds 2 fewer symbols
+            // than .vowel per page. Intended omissions vs .vowel: `` ` `` (backtick,
+            // niche) and `°` (degree, new). `/` MUST stay reachable here — it was
+            // on the pre-page classic keypad, so dropping it would be a regression;
+            // it takes the backtick's slot.
+            return [
+                [.symbol("["), .symbol("]"), .symbol("{"), .symbol("}"), .symbol("<"), .symbol(">"), .symbol("^")],
+                [.symbol("\\"), .symbol("|"), .symbol("="), .symbol("_"), .symbol("~"), .symbol("/"), .symbol("§")],
+                [.symbol("$"), .symbol("€"), .symbol("₩"), .symbol("¥"), .symbol("£"), .symbol("·"), .symbol("•")],
+                [.symbol("—"), .symbol("…"), .symbol("©"), .symbol("®"), .symbol("™"), .backspaceWide],
             ]
         }
     }
@@ -366,7 +441,14 @@ enum KeyboardMetrics {
     /// so input handlers resolve the same key content the user sees — required
     /// for slotC / slotARightColumn customizations to actually take effect.
     static func keyContent(at row: Int, column: Int, mode: KeyboardMode, layout: LayoutCustomization) -> KeyContent? {
-        let grid = activeLayout(for: mode, layout: layout)
+        keyContent(at: row, column: column, mode: mode, layout: layout, symbolPage: 0)
+    }
+
+    /// Page-aware key lookup. Symbol-mode tap/long-press handlers must pass the
+    /// active `symbolPage` so a tap on page 1 resolves the page 1 symbol rather
+    /// than the page 0 grid at the same (row, column).
+    static func keyContent(at row: Int, column: Int, mode: KeyboardMode, layout: LayoutCustomization, symbolPage: Int) -> KeyContent? {
+        let grid = activeLayout(for: mode, layout: layout, symbolPage: symbolPage)
         guard row >= 0 && row < grid.count,
               column >= 0 && column < grid[row].count else {
             return nil

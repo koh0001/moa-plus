@@ -33,8 +33,21 @@ class KeyboardViewModel: ObservableObject {
     let popupState = PopupState()
 
     @Published var keyboardMode: KeyboardMode = .korean
+    /// Active symbol-keypad page (0 = 숫자+상용 문장부호, 1 = 나머지 기호).
+    /// Only meaningful while `keyboardMode.isSymbol`; reset to 0 whenever the
+    /// symbol layer is entered/exited so re-entry always starts on page 0.
+    @Published var symbolPage: Int = 0
     @Published var isSpecialCharLayerVisible: Bool = false
     @Published var shiftState: ShiftState = .off
+
+    /// Whether iOS currently permits advancing to another keyboard
+    /// (`UIInputViewController.needsInputModeSwitchKey`). Only the extension
+    /// can read it, so `KeyboardViewController` pushes it here on every
+    /// appearance — the user can enable a second keyboard in Settings while
+    /// our extension process stays alive, and a value captured once at
+    /// `viewDidLoad` would leave the globe key hidden until the process dies.
+    /// Defaults to `true` for the host app's settings preview.
+    @Published var canSwitchInputMode: Bool = true
 
     /// Preview mode flag — when true, the slot B vowel key gesture routes to
     /// `onPreviewVowel` instead of feeding the composer/delegate. Used by the
@@ -71,6 +84,12 @@ class KeyboardViewModel: ObservableObject {
     /// Raw touch trail captured during a preview-mode consonant gesture so
     /// callers receive the full point list with each `.moved` / `.ended`
     /// phase. Reset on every `.began`.
+    /// 현재 제스처가 시작된 키의 내용. `gestureStarted` 에서 1회 조회해 두고
+    /// `gestureMoved`/`gestureEnded` 는 이 값만 읽는다 — 그러지 않으면 터치
+    /// 포인트마다 레이아웃 배열 전체가 재생성된다. 수명은 제스처 1회이며
+    /// `resetGestureState`/`dismissPopup` 이 비운다.
+    private var activeKeyContent: KeyContent?
+
     private var previewGesturePoints: [CGPoint] = []
     /// Last column id fed to the gesture analyzer during a preview-mode
     /// gesture. Forwarded in every preview phase so the abstract canvas
@@ -99,34 +118,78 @@ class KeyboardViewModel: ObservableObject {
     @Published var abbreviationCandidate: ShortcutExpansion?
     @Published var abbreviationCandidates: [ShortcutExpansion] = []
 
-    // Forwarding properties for backward compatibility
+    // Forwarding properties for backward compatibility.
+    //
+    // **동일 값 재대입을 여기서 차단한다.** `@Published` 는 값이 같아도
+    // `objectWillChange` 를 발행하고, `KeyboardView` 가 `gestureState` 를 루트에서
+    // `@ObservedObject` 로 관찰하므로 발행 1회 = KeyboardView.body → KeyGridView →
+    // 28개 KeyView → FunctionRowView 전체 재평가다. `gestureMoved` 는 터치 포인트마다
+    // 이 setter 들을 호출하는데 값이 실제로 바뀌는 건 한 번의 긋기에서 2~4회뿐이라,
+    // 120Hz 200ms 긋기 기준 약 24회 리빌드 중 20여 회가 순수 낭비였다.
+    // 메인 스레드가 밀리면 UIKit 이 터치를 코얼레싱/드롭해 GestureAnalyzer 가 받는
+    // 샘플이 성겨지므로, 반전 획이 필요한 ㅛ(↑↓↑)·ㅠ(↓↑↓)·ㅢ 의 인식률까지 같이 나빠진다.
+    //
+    // 가드를 setter 에 두는 이유: 호출부(`gestureMoved` 2곳, `dismissPopup` 4곳,
+    // `resetGestureState` 4곳)마다 붙이면 새 호출부가 생길 때마다 빠뜨린다.
+    //
+    // ⚠️ 이건 **발행 억제가 아니라 중복 제거**다. 값이 실제로 바뀌면 그대로 발행된다.
+    // 억제로 바꾸면(예: 오버레이가 꺼져 있으면 previewVowel 발행 안 함) 키 위
+    // 미리보기 라벨(`ConsonantKeyView:143,171,188`)이 사라진다.
     var activeKey: (row: Int, column: Int)? {
         get { gestureState.activeKey }
-        set { gestureState.activeKey = newValue }
+        set {
+            // 튜플 옵셔널은 `!=` 가 합성되지 않아 직접 편다.
+            switch (gestureState.activeKey, newValue) {
+            case (nil, nil): return
+            case let (old?, new?) where old == new: return
+            default: gestureState.activeKey = newValue
+            }
+        }
     }
     var previewVowel: Jungseong? {
         get { gestureState.previewVowel }
-        set { gestureState.previewVowel = newValue }
+        set {
+            guard gestureState.previewVowel != newValue else { return }
+            gestureState.previewVowel = newValue
+        }
     }
     var gestureDirections: [GestureDirection] {
         get { gestureState.directions }
-        set { gestureState.directions = newValue }
+        set {
+            guard gestureState.directions != newValue else { return }
+            gestureState.directions = newValue
+        }
     }
     var gestureStartPoint: CGPoint? {
         get { gestureState.startPoint }
-        set { gestureState.startPoint = newValue }
+        set {
+            guard gestureState.startPoint != newValue else { return }
+            gestureState.startPoint = newValue
+        }
     }
+    // 위 `gestureState` 포워딩과 같은 이유의 중복 제거. `dismissPopup()` 은 매 제스처
+    // 종료마다 이 셋을 순차 대입하는데 팝업을 띄우지 않은 제스처에서는 셋 다 이미
+    // 기본값이라, 가드가 없으면 손을 뗄 때마다 발행 3회가 그냥 나간다.
     var longPressPopupText: String? {
         get { popupState.text }
-        set { popupState.text = newValue }
+        set {
+            guard popupState.text != newValue else { return }
+            popupState.text = newValue
+        }
     }
     var longPressPopupCandidates: [String] {
         get { popupState.candidates }
-        set { popupState.candidates = newValue }
+        set {
+            guard popupState.candidates != newValue else { return }
+            popupState.candidates = newValue
+        }
     }
     var longPressPopupSelectedIndex: Int {
         get { popupState.selectedIndex }
-        set { popupState.selectedIndex = newValue }
+        set {
+            guard popupState.selectedIndex != newValue else { return }
+            popupState.selectedIndex = newValue
+        }
     }
 
     private let composer = HangulComposer()
@@ -200,7 +263,16 @@ class KeyboardViewModel: ObservableObject {
         if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
+        symbolPage = 0   // 심볼 진입/이탈 시 항상 page 0 에서 시작
         keyboardMode = keyboardMode.toggleSymbol()
+        triggerHapticFeedback()
+    }
+
+    /// Flip the symbol keypad between page 0 and page 1. No-op unless we're
+    /// currently in a symbol mode (the toggle key only renders there).
+    func toggleSymbolPage() {
+        guard keyboardMode.isSymbol else { return }
+        symbolPage = (symbolPage + 1) % KeyboardMetrics.symbolPageCount
         triggerHapticFeedback()
     }
 
@@ -208,6 +280,7 @@ class KeyboardViewModel: ObservableObject {
         if previewMode { return }
         stopBackspaceRepeat()
         commitCurrent()
+        symbolPage = 0   // 심볼→문자 전환 시 페이지 상태 초기화
         keyboardMode = keyboardMode.toggleLetter()
         // Abbreviation engine applies in both Korean and English; reset the
         // buffer so half-typed triggers don't leak across modes.
@@ -481,7 +554,7 @@ class KeyboardViewModel: ObservableObject {
 
         // Load popup candidates from secondary action
         if let activeRow = activeKey?.row, let activeCol = activeKey?.column {
-            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization)
+            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage)
 
             let keyId: String? = {
                 switch content {
@@ -566,6 +639,7 @@ class KeyboardViewModel: ObservableObject {
         longPressPopupSelectedIndex = 0
         // Reset gesture visual state so hints restore immediately after popup ends
         activeKey = nil
+        activeKeyContent = nil
         previewVowel = nil
         gestureDirections = []
         gestureStartPoint = nil
@@ -724,10 +798,24 @@ class KeyboardViewModel: ObservableObject {
         gestureStartPoint = point
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        // 활성 키의 내용은 한 제스처 동안 바뀌지 않으므로 여기서 한 번만 조회한다.
+        // `keyContent` 는 캐시가 없어 호출마다 `activeLayout` → `koreanLayout` 을 타고
+        // 4개 행 배열 + leftCol 배열 + KeyContent 28개를 새로 만든다. 이걸
+        // `gestureMoved` 가 터치 포인트마다 반복하고 있었다(120Hz 긋기 1회 = 배열
+        // 약 144개, KeyContent 약 672개의 순수 낭비 할당). 익스텐션 ~30MB 한계에서
+        // 단명 할당은 그대로 allocator 압박이 된다.
+        //
+        // 캐시 수명은 **제스처 1회**다. `gestureStarted` 가 항상 새로 채우고
+        // `resetGestureState`/`dismissPopup` 이 비우므로, 모드나 심볼 페이지가 바뀌어도
+        // 다음 제스처는 반드시 새 값으로 시작한다 — 안 비우면 한/영·123 전환 직후
+        // 첫 제스처가 이전 레이아웃으로 해석된다.
+        let content = KeyboardMetrics.keyContent(
+            at: row, column: column, mode: keyboardMode,
+            layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage)
+        activeKeyContent = content
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
-        if keyboardMode == .korean,
-           let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization) {
+        if keyboardMode == .korean, let content {
             switch content {
             case .consonant(let consonant):
                 gestureAnalyzer.columnId = KeyboardMetrics.columnIndex(for: consonant)
@@ -772,8 +860,8 @@ class KeyboardViewModel: ObservableObject {
         // Update preview vowel based on active key type so preview matches actual output.
         // Vowel primitive keys (ㅣ, ㅡ) use the same resolver as input commit;
         // consonant keys use the 8-direction VowelResolver pattern trie.
-        if let key = activeKey,
-           let content = KeyboardMetrics.keyContent(at: key.row, column: key.column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization) {
+        // `gestureStarted` 가 같은 인자로 조회해 둔 값을 쓴다(§ activeKeyContent).
+        if let content = activeKeyContent {
             switch content {
             case .vowelPrimitive(let primitive):
                 previewVowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
@@ -869,7 +957,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func handleSymbolModeTap(row: Int, column: Int) {
-        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization) else { return }
+        guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage) else { return }
 
         switch content {
         case .symbol(let symbol):
@@ -960,6 +1048,7 @@ class KeyboardViewModel: ObservableObject {
         didHandleShiftLongPressInCurrentGesture = false
         dismissPopup()
         activeKey = nil
+        activeKeyContent = nil
         gestureStartPoint = nil
         gestureDirections = []
         previewVowel = nil
@@ -980,7 +1069,7 @@ class KeyboardViewModel: ObservableObject {
     /// 자음 키는 8방향 VowelResolver. 통일 안 하면 캔버스가 ㅡ키 ← 를 ㅛ 가 아닌
     /// ㅓ(자음 매핑)로 잘못 표시한다(실제 입력은 ㅛ 인데 미리보기만 ㅓ).
     private func resolvedPreviewVowel(row: Int, column: Int, directions: [GestureDirection]) -> Jungseong? {
-        if let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization),
+        if let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage),
            case .vowelPrimitive(let primitive) = content {
             return resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
         }
@@ -1013,6 +1102,13 @@ class KeyboardViewModel: ObservableObject {
     /// ㅡ 진입 후 ㅣ방향(↗/↖) 후속은 ㅢ. 첫 획이 카디널이거나 후속 없는 단독
     /// 대각선이면 nil → 호출부가 기존 `VowelResolver`(ㅣ/ㅡ 단독)로 폴백한다.
     func resolveConsonantDiagonalVowel(_ directions: [GestureDirection]) -> Jungseong? {
+        // 순정 모아키(기본값)에서는 이 경로 자체가 없다. 대각선은 최종 결과
+        // (↖↗=ㅣ, ↙↘=ㅡ)이며, 복합모음은 카디널 조합(ㅘ=↑→ 등)으로만 만든다.
+        // nil 을 돌려주면 호출부 3곳이 모두 `VowelResolver` 트라이로 폴백하는데,
+        // 그 패턴 테이블(`VowelPattern.all`)이 이미 순정 스펙과 동일하다.
+        // 단독 대각선은 어차피 아래 `rest.isEmpty` 가드로 폴백하므로, 이 게이트는
+        // 클래식/확장형 레이아웃의 ㅣ/ㅡ 입력에 영향을 주지 않는다.
+        guard KeyboardSettings.shared.consonantDiagonalDerivationEnabled else { return nil }
         guard let first = directions.first, first.isDiagonal else { return nil }
         let primitive: VowelPrimitiveType = (first == .upRight || first == .upLeft) ? .bar : .dash
         let rest = Array(directions.dropFirst())

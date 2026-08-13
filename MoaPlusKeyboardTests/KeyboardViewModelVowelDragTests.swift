@@ -19,40 +19,84 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
 
     // MARK: - 자음 대각선 진입 파생 (spec 2026-06-25)
     // 자음 키에서 ↗↖=ㅣ, ↙↘=ㅡ 로 시작한 뒤 후속 방향으로 천지인 파생.
+    //
+    // ⚠️ v1.9 부터 이 경로는 **기본 OFF**(순정 모아키 방식)이며 설정으로만 켠다.
+    // 아래 테스트들은 기능 자체가 살아있는지 검증하므로 명시적으로 켜고 돈다.
+    // 기본값(순정) 동작은 `test_moakeyDefault_*` 에서 따로 고정한다.
+
+    /// 자음 대각선 파생 경로를 켠 상태로 블록을 실행한다.
+    private func withDiagonalDerivation(_ enabled: Bool, _ body: () -> Void) {
+        let original = KeyboardSettings.shared.consonantDiagonalDerivationEnabled
+        defer { KeyboardSettings.shared.consonantDiagonalDerivationEnabled = original }
+        KeyboardSettings.shared.consonantDiagonalDerivationEnabled = enabled
+        body()
+    }
+
+    // MARK: - 순정 모아키 기본 동작 (v1.9 기본값)
+
+    /// 기본값에서는 대각선 진입 파생이 **완전히 비활성**이다.
+    /// 이것이 리뷰 3건(몰라디·므미므므·콩픈패스)의 "'으'→'워', '이'→'와'" 오타
+    /// 경로를 구조적으로 제거한다 — 임계값 튜닝이 아니라 경로 삭제다.
+    func test_moakeyDefault_consonantDiagonalDerivationIsOff() {
+        XCTAssertFalse(KeyboardSettings.shared.consonantDiagonalDerivationEnabled,
+                       "기본값은 순정 모아키 방식(OFF)이어야 함")
+        withDiagonalDerivation(false) {
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .right]),
+                         "↙↑→ 가 ㅘ 로 파생되면 안 됨 (순정에 없는 경로)")
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .left]),
+                         "↙↓← 가 ㅝ 로 파생되면 안 됨")
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.downLeft, .upRight]),
+                         "↙↗ 가 ㅢ 로 파생되면 안 됨")
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.upRight, .right]),
+                         "↗→ 가 ㅏ 로 파생되면 안 됨")
+        }
+    }
 
     func test_consonantDiagonal_iStart_base() {
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .right]), .ㅏ)  // ↗ㅣ→
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upLeft, .left]), .ㅓ)    // ↖ㅣ←
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .up]), .ㅕ)     // ↗ㅣ↑
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .down]), .ㅑ)   // ↗ㅣ↓
+        withDiagonalDerivation(true) {
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .right]), .ㅏ)  // ↗ㅣ→
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upLeft, .left]), .ㅓ)    // ↖ㅣ←
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .up]), .ㅕ)     // ↗ㅣ↑
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .down]), .ㅑ)   // ↗ㅣ↓
+        }
     }
 
     func test_consonantDiagonal_iStart_compound() {
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .right, .left]), .ㅐ)  // ↗ㅣ→←
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upLeft, .left, .right]), .ㅔ)   // ↖ㅣ←→
+        withDiagonalDerivation(true) {
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upRight, .right, .left]), .ㅐ)  // ↗ㅣ→←
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.upLeft, .left, .right]), .ㅔ)   // ↖ㅣ←→
+        }
     }
 
     func test_consonantDiagonal_euStart_base() {
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up]), .ㅗ)    // ↙ㅡ↑
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down]), .ㅜ)  // ↙ㅡ↓
+        withDiagonalDerivation(true) {
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up]), .ㅗ)    // ↙ㅡ↑
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down]), .ㅜ)  // ↙ㅡ↓
+        }
     }
 
     func test_consonantDiagonal_euStart_compound() {
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .right]), .ㅘ)  // ↙ㅡ↑→
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .left]), .ㅚ)   // ↙ㅡ↑←
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .left]), .ㅝ) // ↙ㅡ↓←
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .right]), .ㅟ)// ↙ㅡ↓→
+        withDiagonalDerivation(true) {
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .right]), .ㅘ)  // ↙ㅡ↑→
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .up, .left]), .ㅚ)   // ↙ㅡ↑←
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .left]), .ㅝ) // ↙ㅡ↓←
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .down, .right]), .ㅟ)// ↙ㅡ↓→
+        }
     }
 
     func test_consonantDiagonal_eui() {
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downRight, .upLeft]), .ㅢ)  // ↘ㅡ↖
-        XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .upRight]), .ㅢ)  // ↙ㅡ↗
+        withDiagonalDerivation(true) {
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downRight, .upLeft]), .ㅢ)  // ↘ㅡ↖
+            XCTAssertEqual(vm.resolveConsonantDiagonalVowel([.downLeft, .upRight]), .ㅢ)  // ↙ㅡ↗
+        }
     }
 
     func test_consonantDiagonal_soloAndCardinalReturnNil() {
-        XCTAssertNil(vm.resolveConsonantDiagonalVowel([.upRight]))      // 단독 대각선 → 폴백
-        XCTAssertNil(vm.resolveConsonantDiagonalVowel([.downRight]))    // 단독 → 폴백
-        XCTAssertNil(vm.resolveConsonantDiagonalVowel([.right, .left])) // 카디널 시작 → 폴백
+        withDiagonalDerivation(true) {
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.upRight]))      // 단독 대각선 → 폴백
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.downRight]))    // 단독 → 폴백
+            XCTAssertNil(vm.resolveConsonantDiagonalVowel([.right, .left])) // 카디널 시작 → 폴백
+        }
     }
 
     // MARK: - Multi-stroke vowel drag (PR G14)
@@ -551,93 +595,159 @@ final class KeyboardViewModelVowelDragTests: XCTestCase {
     private static let D: CGFloat = 70
 
     func test_consonantDiagonal_pipeline_iStart_base() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D), (D, 0)])
-        XCTAssertEqual(vm.composingText, "가", "ㄱ ↗ㅣ→ = 가(ㄱ+ㅏ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D), (D, 0)])
+            XCTAssertEqual(vm.composingText, "가", "ㄱ ↗ㅣ→ = 가(ㄱ+ㅏ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_iStart_eo() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, -D), (-D, 0)])
-        XCTAssertEqual(vm.composingText, "거", "ㄱ ↖ㅣ← = 거(ㄱ+ㅓ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, -D), (-D, 0)])
+            XCTAssertEqual(vm.composingText, "거", "ㄱ ↖ㅣ← = 거(ㄱ+ㅓ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_iStart_yeo() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D), (0, -D)])
-        XCTAssertEqual(vm.composingText, "겨", "ㄱ ↗ㅣ↑ = 겨(ㄱ+ㅕ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D), (0, -D)])
+            XCTAssertEqual(vm.composingText, "겨", "ㄱ ↗ㅣ↑ = 겨(ㄱ+ㅕ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_iStart_ya() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D), (0, D)])
-        XCTAssertEqual(vm.composingText, "갸", "ㄱ ↗ㅣ↓ = 갸(ㄱ+ㅑ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D), (0, D)])
+            XCTAssertEqual(vm.composingText, "갸", "ㄱ ↗ㅣ↓ = 갸(ㄱ+ㅑ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_o() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, -D)])
-        XCTAssertEqual(vm.composingText, "고", "ㄱ ↙ㅡ↑ = 고(ㄱ+ㅗ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, -D)])
+            XCTAssertEqual(vm.composingText, "고", "ㄱ ↙ㅡ↑ = 고(ㄱ+ㅗ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_u() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, D)])
-        XCTAssertEqual(vm.composingText, "구", "ㄱ ↙ㅡ↓ = 구(ㄱ+ㅜ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, D)])
+            XCTAssertEqual(vm.composingText, "구", "ㄱ ↙ㅡ↓ = 구(ㄱ+ㅜ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_yo() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (-D, 0)])
-        XCTAssertEqual(vm.composingText, "교", "ㄱ ↙ㅡ← = 교(ㄱ+ㅛ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (-D, 0)])
+            XCTAssertEqual(vm.composingText, "교", "ㄱ ↙ㅡ← = 교(ㄱ+ㅛ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_yu() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (D, 0)])
-        XCTAssertEqual(vm.composingText, "규", "ㄱ ↙ㅡ→ = 규(ㄱ+ㅠ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (D, 0)])
+            XCTAssertEqual(vm.composingText, "규", "ㄱ ↙ㅡ→ = 규(ㄱ+ㅠ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_wa() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, -D), (D, 0)])
-        XCTAssertEqual(vm.composingText, "과", "ㄱ ↙ㅡ↑→ = 과(ㄱ+ㅘ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, -D), (D, 0)])
+            XCTAssertEqual(vm.composingText, "과", "ㄱ ↙ㅡ↑→ = 과(ㄱ+ㅘ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_oe() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, -D), (-D, 0)])
-        XCTAssertEqual(vm.composingText, "괴", "ㄱ ↙ㅡ↑← = 괴(ㄱ+ㅚ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, -D), (-D, 0)])
+            XCTAssertEqual(vm.composingText, "괴", "ㄱ ↙ㅡ↑← = 괴(ㄱ+ㅚ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_weo() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, D), (-D, 0)])
-        XCTAssertEqual(vm.composingText, "궈", "ㄱ ↙ㅡ↓← = 궈(ㄱ+ㅝ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, D), (-D, 0)])
+            XCTAssertEqual(vm.composingText, "궈", "ㄱ ↙ㅡ↓← = 궈(ㄱ+ㅝ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_euStart_wi() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, D), (D, 0)])
-        XCTAssertEqual(vm.composingText, "귀", "ㄱ ↙ㅡ↓→ = 귀(ㄱ+ㅟ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D), (0, D), (D, 0)])
+            XCTAssertEqual(vm.composingText, "귀", "ㄱ ↙ㅡ↓→ = 귀(ㄱ+ㅟ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_eui() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, D), (-D, -D)])
-        XCTAssertEqual(vm.composingText, "긔", "ㄱ ↘ㅡ↖ = 긔(ㄱ+ㅢ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, D), (-D, -D)])
+            XCTAssertEqual(vm.composingText, "긔", "ㄱ ↘ㅡ↖ = 긔(ㄱ+ㅢ)")
+        }
     }
 
     // 단독 대각선(후속 없음)은 ㅣ/ㅡ 단독 — 회귀 보존.
     func test_consonantDiagonal_pipeline_soloI_yieldsGi() {
-        let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D)])
-        XCTAssertEqual(vm.composingText, "기", "ㄱ ↗ 단독 = 기(ㄱ+ㅣ)")
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D)])
+            XCTAssertEqual(vm.composingText, "기", "ㄱ ↗ 단독 = 기(ㄱ+ㅣ)")
+        }
     }
 
     func test_consonantDiagonal_pipeline_soloEu_yieldsGeu() {
+        withDiagonalDerivation(true) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D)])
+            XCTAssertEqual(vm.composingText, "그", "ㄱ ↙ 단독 = 그(ㄱ+ㅡ)")
+        }
+    }
+
+    // MARK: - 순정 기본값(파생 OFF) 파이프라인 회귀 가드
+    //
+    // 클래식(.classic11)/확장형(.fullPackage) 레이아웃에는 전용 ㅣ/ㅡ 키가 없어
+    // **자음 키 대각선이 유일한 ㅣ/ㅡ 입력 경로**다. 파생 경로를 기본 OFF 로 돌린
+    // 변경이 이걸 깨면 두 레이아웃 사용자가 ㅣ/ㅡ 를 아예 못 친다.
+    // 단독 대각선은 `VowelResolver` 트라이(.ㅣ=↗, .ㅡ=↘)가 처리하므로 무관해야 한다.
+
+    func test_moakeyDefault_pipeline_soloDiagonalsStillProduceBarAndDash() {
+        withDiagonalDerivation(false) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(D, -D)])
+            XCTAssertEqual(vm.composingText, "기", "순정 기본값에서도 ㄱ ↗ 단독 = 기")
+        }
+        vm = KeyboardViewModel()
+        withDiagonalDerivation(false) {
+            let D = Self.D
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D)])
+            XCTAssertEqual(vm.composingText, "그", "순정 기본값에서도 ㄱ ↙ 단독 = 그")
+        }
+    }
+
+    /// 순정 복합모음(카디널 조합)은 파생 OFF 에서도 그대로 나와야 한다.
+    /// ㅘ = ↱(↑→), ㅝ = ↲(↓←) — 순정 스펙.
+    func test_moakeyDefault_pipeline_cardinalCompoundsStillWork() {
         let D = Self.D
-        driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(-D, D)])
-        XCTAssertEqual(vm.composingText, "그", "ㄱ ↙ 단독 = 그(ㄱ+ㅡ)")
+        withDiagonalDerivation(false) {
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(0, -D), (D, 0)])
+            XCTAssertEqual(vm.composingText, "과", "ㄱ ↑→ = 과 (순정 ㅘ)")
+        }
+        vm = KeyboardViewModel()
+        withDiagonalDerivation(false) {
+            driveKeyMulti(row: Self.gKey.row, column: Self.gKey.column, strokes: [(0, D), (-D, 0)])
+            XCTAssertEqual(vm.composingText, "궈", "ㄱ ↓← = 궈 (순정 ㅝ)")
+        }
     }
 }

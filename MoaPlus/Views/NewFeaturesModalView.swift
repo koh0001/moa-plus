@@ -19,22 +19,22 @@ struct NewFeaturesModalView: View {
 
     private let features: [Feature] = [
         Feature(
-            icon: "arrow.up.right",
+            icon: "arrow.up.and.down.and.arrow.left.and.right",
             tint: .blue,
-            title: "자음에서 바로 모음",
-            detail: "자음 키를 ㅣ/ㅡ 방향(↗↖ / ↙↘)으로 긋고 이어서 그으면 모음이 완성됩니다. 예: ㄱ을 ↗→ = ‘가’, ↙↑ = ‘고’."
+            title: "키보드 높이 조절",
+            detail: "설정 → 키보드 → 크기 · 전환 키에서 키보드 높이를 85%~135%로 조절할 수 있습니다. 미리보기를 보면서 맞추고, 언제든 기본값으로 되돌릴 수 있습니다."
         ),
         Feature(
-            icon: "ipad",
-            tint: .purple,
-            title: "iPad 정식 지원",
-            detail: "아이패드 전용 레이아웃과 가로·세로 분리 키보드를 지원합니다. 큰 화면에서 더 편하게 입력하세요."
+            icon: "globe",
+            tint: .green,
+            title: "키보드 전환 키",
+            detail: "설정 → 키보드 → 크기 · 전환 키에서 '키보드 전환 키 표시'를 켜면 기능 행 맨 왼쪽에 지구본 키가 생겨 애플 기본 키보드 등으로 바로 전환합니다. 기본은 꺼져 있고, iOS 26 아이폰은 시스템이 키보드 아래에 지구본 바를 직접 표시합니다."
         ),
         Feature(
             icon: "dial.medium",
             tint: .orange,
-            title: "입력 정확도 대폭 개선",
-            detail: "8방향 좌·우 각도를 따로 조정하고, 4방향 전용 모드와 멀티스트로크 민감도로 내 손에 맞게 맞출 수 있습니다. 설정 → 긋기 테스트에서 실시간 확인도 가능합니다."
+            title: "각도가 안 맞으면 조절하세요",
+            detail: "오타가 잦다면 설정 → 키보드 → 제스처에서 8방향 좌·우 각도를 따로 넓히거나 4방향 전용 모드를 켜 보세요. 긋기 테스트에서 실시간으로 확인할 수 있습니다."
         ),
     ]
 

@@ -6,6 +6,9 @@ struct KeyGridView: View {
     let totalWidth: CGFloat
     let mode: KeyboardMode
     let layoutCustomization: LayoutCustomization
+    /// Active symbol-keypad page (ignored outside symbol modes). Threaded from
+    /// KeyboardViewModel.symbolPage so page 1 renders its own symbol grid.
+    var symbolPage: Int = 0
     let activeKey: (row: Int, column: Int)?
     let previewVowel: Jungseong?
     var shiftState: ShiftState = .off
@@ -35,9 +38,13 @@ struct KeyGridView: View {
         return KeyboardMetrics.keyWidth(for: column, row: row, centerKeyWidth: centerKeyWidth, mode: mode)
     }
 
-    /// Compute total width of a single row (sum of key widths + gaps)
-    private func rowWidth(for row: Int) -> CGFloat {
-        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+    /// Compute total width of a single row (sum of key widths + gaps).
+    ///
+    /// 레이아웃을 인자로 받는다 — 예전에는 여기서 직접 `activeLayout` 을 불렀는데,
+    /// 이 함수가 행마다 호출되므로 body 1회 평가에 레이아웃이 총 6번(body 1 +
+    /// rowCount 1 + 행 4) 재구축됐다. `activeLayout` 은 호출마다 4×7 KeyContent
+    /// 배열과 leftCol 배열을 새로 만든다.
+    private func rowWidth(for row: Int, in layoutGrid: [[KeyContent]]) -> CGFloat {
         guard row >= 0 && row < layoutGrid.count else { return 0 }
         let cells = layoutGrid[row]
         var width: CGFloat = 0
@@ -50,15 +57,11 @@ struct KeyGridView: View {
         return width
     }
 
-    /// Number of rows in the active layout.
-    private var rowCount: Int {
-        KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization).count
-    }
-
     var body: some View {
-        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization)
+        // 레이아웃은 body 당 정확히 1회만 만든다. 행 수·행 폭도 이 값에서 파생시킨다.
+        let layoutGrid = KeyboardMetrics.activeLayout(for: mode, layout: layoutCustomization, symbolPage: symbolPage)
         VStack(spacing: KeyboardMetrics.keySpacing) {
-            ForEach(0..<rowCount, id: \.self) { row in
+            ForEach(0..<layoutGrid.count, id: \.self) { row in
                 HStack(spacing: KeyboardMetrics.keySpacing) {
                     let columnCount = layoutGrid[row].count
 
@@ -198,7 +201,7 @@ struct KeyGridView: View {
                         }   // close else branch (slot B intercept)
                     }
                 }
-                .frame(width: rowWidth(for: row))
+                .frame(width: rowWidth(for: row, in: layoutGrid))
                 .frame(maxWidth: .infinity)
             }
         }
