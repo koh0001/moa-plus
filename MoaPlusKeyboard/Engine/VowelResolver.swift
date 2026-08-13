@@ -11,7 +11,14 @@ class VowelResolver {
         let hasMoreMatches: Bool
     }
 
-    func resolve(directions: [GestureDirection]) -> Resolution {
+    /// - Parameter firstStrokeCardinal: 첫 획(대각선)의 실제 각도를 4방향으로
+    ///   스냅한 값 (`GestureAnalyzer.finalizeGestureDetailed()`). 순정 모아키는
+    ///   첫 획을 8방향으로 잠정 분류했다가 **후속 획이 오면 4방향으로 재해석**
+    ///   한다(영상 A8-A13/C/F 실측: ↗ 왕복=ㅐ, ↖↘=ㅔ, ↙↑↓=ㅠ). 두 해석을 모두
+    ///   트라이에 넣어 **더 많은 간선을 따라간 쪽**을 채택하고, 동률이면 기존
+    ///   해석을 유지한다 — ↙↗=ㅢ(천지인 ㅡ+ㅣ)가 재해석(←→=ㅔ)에 밀리지 않게.
+    func resolve(directions: [GestureDirection],
+                 firstStrokeCardinal: GestureDirection? = nil) -> Resolution {
         guard !directions.isEmpty else {
             return Resolution(vowel: nil, hasMoreMatches: false)
         }
@@ -23,7 +30,27 @@ class VowelResolver {
 
         let normalized = normalizeForMatching(directions)
         let match = patternTrie.match(normalized)
+
+        if let alt = cardinalReinterpretation(directions, firstStrokeCardinal: firstStrokeCardinal) {
+            let altMatch = patternTrie.match(alt)
+            if altMatch.vowel != nil,
+               match.vowel == nil || altMatch.matchedCount > match.matchedCount {
+                return Resolution(vowel: altMatch.vowel, hasMoreMatches: altMatch.hasLongerMatch)
+            }
+        }
+
         return Resolution(vowel: match.vowel, hasMoreMatches: match.hasLongerMatch)
+    }
+
+    /// 첫 획을 4방향 스냅으로 바꾼 대안 시퀀스. 첫 획이 대각선이고 후속 획이
+    /// 있을 때만 성립한다.
+    private func cardinalReinterpretation(_ directions: [GestureDirection],
+                                          firstStrokeCardinal: GestureDirection?) -> [GestureDirection]? {
+        guard let cardinal = firstStrokeCardinal,
+              cardinal.isCardinal,
+              directions.count >= 2,
+              directions[0].isDiagonal else { return nil }
+        return normalizeForMatching([cardinal] + directions.dropFirst())
     }
 
     /// Single-stroke direction → Jungseong, mirroring the first-stroke
@@ -54,7 +81,8 @@ class VowelResolver {
     }
 
     // For real-time feedback during gesture
-    func peekVowel(directions: [GestureDirection]) -> Jungseong? {
+    func peekVowel(directions: [GestureDirection],
+                   firstStrokeCardinal: GestureDirection? = nil) -> Jungseong? {
         guard !directions.isEmpty else { return nil }
 
         // Direct diagonal mapping check
@@ -62,8 +90,8 @@ class VowelResolver {
             return directVowel
         }
 
-        let normalized = normalizeForMatching(directions)
-        return patternTrie.match(normalized).vowel
+        // 미리보기도 입력 확정(resolve)과 같은 재해석 우선순위를 쓴다.
+        return resolve(directions: directions, firstStrokeCardinal: firstStrokeCardinal).vowel
     }
 
     // Check if current directions could potentially match a vowel
@@ -147,7 +175,8 @@ class VowelResolver {
             if index == 0 {
                 next = normalizeFirstStroke(direction)
             } else {
-                next = normalizeTrailingStroke(direction, previous: normalized.last)
+                next = normalizeTrailingStroke(direction, previous: normalized.last,
+                                               first: normalized.first)
             }
 
             // Treat repeated same-direction segments as one stroke.
@@ -165,7 +194,21 @@ class VowelResolver {
     }
 
     private func normalizeTrailingStroke(_ direction: GestureDirection,
-                                         previous: GestureDirection?) -> GestureDirection {
+                                         previous: GestureDirection?,
+                                         first: GestureDirection? = nil) -> GestureDirection {
+        // 순정 실측(영상 R2 6/6 + F1 #8·F3 #3 + B2 #7): **수평으로 시작한**
+        // 제스처에서 직각(↑/↓) 후속 획은 수평 반전으로 스냅된다 —
+        // →↓/→↑=ㅐ, ←↑/←↓=ㅔ, →↓→=ㅑ. 수평 시작 트라이에는 직각 간선이
+        // 없기 때문. 반전으로 접어 주면 나머지는 기존 트라이(→←=ㅐ …)가 처리.
+        // 수직 시작 제스처에는 적용하지 않는다 — 직각 간선이 실재하고(↑→=ㅘ,
+        // ↓←=ㅝ), 중간 수평 노이즈 뒤의 수직 획을 접으면 ㅛ(↑←↓↑ 등)의 skip
+        // 관대함이 깨진다. 순정도 수직 시작에서 무효 직각 획은 그냥 버린다
+        // (영상 D4 att04: ↑→ 후 진짜 ↓ 획 폐기).
+        if direction == .up || direction == .down,
+           previous == .left || previous == .right,
+           first == .left || first == .right {
+            return previous == .left ? .right : .left
+        }
         guard direction.isDiagonal else { return direction }
 
         guard let (vertical, horizontal) = diagonalComponents(of: direction) else {
