@@ -450,11 +450,13 @@ class KeyboardViewModel: ObservableObject {
         gestureDirections = directions
         // Slot B is a bare-vowel key (no consonant prefix); the resolver's
         // pattern trie still gives the best matching Jungseong for preview.
-        previewVowel = vowelResolver.peekVowel(directions: directions)
+        previewVowel = vowelResolver.peekVowel(
+            directions: directions,
+            firstStrokeCardinal: gestureAnalyzer.currentFirstStrokeCardinal())
     }
 
     func slotBVowelGestureEnded() {
-        let directions = gestureAnalyzer.finalizeGesture()
+        let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
         gestureAnalyzer.reset()
         // Clear gestureState so the overlay disappears.
         activeKey = nil
@@ -470,7 +472,8 @@ class KeyboardViewModel: ObservableObject {
             }
             return
         }
-        let resolution = vowelResolver.resolve(directions: directions)
+        let resolution = vowelResolver.resolve(directions: directions,
+                                               firstStrokeCardinal: firstStrokeCardinal)
         if let vowel = resolution.vowel {
             if previewMode {
                 emitPreviewVowel(vowel)
@@ -870,12 +873,16 @@ class KeyboardViewModel: ObservableObject {
                 // 미리 보여준다. 실제 입력(handleKoreanModeGesture)과 동일하게
                 // resolveConsonantDiagonalVowel 을 먼저 시도하고, 아니면 trie peek.
                 previewVowel = resolveConsonantDiagonalVowel(directions)
-                    ?? vowelResolver.peekVowel(directions: directions)
+                    ?? vowelResolver.peekVowel(
+                        directions: directions,
+                        firstStrokeCardinal: gestureAnalyzer.currentFirstStrokeCardinal())
             default:
                 previewVowel = nil
             }
         } else {
-            previewVowel = vowelResolver.peekVowel(directions: directions)
+            previewVowel = vowelResolver.peekVowel(
+                directions: directions,
+                firstStrokeCardinal: gestureAnalyzer.currentFirstStrokeCardinal())
         }
         if onPreviewConsonantGesture != nil {
             previewGesturePoints.append(point)
@@ -907,11 +914,12 @@ class KeyboardViewModel: ObservableObject {
         // composer state or insert into a host text field.
         if previewMode {
             // Still consume any gesture-analyzer state so the next press starts clean.
-            let directions = gestureAnalyzer.finalizeGesture()
+            let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
             // Surface the final resolved vowel so the gesture test screen
             // shows what the production keyboard would have committed.
             if onPreviewConsonantGesture != nil {
-                let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions)
+                let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions,
+                                                    firstStrokeCardinal: firstStrokeCardinal)
                 onPreviewConsonantGesture?(
                     .ended(points: previewGesturePoints,
                            columnId: previewGestureColumnId),
@@ -933,8 +941,9 @@ class KeyboardViewModel: ObservableObject {
             // finalizeGesture() 로 정리된 directions 를 써서 시각화 "최종 결과"가
             // 실제 입력 경로(handleKoreanModeGesture)와 정확히 일치하게 한다.
             // finalizeGesture 는 상태를 바꾸지 않으므로 아래 핸들러가 다시 호출해도 무방.
-            let directions = gestureAnalyzer.finalizeGesture()
-            let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions)
+            let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
+            let resolved = resolvedPreviewVowel(row: row, column: column, directions: directions,
+                                                firstStrokeCardinal: firstStrokeCardinal)
             onPreviewConsonantGesture?(
                 .ended(points: previewGesturePoints,
                        columnId: previewGestureColumnId),
@@ -988,7 +997,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func handleKoreanModeGesture(row: Int, column: Int) {
-        let directions = gestureAnalyzer.finalizeGesture()
+        let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
 
         guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization) else { return }
 
@@ -1002,7 +1011,8 @@ class KeyboardViewModel: ObservableObject {
                 inputConsonant(consonant)
 
                 let vowel = resolveConsonantDiagonalVowel(directions)
-                    ?? vowelResolver.resolve(directions: directions).vowel
+                    ?? vowelResolver.resolve(directions: directions,
+                                             firstStrokeCardinal: firstStrokeCardinal).vowel
                 if let vowel {
                     inputVowel(vowel)
                 }
@@ -1068,13 +1078,15 @@ class KeyboardViewModel: ObservableObject {
     /// vowelPrimitive(ㅣ/ㅡ) 키는 실제 입력과 같은 resolveVowelFromPrimitiveDrag,
     /// 자음 키는 8방향 VowelResolver. 통일 안 하면 캔버스가 ㅡ키 ← 를 ㅛ 가 아닌
     /// ㅓ(자음 매핑)로 잘못 표시한다(실제 입력은 ㅛ 인데 미리보기만 ㅓ).
-    private func resolvedPreviewVowel(row: Int, column: Int, directions: [GestureDirection]) -> Jungseong? {
+    private func resolvedPreviewVowel(row: Int, column: Int, directions: [GestureDirection],
+                                      firstStrokeCardinal: GestureDirection? = nil) -> Jungseong? {
         if let content = KeyboardMetrics.keyContent(at: row, column: column, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage),
            case .vowelPrimitive(let primitive) = content {
             return resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions)
         }
         return resolveConsonantDiagonalVowel(directions)
-            ?? vowelResolver.resolve(directions: directions).vowel
+            ?? vowelResolver.resolve(directions: directions,
+                                     firstStrokeCardinal: firstStrokeCardinal).vowel
     }
 
     func resolveVowelFromPrimitiveDrag(primitive: VowelPrimitiveType, directions: [GestureDirection]) -> Jungseong? {

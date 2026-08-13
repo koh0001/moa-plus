@@ -5,11 +5,16 @@ class GestureAnalyzer {
     private struct DirectionSegment {
         var direction: GestureDirection
         var magnitude: CGFloat
+        var vector: CGVector
     }
 
     private var touchPoints: [CGPoint] = []
     private var directions: [GestureDirection] = []
     private var directionMagnitudes: [CGFloat] = []
+    /// 각 stroke 의 순 변위(origin → 마지막 관측점). 순정 모아키의 "첫 획 8방향
+    /// 잠정 → 후속 획 도착 시 4방향 재해석"(영상 A8-A13 판독)을 재현하려면 첫
+    /// 획의 실제 각도가 필요해서, 방향 enum 과 나란히 벡터를 보관한다.
+    private var directionVectors: [CGVector] = []
     /// 현재 stroke가 처음 등록된 지점(누적 magnitude/finalize 기준).
     private var lastDirectionChangePoint: CGPoint?
     /// 현재 stroke에서 마지막으로 같은 방향이 관측된 점. 방향이 바뀌면 이 점이
@@ -147,6 +152,7 @@ class GestureAnalyzer {
         touchPoints.removeAll(keepingCapacity: true)
         directions.removeAll(keepingCapacity: true)
         directionMagnitudes.removeAll(keepingCapacity: true)
+        directionVectors.removeAll(keepingCapacity: true)
         lastDirectionChangePoint = nil
         strokeAnchorPoint = nil
         strokeOriginPoint = nil
@@ -205,6 +211,7 @@ class GestureAnalyzer {
                     let ex = currentPoint.x - origin.x
                     let ey = currentPoint.y - origin.y
                     directionMagnitudes[directionMagnitudes.count - 1] = sqrt(ex * ex + ey * ey)
+                    directionVectors[directionVectors.count - 1] = CGVector(dx: ex, dy: ey)
                 }
                 return
             }
@@ -239,6 +246,7 @@ class GestureAnalyzer {
             if displacement >= turnThreshold && passesAmplitudeGuard {
                 directions.append(newDirection)
                 directionMagnitudes.append(displacement)
+                directionVectors.append(CGVector(dx: dx, dy: dy))
                 lastDirectionChangePoint = currentPoint
                 strokeAnchorPoint = currentPoint
                 strokeOriginPoint = anchor
@@ -252,6 +260,7 @@ class GestureAnalyzer {
             if displacement >= effectiveThreshold {
                 directions.append(newDirection)
                 directionMagnitudes.append(displacement)
+                directionVectors.append(CGVector(dx: dx, dy: dy))
                 lastDirectionChangePoint = currentPoint
                 strokeAnchorPoint = currentPoint
                 strokeOriginPoint = startPoint
@@ -337,10 +346,66 @@ class GestureAnalyzer {
     }
 
     func finalizeGesture() -> [GestureDirection] {
-        let segments = zip(directions, directionMagnitudes).map {
-            DirectionSegment(direction: $0.0, magnitude: $0.1)
+        finalizeGestureDetailed().directions
+    }
+
+    /// finalize 결과 + "첫 획 카디널 재해석" 후보.
+    ///
+    /// 순정 모아키 실측(영상 A8-A13/C/F 판독): 첫 획은 8방향으로 잠정 분류되고
+    /// (↗↖=ㅣ, ↙↘=ㅡ 단독 인정), **후속 획이 등록되는 순간 첫 획을 실제 각도
+    /// 기준 4방향으로 재해석한 해석도 함께 성립**한다 — ↗(≤45°) 왕복 = →← = ㅐ,
+    /// ↖ 후 ↘ = ←→ = ㅔ, ↙(수직 쪽) ↑↓ = ㅠ 등. `firstStrokeCardinal` 은 그
+    /// 재해석에 쓸 첫 획의 4방향 스냅 값이다(첫 획이 카디널이거나 획이 1개면 nil).
+    /// 채택 여부는 `VowelResolver` 가 트라이 매칭 결과를 비교해 결정한다.
+    func finalizeGestureDetailed() -> (directions: [GestureDirection], firstStrokeCardinal: GestureDirection?) {
+        let segments = zip(directions, zip(directionMagnitudes, directionVectors)).map {
+            DirectionSegment(direction: $0.0, magnitude: $0.1.0, vector: $0.1.1)
         }
-        return normalizeSegments(segments).map { $0.direction }
+        let normalized = normalizeSegments(segments)
+        return (normalized.map { $0.direction },
+                firstStrokeCardinal(of: normalized))
+    }
+
+    /// 재해석을 발동시키는 두 번째 획의 최소 크기 (keyWidth 대비).
+    /// 순정 실측에서 진짜 후속 획은 키 폭의 ~0.9배 이상(ㅐ 왕복 150~290px,
+    /// ㅢ 반환 145~405px, ↙↑↓=ㅠ 의 ↑ 168px / 키 피치 154px 기준)이고,
+    /// 손 떼며 생기는 호 꼬리는 ~0.45배 이하였다(특성화 테스트 21pt / 50pt).
+    /// 0.6 은 양쪽 모두에 마진을 준 중간값 — 꼬리가 재해석을 발동시켜 ㅡ 가
+    /// ㅔ 로 승격되는 회귀(`test_upwardArcTailAfterDownLeft…`)를 막는다.
+    private static let reinterpretMinSecondStrokeRatio: CGFloat = 0.6
+
+    /// 진행 중(미확정) 제스처의 첫 획 카디널 스냅 — 실시간 미리보기용.
+    /// finalize 의 노이즈 트림 전 원시 첫 획을 쓰므로 최종값과 미세하게 다를 수
+    /// 있지만, 미리보기는 어차피 획마다 갱신되므로 허용한다.
+    func currentFirstStrokeCardinal() -> GestureDirection? {
+        guard directions.count >= 2,
+              let first = directions.first, first.isDiagonal,
+              let vector = directionVectors.first,
+              directionMagnitudes.count >= 2,
+              directionMagnitudes[1] >= keyWidth * Self.reinterpretMinSecondStrokeRatio
+        else { return nil }
+        return cardinalSnap(of: vector)
+    }
+
+    private func firstStrokeCardinal(of segments: [DirectionSegment]) -> GestureDirection? {
+        guard segments.count >= 2,
+              let first = segments.first, first.direction.isDiagonal,
+              segments[1].magnitude >= keyWidth * Self.reinterpretMinSecondStrokeRatio
+        else { return nil }
+        return cardinalSnap(of: first.vector)
+    }
+
+    /// 벡터를 사용자 섹터 회전을 존중한 4방향(90° 사분면)으로 스냅한다.
+    /// 순정 실측에서 첫 획 4방향 경계는 45° 옥탄트와 정합했다(A8-A13 §3-4).
+    private func cardinalSnap(of vector: CGVector) -> GestureDirection? {
+        GestureDirection.from(
+            vector: vector,
+            sectors: effectiveSectors,
+            rotationOffset: effectiveRotationOffset,
+            threshold: 1,
+            fourWay: true,
+            fillGap: true
+        )
     }
 
     /// Keep intentional turns for 3-stroke gestures (important for ㅙ/ㅞ),
@@ -363,6 +428,8 @@ class GestureAnalyzer {
                 if segment.magnitude > (result.last?.magnitude ?? 0) {
                     result[result.count - 1].magnitude = segment.magnitude
                 }
+                result[result.count - 1].vector.dx += segment.vector.dx
+                result[result.count - 1].vector.dy += segment.vector.dy
                 continue
             }
             result.append(segment)
@@ -391,6 +458,8 @@ class GestureAnalyzer {
 
             if returnsToPrevious && isAdjacentJitter && isTinySegment {
                 result[index - 1].magnitude = max(previous.magnitude, next.magnitude)
+                result[index - 1].vector.dx += current.vector.dx + next.vector.dx
+                result[index - 1].vector.dy += current.vector.dy + next.vector.dy
                 result.remove(at: index + 1)
                 result.remove(at: index)
                 if index > 1 {
