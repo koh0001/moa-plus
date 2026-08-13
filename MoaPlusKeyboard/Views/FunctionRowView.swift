@@ -630,14 +630,11 @@ struct SlotBVowelKey: View {
     private var fg: Color { KeyboardSettings.shared.resolvedKeyText }
 
     var body: some View {
+        // 삼성 순정 모아키의 통합 모음 키 라벨(ㅣ·ㅡ / 모음)과 동일한 표기.
+        // 방향별 파생 힌트(ㅗㅓㅏㅜ)보다 "천지인 모음 키"라는 정체가 먼저 읽힌다.
         VStack(spacing: 1) {
-            Text("ㅗ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
-            HStack(spacing: 4) {
-                Text("ㅓ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
-                Text("ㆍ").font(.system(size: 16, weight: .medium)).foregroundColor(fg)
-                Text("ㅏ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
-            }
-            Text("ㅜ").font(.system(size: 9)).foregroundColor(fg.opacity(0.5))
+            Text("ㅣㆍㅡ").font(.system(size: 14, weight: .medium)).foregroundColor(fg)
+            Text("모음").font(.system(size: 9)).foregroundColor(fg.opacity(0.6))
         }
         .frame(width: width, height: height)
         .background(
