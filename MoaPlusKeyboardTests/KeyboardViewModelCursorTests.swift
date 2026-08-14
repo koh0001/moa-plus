@@ -128,10 +128,28 @@ final class KeyboardViewModelCursorTests: XCTestCase {
         XCTAssertEqual(delegate.cursorMoves, [-5], "4 + 1 + (1-1) = 5 후퇴")
     }
 
-    func testMoveCursorLineUp_withoutPreviousLineInContext_isNoOp() {
-        delegate.contextBefore = "가나다"
+    // MARK: 문단 절단 호스트 (일반 케이스 — before/after 에 \n 이 없음)
+    // 실기기 대부분의 호스트가 이 경로다: before.count 가 곧 현재 열.
+
+    func testMoveCursorLineUp_paragraphLimitedContext_landsAtPreviousLineEnd() {
+        delegate.contextBefore = "가나"   // 문단 절단: 현재 줄 커서 앞 = 열 2
         viewModel.moveCursorLine(by: -1)
-        XCTAssertTrue(delegate.cursorMoves.isEmpty, "컨텍스트에 이전 줄이 없으면 이동하지 않음")
+        XCTAssertEqual(delegate.cursorMoves, [-3], "열(2) + 줄바꿈(1) 후퇴 → 이전 줄 끝")
+    }
+
+    func testMoveCursorLineUp_paragraphLimited_phase2RestoresColumn() {
+        delegate.contextBefore = "가나"
+        viewModel.moveCursorLine(by: -1)
+        // 착지 후: 이전 줄("라마바사", 길이 4) 전체가 새 before 로 온다.
+        delegate.contextBefore = "라마바사"
+        viewModel.restoreColumnAfterLineMove(direction: -1, targetColumn: 2)
+        XCTAssertEqual(delegate.cursorMoves, [-3, -2], "줄 끝(열 4)에서 목표 열 2 로 2 후퇴")
+    }
+
+    func testMoveCursorLineUp_withoutContext_isNoOp() {
+        delegate.contextBefore = nil
+        viewModel.moveCursorLine(by: -1)
+        XCTAssertTrue(delegate.cursorMoves.isEmpty, "호스트 컨텍스트가 없으면 이동하지 않음")
     }
 
     func testMoveCursorLineDown_movesToSameColumnOfNextLine() {
@@ -148,11 +166,27 @@ final class KeyboardViewModelCursorTests: XCTestCase {
         XCTAssertEqual(delegate.cursorMoves, [2], "0 + 1 + 1 = 2 전진")
     }
 
-    func testMoveCursorLineDown_withoutNextLineInContext_isNoOp() {
-        delegate.contextBefore = "가나"
-        delegate.contextAfter = "다라"
+    func testMoveCursorLineDown_paragraphLimitedContext_landsAtNextLineStart() {
+        delegate.contextBefore = "가나다"   // 열 3
+        delegate.contextAfter = "라마"      // 현재 줄 잔여 2
         viewModel.moveCursorLine(by: 1)
-        XCTAssertTrue(delegate.cursorMoves.isEmpty, "뒤 컨텍스트에 줄바꿈이 없으면 이동하지 않음")
+        XCTAssertEqual(delegate.cursorMoves, [3], "잔여(2) + 줄바꿈(1) 전진 → 다음 줄 시작")
+    }
+
+    func testMoveCursorLineDown_paragraphLimited_phase2ClampsToShortLine() {
+        delegate.contextBefore = "가나다"
+        delegate.contextAfter = "라마"
+        viewModel.moveCursorLine(by: 1)
+        // 착지 후: 다음 줄("바", 길이 1) 전체가 새 after 로 온다 → 목표 열 min(3,1)=1.
+        delegate.contextAfter = "바"
+        viewModel.restoreColumnAfterLineMove(direction: 1, targetColumn: 3)
+        XCTAssertEqual(delegate.cursorMoves, [3, 1])
+    }
+
+    func testMoveCursorLineDown_withoutContext_isNoOp() {
+        delegate.contextAfter = nil
+        viewModel.moveCursorLine(by: 1)
+        XCTAssertTrue(delegate.cursorMoves.isEmpty, "호스트 컨텍스트가 없으면 이동하지 않음")
     }
 }
 
