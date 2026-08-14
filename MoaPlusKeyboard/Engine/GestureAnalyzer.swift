@@ -288,9 +288,21 @@ class GestureAnalyzer {
         return 0
     }
 
-    /// 방향 판정용 window 호 길이(= reversal 거리). 최근 이만큼의 궤적으로 방향을
-    /// 본다. 컬럼/keyWidth 보정이 이미 반영된 effectiveReversalThreshold 를 재사용.
-    private var effectiveDirectionWindow: CGFloat { effectiveReversalThreshold }
+    /// 방향 판정용 window 호 길이. 최근 이만큼의 궤적으로 방향을 본다.
+    ///
+    /// 반전 **등록** 임계(`effectiveReversalThreshold`)와 분리해 swipe 임계의
+    /// 절반(보통 길이 기준 ≈ 키폭 20%)으로 고정한다. 원래는 등록 임계를 재사용
+    /// 했는데, v2.0 실측 반영으로 등록 임계를 키폭 30%로 올리자 window 도 함께
+    /// 커져 방향 분류가 늦어졌고, 그동안 같은-방향 분기가 anchor 를 되돌림 경로
+    /// 안으로 전진시켜 등록에 필요한 실제 되돌림이 (window + 임계)로 부풀었다 —
+    /// 의도적인 키폭 50% 되돌림(ㅚ/ㅐ)까지 뭉개지는 과소인식
+    /// (`test_moderateIntentionalReversal_stillRegisters` 가드).
+    private var effectiveDirectionWindow: CGFloat {
+        let base: CGFloat = columnId > 0
+            ? settings.effectiveSwipeThreshold(forColumn: columnId, keyWidth: keyWidth)
+            : settings.swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
+        return base * 0.5
+    }
 
     /// window 벡터의 방향 분류 임계. window 길이의 절반이라 직선에 가까운 궤적은
     /// 통과하고 거의 정지한 구간은 무시한다(최소 1pt 가드).
@@ -507,6 +519,12 @@ class GestureAnalyzer {
         // 실측 분리: 노이즈 꼬리 15~20pt / 진입 63pt = 0.24~0.32,
         //            의도적 마지막 획 30pt / 직전 55pt = 0.55.
         // 인접(≤45°) 꼬리는 기존대로 비율과 무관하게 제거한다(완만한 흘림).
+        //
+        // ⚠️ 비율을 절대 크기와 분리해 단독 컷으로 쓰지 말 것: 재촬영 S2 판독
+        // (2026-08-14)에서 순정은 300px+ 진입 후 60~80px 되돌림(비율 0.2~0.27)도
+        // 전부 획으로 인정했다 — 순정의 되돌림 판정은 절대 크기(~키폭 30%,
+        // `reversalThresholdRatio` 참고)이며, 여기 트림은 그 하한 아래로 등록된
+        // 경계 사례만 정리하는 안전망이다.
         while result.count > 1, let last = result.last, let previous = result.dropLast().last {
             let isTinyAbsolute = last.magnitude <= edgeNoiseCap
             let isTinyRelative = last.magnitude < previous.magnitude * Self.trailingNoiseRatio
@@ -527,5 +545,42 @@ extension GestureAnalyzer {
 
     var hasGesture: Bool {
         !directions.isEmpty
+    }
+
+    /// 획 하나의 계측값 — 긋기 테스트 화면의 "획별 측정" 표시용.
+    /// 실기기 실측(T2)에서 "어느 각도에서 다른 모음으로 넘어가는지 확인 불가"
+    /// 피드백을 받아 추가했다.
+    struct StrokeInfo: Identifiable {
+        let id: Int
+        let direction: GestureDirection
+        let magnitude: CGFloat
+        let vector: CGVector
+
+        /// 수학 좌표 각도(0° = 오른쪽, 반시계 방향 +, 0..<360). 화면 y 는
+        /// 아래로 증가하므로 dy 부호를 뒤집는다 — `DirectionSector.centerAngle`
+        /// 과 같은 규약이라 섹터 경계 각도와 직접 비교할 수 있다.
+        var angleDegrees: Double {
+            let deg = atan2(Double(-vector.dy), Double(vector.dx)) * 180 / .pi
+            return deg < 0 ? deg + 360 : deg
+        }
+    }
+
+    /// 등록된 원시 획 목록(노이즈 트림 전) — 진행 중 실시간 표시용.
+    func currentStrokeInfos() -> [StrokeInfo] {
+        zip(directions, zip(directionMagnitudes, directionVectors)).enumerated().map { index, entry in
+            StrokeInfo(id: index, direction: entry.0, magnitude: entry.1.0, vector: entry.1.1)
+        }
+    }
+
+    /// finalize 와 동일한 노이즈 트림을 거친 획 목록 — 손을 뗀 뒤 "최종" 표시용.
+    /// `finalizeGestureDetailed()` 처럼 상태를 바꾸지 않는다.
+    func finalizedStrokeInfos() -> [StrokeInfo] {
+        let segments = zip(directions, zip(directionMagnitudes, directionVectors)).map {
+            DirectionSegment(direction: $0.0, magnitude: $0.1.0, vector: $0.1.1)
+        }
+        return normalizeSegments(segments).enumerated().map { index, segment in
+            StrokeInfo(id: index, direction: segment.direction,
+                       magnitude: segment.magnitude, vector: segment.vector)
+        }
     }
 }

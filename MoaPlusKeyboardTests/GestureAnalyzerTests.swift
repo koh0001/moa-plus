@@ -5,7 +5,10 @@ final class GestureAnalyzerTests: XCTestCase {
     // MARK: - Reversal Threshold Tests
 
     func testReversalDetectedAtLowerThreshold() {
-        // With reversalThreshold=10, opposite direction change should be detected at 10px
+        // reversal 임계는 full threshold(20)보다 낮은 14px (키폭 28%, 순정 adb
+        // 실측 정합 — reversalThresholdRatio 0.70). 주의: 생성자에 10을 넘겨도
+        // KeyboardMetrics.reversalThreshold(10)와 같은 값이라 "커스텀"으로 인식되지
+        // 않고 settings 경로를 탄다.
         let analyzer = GestureAnalyzer(threshold: 20, reversalThreshold: 10, directionChangeThreshold: 15)
 
         // Start at origin, move up 25px (above threshold=20)
@@ -14,10 +17,10 @@ final class GestureAnalyzerTests: XCTestCase {
 
         XCTAssertEqual(analyzer.getDirections(), [.up])
 
-        // Now reverse down by only 12px from direction change point (above reversal=10, below threshold=20)
-        analyzer.addPoint(CGPoint(x: 100, y: 87))  // 12px down from y=75
+        // Reverse down 17px (above reversal=14, below threshold=20)
+        analyzer.addPoint(CGPoint(x: 100, y: 92))  // 17px down from y=75
 
-        XCTAssertEqual(analyzer.getDirections(), [.up, .down], "Opposite reversal should be detected at reversal threshold (10px)")
+        XCTAssertEqual(analyzer.getDirections(), [.up, .down], "Opposite reversal should be detected at reversal threshold (14px)")
     }
 
     func testNonReversalRequiresFullThreshold() {
@@ -46,13 +49,13 @@ final class GestureAnalyzerTests: XCTestCase {
 
         XCTAssertEqual(analyzer.getDirections(), [.up])
 
-        // Second direction (reversal): down 12px
-        analyzer.addPoint(CGPoint(x: 100, y: 87))  // 12px down from y=75
+        // Second direction (reversal): down 17px (reversal 임계 15px 이상)
+        analyzer.addPoint(CGPoint(x: 100, y: 92))  // 17px down from y=75
 
         XCTAssertEqual(analyzer.getDirections(), [.up, .down])
 
-        // Third direction (reversal): up 12px
-        analyzer.addPoint(CGPoint(x: 100, y: 75))  // 12px up from y=87
+        // Third direction (reversal): up 17px
+        analyzer.addPoint(CGPoint(x: 100, y: 75))  // 17px up from y=92
 
         let finalDirs = analyzer.finalizeGesture()
         XCTAssertEqual(finalDirs, [.up, .down, .up], "Triple reversal should produce ㅛ pattern (↑↓↑)")
@@ -68,13 +71,13 @@ final class GestureAnalyzerTests: XCTestCase {
 
         XCTAssertEqual(analyzer.getDirections(), [.down])
 
-        // Second direction (reversal): up 12px
-        analyzer.addPoint(CGPoint(x: 100, y: 113))  // 12px up from y=125
+        // Second direction (reversal): up 17px (reversal 임계 15px 이상)
+        analyzer.addPoint(CGPoint(x: 100, y: 108))  // 17px up from y=125
 
         XCTAssertEqual(analyzer.getDirections(), [.down, .up])
 
-        // Third direction (reversal): down 12px
-        analyzer.addPoint(CGPoint(x: 100, y: 125))  // 12px down from y=113
+        // Third direction (reversal): down 17px
+        analyzer.addPoint(CGPoint(x: 100, y: 125))  // 17px down from y=108
 
         let finalDirs = analyzer.finalizeGesture()
         XCTAssertEqual(finalDirs, [.down, .up, .down], "Triple reversal should produce ㅠ pattern (↓↑↓)")
@@ -368,10 +371,10 @@ final class GestureAnalyzerTests: XCTestCase {
 
         analyzer.addPoint(CGPoint(x: 100, y: 100))
         analyzer.addPoint(CGPoint(x: 100, y: 75))   // ↑ 25
-        analyzer.addPoint(CGPoint(x: 112, y: 75))   // → 12 (gap 90)
+        analyzer.addPoint(CGPoint(x: 117, y: 75))   // → 17 (gap 90, reversal 임계 15px 이상)
 
         XCTAssertEqual(analyzer.getDirections(), [.up, .right],
-                       "sens 2: 직각 turn 이 12px 만으로 등록 (원점 복귀 불필요 ⚡️)")
+                       "sens 2: 직각 turn 이 17px 만으로 등록 (원점 복귀 불필요 ⚡️)")
     }
 
     func testSensitivity2AmplitudeGuardBlocksTinyJitterPromotion() {
@@ -394,10 +397,26 @@ final class GestureAnalyzerTests: XCTestCase {
 
         analyzer.addPoint(CGPoint(x: 100, y: 100))
         analyzer.addPoint(CGPoint(x: 100, y: 60))   // ↑ 40
-        analyzer.addPoint(CGPoint(x: 100, y: 72))   // ↓ 12
+        // 18px: 새 기본 reversal 임계(키폭 28% = 14pt, 순정 adb 실측 42px/150px
+        // 정합) 바로 위. 이전 기본(키폭 20% = 10pt)에서는 12px 도 등록됐지만,
+        // v2.0 실기기 실측의 꼬리 승격 오타(ㅚ→ㅛ 등)로 임계를 순정 수준으로 올렸다.
+        analyzer.addPoint(CGPoint(x: 100, y: 78))   // ↓ 18
 
         XCTAssertEqual(analyzer.getDirections(), [.up, .down],
-                       "sens 0: 12px 반대 turn 은 그대로 등록 (진폭 가드 비활성 = 기존 동작)")
+                       "sens 0: 임계(14pt) 이상 반대 turn 은 진폭 가드 없이 등록")
+    }
+
+    func testSensitivity0BelowReversalThresholdNotRegistered() {
+        var settings = GestureSettings.default
+        settings.multiStrokeTurnSensitivity = 0
+        let analyzer = GestureAnalyzer(settings: settings, columnId: 0)
+
+        analyzer.addPoint(CGPoint(x: 100, y: 100))
+        analyzer.addPoint(CGPoint(x: 100, y: 60))   // ↑ 40
+        analyzer.addPoint(CGPoint(x: 100, y: 72))   // ↓ 12 — 임계(14pt) 미만
+
+        XCTAssertEqual(analyzer.getDirections(), [.up],
+                       "키폭 28% 미만 되돌림은 손 떼는 꼬리로 보고 등록하지 않음 (실기기 실측 a5/b6)")
     }
 
     func testLegacyGestureSettingsJSONWithoutSensitivityDecodes() throws {

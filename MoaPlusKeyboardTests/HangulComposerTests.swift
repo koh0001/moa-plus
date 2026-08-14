@@ -345,6 +345,42 @@ final class HangulComposerTests: XCTestCase {
         XCTAssertEqual(composer.currentComposingCharacter, "ㅐ")
     }
 
+    // MARK: - ㆍ 무한 토글 (순정 adb 실측 2026-08-14, 실기기 체크리스트 a6)
+
+    func test_aePlusDot_togglesYaeAndBack() {
+        // 애 + ㆍ = 얘, 얘 + ㆍ = 애 … 무한 토글 (갤럭시 순정 모아키 실측).
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅐ)
+        XCTAssertEqual(composer.currentComposingCharacter, "애")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "얘")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "애")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "얘")
+        XCTAssertTrue(composer.composedText.isEmpty, "토글 중 커밋되면 안 됨")
+    }
+
+    func test_ePlusDot_togglesYeAndBack() {
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅔ)
+        XCTAssertEqual(composer.currentComposingCharacter, "에")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "예")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "에")
+        XCTAssertTrue(composer.composedText.isEmpty)
+    }
+
+    func test_standaloneAePlusDot_togglesYae() {
+        // 자음 없는 standalone 경로도 동일 규칙.
+        _ = composer.inputJungseong(.ㅐ)
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅒ")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅐ")
+    }
+
     func test_standalone_dotDotI_yieldsYeo() {
         // PR G5: ㆍ accumulates in dotPending. ㆍ+ㆍ+ㅣ → ㅕ (천지인 3-stroke).
         _ = composer.inputJungseong(.ㆍ)
