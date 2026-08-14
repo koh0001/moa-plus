@@ -31,7 +31,6 @@ final class KeyboardSettings: ObservableObject {
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
-        static let spaceDragVerticalMoveEnabled = "spaceDragVerticalMoveEnabled"
         static let cursorRepeatSpeed = "cursorRepeatSpeed"
         static let periodOnDoubleSpace = "periodOnDoubleSpace"
         static let abbreviationEnabled = "abbreviationEnabled"
@@ -233,14 +232,6 @@ final class KeyboardSettings: ObservableObject {
     /// Space-bar drag moves the cursor (default ON)
     @Published var cursorMoveBySpaceDragEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(cursorMoveBySpaceDragEnabled, forKey: Keys.cursorMoveBySpaceDragEnabled) }
-    }
-
-    /// 스페이스 드래그 상하 줄 이동 (순정 모아키 커서 이동 모드의 세로 축 —
-    /// 영상 실측 2026-08-14). iOS 익스텐션엔 세로 이동 API 가 없어 커서 앞뒤
-    /// 컨텍스트의 하드 줄바꿈(\n)으로 환산한다 — 소프트 줄바꿈은 감지 불가라
-    /// **옵션(기본 OFF)** 으로 둔다.
-    @Published var spaceDragVerticalMoveEnabled: Bool = false {
-        didSet { guard !isLoading else { return }; writePrimitive(spaceDragVerticalMoveEnabled, forKey: Keys.spaceDragVerticalMoveEnabled) }
     }
 
     /// Space-drag hold-to-repeat cursor speed: 0=slow, 1=normal, 2=fast.
@@ -447,7 +438,6 @@ final class KeyboardSettings: ObservableObject {
         assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
         assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
-        assign(\.spaceDragVerticalMoveEnabled, defaults.object(forKey: Keys.spaceDragVerticalMoveEnabled) as? Bool ?? false)
         assign(\.cursorRepeatSpeed, defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1)
         assign(\.periodOnDoubleSpaceEnabled, defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true)
         assign(\.layoutCustomization, load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization())
@@ -506,7 +496,6 @@ final class KeyboardSettings: ObservableObject {
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true
-        spaceDragVerticalMoveEnabled = false
         cursorRepeatSpeed = 1
         periodOnDoubleSpaceEnabled = true
         layoutCustomization = LayoutCustomization()

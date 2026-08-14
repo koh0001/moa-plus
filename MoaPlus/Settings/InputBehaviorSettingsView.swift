@@ -29,14 +29,9 @@ struct InputBehaviorSettingsView: View {
                         Text("빠름").tag(2)
                     }
                     .pickerStyle(.segmented)
-                    Toggle("위·아래 줄 이동 (실험적)", isOn: $settings.spaceDragVerticalMoveEnabled)
                 }
             } footer: {
-                if settings.cursorMoveBySpaceDragEnabled && settings.spaceDragVerticalMoveEnabled {
-                    Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로, 위·아래로 끌면 줄 사이를 이동합니다 (순정 모아키의 커서 이동 방식). 줄 이동은 엔터로 나뉜 줄 기준이라 자동 줄바꿈된 긴 문단 안에서는 건너뛸 수 있고, 일부 앱에서는 동작하지 않을 수 있습니다.")
-                } else {
-                    Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로 이동합니다. 바 양쪽 끝(15%)까지 밀고 유지하면 그 방향으로 연속 이동하며, 속도는 위에서 조절합니다.")
-                }
+                Text("스페이스바를 길게 누른 채 드래그하면 커서가 좌우로 이동합니다. 바 양쪽 끝(15%)까지 밀고 유지하면 그 방향으로 연속 이동하며, 속도는 위에서 조절합니다.")
             }
 
             Section {
