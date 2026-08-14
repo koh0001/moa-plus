@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import MessageUI
 
 /// 실기기 실측용 입력 기록 보드.
 ///
@@ -53,6 +54,30 @@ final class DebugBoardStore: ObservableObject {
         }.joined(separator: "\n\n---\n\n")
     }
 
+    /// 개발자 전송용 리포트 — 기록 + 오타 분석에 필요한 맥락(긋기 설정 요약,
+    /// 앱/기기 정보)을 한 덩어리로 묶는다. 임계값 튜닝은 사용자의 설정 상태를
+    /// 모르면 판독이 안 되기 때문에 리포트에 반드시 동봉한다.
+    var developerReport: String {
+        let s = KeyboardSettings.shared
+        let g = s.gestureSettings
+        let settingsSummary = """
+        [설정 요약]
+        긋기: 프리셋 \(g.swipeProfile.mode.rawValue) / 길이 \(g.swipeProfile.swipeLength.displayName) / 4방향 \(g.swipeProfile.fourWayMode ? "ON" : "OFF")
+        멀티스트로크 민감도: \(g.multiStrokeTurnSensitivity) / 복합모음: \(s.consonantDiagonalDerivationEnabled ? "확장(대각선 진입)" : "순정 모아키")
+        반전 임계 비율: \(g.reversalThresholdRatio) / 방향 전환 임계: \(g.directionChangeThreshold)
+        높이 배율: \(s.keyboardHeightScale) / 사이드 키 폭: \(s.sideKeyWidthRatio)
+        레이아웃: slotA \(s.layoutCustomization.slotA.rawValue) / slotB \(s.layoutCustomization.slotB.rawValue)
+        """
+        let records = entries.isEmpty ? "(저장된 기록 없음)" : exportText
+        return """
+        [입력 기록]
+        \(records)
+
+        \(settingsSummary)
+        \(FeedbackContext.defaultBody())
+        """
+    }
+
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode([DebugBoardEntry].self, from: data) else { return }
@@ -69,6 +94,13 @@ struct DebugBoardView: View {
     @StateObject private var store = DebugBoardStore()
     @State private var draft = ""
     @FocusState private var editorFocused: Bool
+    @State private var showingMailComposer = false
+    @State private var showingMailUnavailableAlert = false
+    @State private var showingGitHubCopiedAlert = false
+
+    /// AboutView 의 피드백 채널과 동일한 목적지.
+    private static let supportEmail = "koh0001@outlook.kr"
+    private static let newIssueURL = URL(string: "https://github.com/koh0001/moa-plus/issues/new")!
 
     private var draftIsBlank: Bool {
         draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -107,6 +139,31 @@ struct DebugBoardView: View {
 
             if !store.entries.isEmpty {
                 Section {
+                    Button {
+                        if MFMailComposeViewController.canSendMail() {
+                            showingMailComposer = true
+                        } else {
+                            showingMailUnavailableAlert = true
+                        }
+                    } label: {
+                        Label("메일로 보내기", systemImage: "envelope")
+                    }
+                    Button {
+                        // GitHub 이슈 작성 폼은 본문을 URL 로 넘기면 길이 제한에
+                        // 걸리기 쉽다 — 리포트를 클립보드에 복사해 두고 폼을 열어
+                        // 붙여넣게 한다.
+                        UIPasteboard.general.string = store.developerReport
+                        showingGitHubCopiedAlert = true
+                    } label: {
+                        Label("GitHub 이슈로 보내기", systemImage: "ladybug")
+                    }
+                } header: {
+                    Text("개발자에게 보내기")
+                } footer: {
+                    Text("저장된 기록 전체와 긋기 설정 요약, 앱·기기 정보가 함께 담깁니다. 입력한 내용이 그대로 전송되니 보내기 전에 확인하세요.")
+                }
+
+                Section {
                     ForEach(store.entries) { entry in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(entry.date, format: .dateTime.year().month().day().hour().minute().second())
@@ -142,6 +199,29 @@ struct DebugBoardView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingMailComposer) {
+            MailComposeView(
+                recipient: Self.supportEmail,
+                subject: "[모아+] 입력 기록 리포트",
+                body: store.developerReport
+            )
+            .ignoresSafeArea()
+        }
+        .alert("메일을 보낼 수 없습니다", isPresented: $showingMailUnavailableAlert) {
+            Button("확인", role: .cancel) {}
+            Button("GitHub 이슈로 보내기") {
+                UIPasteboard.general.string = store.developerReport
+                showingGitHubCopiedAlert = true
+            }
+        } message: {
+            Text("이 기기에 메일 계정이 설정되어 있지 않습니다. GitHub 이슈나 \(Self.supportEmail) 으로 보내주세요.")
+        }
+        .alert("리포트가 복사되었습니다", isPresented: $showingGitHubCopiedAlert) {
+            Button("취소", role: .cancel) {}
+            Button("GitHub 열기") { UIApplication.shared.open(Self.newIssueURL) }
+        } message: {
+            Text("이슈 작성 화면이 열리면 본문에 붙여넣기 하세요.")
         }
     }
 }
