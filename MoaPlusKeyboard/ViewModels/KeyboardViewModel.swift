@@ -737,6 +737,48 @@ class KeyboardViewModel: ObservableObject {
         delegate?.moveCursor(by: offset)
     }
 
+    /// 스페이스 드래그 상하 줄 이동 (순정 모아키 커서 이동 모드의 세로 축).
+    ///
+    /// iOS 익스텐션에는 세로 커서 API 가 없어(`adjustTextPosition` 은 문자
+    /// 오프셋 전용) 커서 앞뒤 컨텍스트의 **하드 줄바꿈(\n)** 을 기준으로 같은
+    /// 열(column)에 최대한 가깝게 환산 이동한다. 한 번에 한 줄씩만 처리 —
+    /// 이동 후에는 컨텍스트가 바뀌므로 여러 줄은 호출자가 스텝마다 다시 부른다.
+    ///
+    /// 한계(설정 문구에 고지): 소프트 줄바꿈(자동 줄바꿈)은 감지할 수 없고,
+    /// 호스트가 주는 컨텍스트가 잘려 있으면(이전/다음 줄이 안 보이면) 그
+    /// 방향으로는 이동하지 않는다.
+    func moveCursorLine(by direction: Int) {
+        guard direction != 0, let delegate else { return }
+        commitCurrent()
+        abbreviationEngine.resetBuffer()
+
+        if direction < 0 {
+            // 윗줄로: before = "…이전줄\n현재줄커서앞".
+            guard let before = delegate.textBeforeCursor() else { return }
+            let lines = before.components(separatedBy: "\n")
+            guard lines.count >= 2 else { return }   // 컨텍스트에 이전 줄 없음
+            let column = lines[lines.count - 1].count
+            let previousLine = lines[lines.count - 2]
+            let targetColumn = min(column, previousLine.count)
+            // 현재 열만큼 후퇴 + 줄바꿈 1 + 이전 줄 끝에서 목표 열까지 후퇴.
+            let offset = -(column + 1 + (previousLine.count - targetColumn))
+            delegate.moveCursor(by: offset)
+        } else {
+            // 아랫줄로: after = "커서뒤현재줄\n다음줄…".
+            guard let after = delegate.textAfterCursor(),
+                  let newlineIndex = after.firstIndex(of: "\n") else { return }
+            let column = delegate.textBeforeCursor()?
+                .components(separatedBy: "\n").last?.count ?? 0
+            let restOfCurrentLine = after.distance(from: after.startIndex, to: newlineIndex)
+            let nextLine = after[after.index(after: newlineIndex)...]
+            let nextLineLength = nextLine.firstIndex(of: "\n")
+                .map { nextLine.distance(from: nextLine.startIndex, to: $0) }
+                ?? nextLine.count
+            let targetColumn = min(column, nextLineLength)
+            delegate.moveCursor(by: restOfCurrentLine + 1 + targetColumn)
+        }
+    }
+
     /// The user moved the caret by tapping directly in the host text field
     /// (not via our space-drag / `moveCursor`). iOS has already repositioned
     /// the caret, and the in-progress composing glyph is already rendered as
