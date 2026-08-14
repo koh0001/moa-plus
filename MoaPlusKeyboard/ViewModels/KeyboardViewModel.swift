@@ -734,48 +734,107 @@ class KeyboardViewModel: ObservableObject {
         commitCurrent()
         // Cursor moves invalidate abbreviation context — reset trie matching state.
         abbreviationEngine.resetBuffer()
+        // 줄 이동의 2단계 열 복원이 대기 중이면 취소 — 사용자가 가로로 움직였으면
+        // 복원이 그 의도와 싸운다.
+        pendingLineColumnRestore?.cancel()
+        pendingLineColumnRestore = nil
         delegate?.moveCursor(by: offset)
     }
 
     /// 스페이스 드래그 상하 줄 이동 (순정 모아키 커서 이동 모드의 세로 축).
     ///
     /// iOS 익스텐션에는 세로 커서 API 가 없어(`adjustTextPosition` 은 문자
-    /// 오프셋 전용) 커서 앞뒤 컨텍스트의 **하드 줄바꿈(\n)** 을 기준으로 같은
-    /// 열(column)에 최대한 가깝게 환산 이동한다. 한 번에 한 줄씩만 처리 —
-    /// 이동 후에는 컨텍스트가 바뀌므로 여러 줄은 호출자가 스텝마다 다시 부른다.
+    /// 오프셋 전용) 커서 앞뒤 컨텍스트로 환산 이동한다. **핵심 제약**: 대부분의
+    /// 호스트에서 `documentContextBefore/AfterInput` 은 문단(줄바꿈) 경계에서
+    /// 잘려 `\n` 을 포함하지 않는다 — 실기기에서 "줄바꿈 찾기" 방식이 항상
+    /// no-op 이 됐던 원인. 그래서 두 갈래로 처리한다:
+    ///   - 컨텍스트에 `\n` 이 있는 호스트(드묾): 열 보존까지 한 번에 정확 환산.
+    ///   - 문단 절단 호스트(일반): 절단을 역이용한다. `before.count` 가 곧
+    ///     현재 열이므로 `-(열+1)` 로 이전 줄 **끝**에, `after.count + 1` 로
+    ///     다음 줄 **시작**에 착지시키고, 프록시 컨텍스트가 갱신된 뒤(2단계,
+    ///     ~80ms) 새 컨텍스트로 열을 복원한다.
     ///
-    /// 한계(설정 문구에 고지): 소프트 줄바꿈(자동 줄바꿈)은 감지할 수 없고,
-    /// 호스트가 주는 컨텍스트가 잘려 있으면(이전/다음 줄이 안 보이면) 그
-    /// 방향으로는 이동하지 않는다.
+    /// 한 번에 한 줄씩만 처리 — 연속 스텝은 호출자가 스텝마다 다시 부른다.
+    /// 소프트 줄바꿈(자동 줄바꿈)은 감지 불가(설정 문구에 고지).
     func moveCursorLine(by direction: Int) {
         guard direction != 0, let delegate else { return }
         commitCurrent()
         abbreviationEngine.resetBuffer()
+        // 이전 스텝의 열 복원이 대기 중이면 취소 — 마지막 스텝의 복원만 유효.
+        pendingLineColumnRestore?.cancel()
+        pendingLineColumnRestore = nil
 
         if direction < 0 {
-            // 윗줄로: before = "…이전줄\n현재줄커서앞".
             guard let before = delegate.textBeforeCursor() else { return }
-            let lines = before.components(separatedBy: "\n")
-            guard lines.count >= 2 else { return }   // 컨텍스트에 이전 줄 없음
-            let column = lines[lines.count - 1].count
-            let previousLine = lines[lines.count - 2]
-            let targetColumn = min(column, previousLine.count)
-            // 현재 열만큼 후퇴 + 줄바꿈 1 + 이전 줄 끝에서 목표 열까지 후퇴.
-            let offset = -(column + 1 + (previousLine.count - targetColumn))
-            delegate.moveCursor(by: offset)
+            if before.contains("\n") {
+                // 전체 컨텍스트 호스트: 열 보존까지 한 번에.
+                let lines = before.components(separatedBy: "\n")
+                let column = lines[lines.count - 1].count
+                let previousLine = lines[lines.count - 2]
+                let targetColumn = min(column, previousLine.count)
+                delegate.moveCursor(by: -(column + 1 + (previousLine.count - targetColumn)))
+            } else {
+                // 문단 절단 호스트: before 전체 = 현재 줄의 커서 앞부분.
+                // 첫 줄에서는 iOS 가 문서 시작으로 클램프한다 (첫 줄 → 맨 앞).
+                let column = before.count
+                delegate.moveCursor(by: -(column + 1))
+                scheduleLineColumnRestore(direction: -1, targetColumn: column)
+            }
         } else {
-            // 아랫줄로: after = "커서뒤현재줄\n다음줄…".
-            guard let after = delegate.textAfterCursor(),
-                  let newlineIndex = after.firstIndex(of: "\n") else { return }
+            guard let after = delegate.textAfterCursor() else { return }
             let column = delegate.textBeforeCursor()?
                 .components(separatedBy: "\n").last?.count ?? 0
-            let restOfCurrentLine = after.distance(from: after.startIndex, to: newlineIndex)
-            let nextLine = after[after.index(after: newlineIndex)...]
-            let nextLineLength = nextLine.firstIndex(of: "\n")
-                .map { nextLine.distance(from: nextLine.startIndex, to: $0) }
-                ?? nextLine.count
-            let targetColumn = min(column, nextLineLength)
-            delegate.moveCursor(by: restOfCurrentLine + 1 + targetColumn)
+            if let newlineIndex = after.firstIndex(of: "\n") {
+                // 전체 컨텍스트 호스트.
+                let restOfCurrentLine = after.distance(from: after.startIndex, to: newlineIndex)
+                let nextLine = after[after.index(after: newlineIndex)...]
+                let nextLineLength = nextLine.firstIndex(of: "\n")
+                    .map { nextLine.distance(from: nextLine.startIndex, to: $0) }
+                    ?? nextLine.count
+                delegate.moveCursor(by: restOfCurrentLine + 1 + min(column, nextLineLength))
+            } else {
+                // 문단 절단 호스트: after 전체 = 현재 줄의 커서 뒷부분.
+                // 마지막 줄에서는 문서 끝으로 클램프된다 (마지막 줄 → 맨 끝).
+                delegate.moveCursor(by: after.count + 1)
+                scheduleLineColumnRestore(direction: 1, targetColumn: column)
+            }
+        }
+    }
+
+    /// 문단 절단 호스트의 2단계 열 복원 대기 작업. 다음 스텝/가로 이동이 오면 취소.
+    private var pendingLineColumnRestore: DispatchWorkItem?
+
+    private func scheduleLineColumnRestore(direction: Int, targetColumn: Int) {
+        let work = DispatchWorkItem { [weak self] in
+            self?.restoreColumnAfterLineMove(direction: direction, targetColumn: targetColumn)
+            self?.pendingLineColumnRestore = nil
+        }
+        pendingLineColumnRestore = work
+        // 프록시 컨텍스트는 adjustTextPosition 직후 동기 갱신되지 않는다 —
+        // 런루프 한 틱 이상 지난 뒤 새 컨텍스트로 열을 맞춘다.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
+    }
+
+    /// 2단계: 이전 줄 끝(위) / 다음 줄 시작(아래)에 착지한 상태에서 갱신된
+    /// 컨텍스트로 목표 열까지 이동한다. 테스트에서 직접 호출할 수 있게 internal.
+    func restoreColumnAfterLineMove(direction: Int, targetColumn: Int) {
+        guard let delegate else { return }
+        if direction < 0 {
+            // 줄 끝에 있음 → before 의 마지막 줄 길이 = 그 줄 전체 길이.
+            guard let before = delegate.textBeforeCursor() else { return }
+            let lineLength = before.components(separatedBy: "\n").last?.count ?? 0
+            let target = min(targetColumn, lineLength)
+            if lineLength > target {
+                delegate.moveCursor(by: -(lineLength - target))
+            }
+        } else {
+            // 줄 시작에 있음 → after 의 첫 줄 길이 = 그 줄 전체 길이.
+            guard let after = delegate.textAfterCursor() else { return }
+            let lineLength = after.components(separatedBy: "\n").first?.count ?? 0
+            let target = min(targetColumn, lineLength)
+            if target > 0 {
+                delegate.moveCursor(by: target)
+            }
         }
     }
 
