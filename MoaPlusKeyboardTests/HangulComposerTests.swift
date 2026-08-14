@@ -372,6 +372,40 @@ final class HangulComposerTests: XCTestCase {
         XCTAssertTrue(composer.composedText.isEmpty)
     }
 
+    func test_oePlusDot_becomesWa_thenIMakesWae() {
+        // 천지인 표준: ㅚ+ㆍ=ㅘ (ㅗ+[ㅣ+ㆍ=ㅏ]) — 순정 adb 실측 (외→와).
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅚ)
+        XCTAssertEqual(composer.currentComposingCharacter, "외")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "와")
+        _ = composer.inputJungseong(.ㅣ)
+        XCTAssertEqual(composer.currentComposingCharacter, "왜", "ㅘ+ㅣ=ㅙ 체인 연결")
+        XCTAssertTrue(composer.composedText.isEmpty)
+    }
+
+    func test_wiPlusDot_becomesWo_thenIMakesWe() {
+        // 대칭: ㅟ+ㆍ=ㅝ — 순정 adb 실측 (위→워).
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅟ)
+        XCTAssertEqual(composer.currentComposingCharacter, "위")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "워")
+        _ = composer.inputJungseong(.ㅣ)
+        XCTAssertEqual(composer.currentComposingCharacter, "웨", "ㅝ+ㅣ=ㅞ 체인 연결")
+    }
+
+    func test_euiPlusDot_commitsAndStartsDotPending() {
+        // 순정은 ㅢ+ㆍ 에서 옛한글 ㅡㅏ 를 만든다(adb 실측) — 현대 한글 밖이라
+        // 재현하지 않고, 의 커밋 + ㆍ pending 으로 둔다 (기존 동작 고정).
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅢ)
+        XCTAssertEqual(composer.currentComposingCharacter, "의")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.composedText, "의", "의는 커밋")
+        XCTAssertEqual(composer.state, .dotPending(choseong: nil, dotCount: 1))
+    }
+
     func test_standaloneAePlusDot_togglesYae() {
         // 자음 없는 standalone 경로도 동일 규칙.
         _ = composer.inputJungseong(.ㅐ)
