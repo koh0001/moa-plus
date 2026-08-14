@@ -25,6 +25,12 @@ final class GestureTestModel: ObservableObject {
     @Published var finalDirections: [GestureDirection] = []
     @Published var finalVowel: Jungseong?
 
+    // 획별 계측 (실측 T2 피드백: "각도가 디버그 안 돼서 어느 정도에서 나오는지
+    // 확인 불가"). 키보드 프리뷰가 넘겨주는 원시 궤적을 소유 analyzer 에 증분
+    // 공급해 production 과 같은 등록/트림 로직으로 획별 각도·길이를 얻는다.
+    @Published var strokeInfos: [GestureAnalyzer.StrokeInfo] = []
+    @Published var strokesAreFinal = false
+
     // MARK: Engine
 
     private let analyzer = GestureAnalyzer()
@@ -145,12 +151,20 @@ final class GestureTestModel: ObservableObject {
             keyboardOriginPoint = startPoint
             self.startPoint = canvasCenter
             points = [canvasCenter]
+            analyzer.reset()
+            analyzer.addPoint(startPoint)
+            fedPointCount = 1
+            strokeInfos = []
+            strokesAreFinal = false
         case .moved(_, let trail, let columnId):
             applyColumn(columnId)
             liveDirections = directions
             liveVowel = vowel
             liveDirectionIndex = directions.last.flatMap { Self.sectorIndex[$0] }
             points = mappedPoints(trail)
+            feedTrail(trail)
+            strokeInfos = analyzer.currentStrokeInfos()
+            strokesAreFinal = false
         case .ended(let trail, let columnId):
             applyColumn(columnId)
             finalDirections = directions
@@ -158,7 +172,25 @@ final class GestureTestModel: ObservableObject {
             liveDirections = directions
             liveDirectionIndex = directions.last.flatMap { Self.sectorIndex[$0] }
             points = mappedPoints(trail)
+            feedTrail(trail)
+            strokeInfos = analyzer.finalizedStrokeInfos()
+            strokesAreFinal = true
         }
+    }
+
+    /// 프리뷰 궤적은 append-only 라 새 점만 이어서 공급한다 (매 콜백마다 전체
+    /// 재공급하면 O(n²)). 소유 analyzer 는 production 과 같은 설정/열/키폭으로
+    /// `configureEngine` 이 맞춰 두지만, ㅣ/ㅡ 전용 키의 `forceCardinalOnly`
+    /// 까지는 흉내 내지 않으므로 그 두 키에서는 방향 라벨이 실제 판정과 다를 수
+    /// 있다 — 각도·길이 수치는 원시 벡터 기반이라 그대로 유효하다.
+    private var fedPointCount = 0
+
+    private func feedTrail(_ trail: [CGPoint]) {
+        guard trail.count > fedPointCount else { return }
+        for point in trail[fedPointCount...] {
+            analyzer.addPoint(point)
+        }
+        fedPointCount = trail.count
     }
 
     /// Origin of the live keyboard gesture in the keyboard's own coordinate
@@ -196,6 +228,9 @@ final class GestureTestModel: ObservableObject {
         liveDirectionIndex = nil
         finalDirections = []
         finalVowel = nil
+        strokeInfos = []
+        strokesAreFinal = false
+        fedPointCount = 0
         analyzer.reset()
     }
 
@@ -441,8 +476,53 @@ struct GestureTestView: View {
                 )
             }
 
+            strokeDetailCard
+
             metricsCard
         }
+    }
+
+    /// 획별 각도·길이 계측 표 (실측 T2 피드백 대응). 어떤 각도·길이에서 다른
+    /// 모음으로 넘어가는지 사용자가 직접 수치로 확인할 수 있다.
+    private var strokeDetailCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "angle")
+                    .foregroundColor(.accentColor)
+                Text(model.strokesAreFinal ? "획별 측정 — 최종 (트림 후)" : "획별 측정 — 실시간")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            if model.strokeInfos.isEmpty {
+                Text("긋기를 시작하면 획마다 각도와 길이가 표시됩니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(model.strokeInfos) { stroke in
+                    HStack {
+                        Text("\(stroke.id + 1)  \(stroke.direction.symbol)")
+                            .frame(width: 52, alignment: .leading)
+                        Spacer()
+                        Text(String(format: "%.0f°", stroke.angleDegrees))
+                        Spacer()
+                        Text(String(format: "%.0f pt · 키폭 %.0f%%",
+                                    stroke.magnitude,
+                                    stroke.magnitude / max(model.deviceCenterKeyWidth, 1) * 100))
+                    }
+                    .font(.system(.caption, design: .monospaced))
+                }
+                Text("각도는 오른쪽 = 0°, 반시계 방향. 키폭 % 는 첫 획 인식(필요 길이)·되돌림 임계와 비교할 때의 기준입니다.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 
     private func resultCard(title: String, vowel: String, directions: [GestureDirection], accent: Color) -> some View {

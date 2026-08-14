@@ -83,6 +83,14 @@ struct SettingsMainView: View {
         }
 
         Section {
+            NavigationLink(destination: DebugBoardView()) {
+                Label("입력 기록 보드", systemImage: "note.text")
+            }
+        } footer: {
+            Text("모아+ 키보드로 자유롭게 입력해 보고 오타 사례를 저장해 둘 수 있습니다.")
+        }
+
+        Section {
             NavigationLink(destination: AboutView()) {
                 Label("앱 정보", systemImage: "info.circle")
             }
