@@ -135,6 +135,22 @@ final class DeviceMeasuredTailRegressionTests: XCTestCase {
         XCTAssertEqual(run(path), "여", "↑↓ 모서리 ↑18pt 튕김 후 ← 는 '여' 여야 함")
     }
 
+    /// 모서리 자리(3획째 이후)의 상한은 키폭 70%(35pt)까지 — 실기기 스크린샷
+    /// 실측에서 갈고리가 키폭 40~60% 크기로도 관찰됐다. 단 비율 가드(양옆의
+    /// 50% 미만)는 유지되므로 흡수량은 양옆 획 크기에 비례한다.
+    func test_a5_largerCornerBounce_absorbedWhenNeighborsAreLong() {
+        let path = [CGVector(dx: 0, dy: -80), CGVector(dx: 0, dy: 80),
+                    CGVector(dx: 0, dy: -32), CGVector(dx: 80, dy: 0)]
+        XCTAssertEqual(run(path), "와", "긴 획 사이의 32pt 모서리 갈고리는 흡수돼야 함")
+    }
+
+    /// 첫 되돌림 자리(2획째)는 보수적 상한(키폭 42%) 유지 — [↑,↓25,←] 의
+    /// ↓25 는 ㅕ 의 **의도적 되돌림**이라 흡수하면 안 된다.
+    func test_intentionalSmallReturn_atSecondStroke_isNotAbsorbed() {
+        let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 25), CGVector(dx: -55, dy: 0)]
+        XCTAssertEqual(run(path), "여", "2획째 25pt 되돌림은 의도적 획 — ㅗ 로 뭉개지면 안 됨")
+    }
+
     func test_a5_adjacentCurveCorner_doesNotBreakWa() {
         // ↓→ 코너를 ↘ 로 스치는 곡선 전환 — 인접 곡선 흡수 갈래.
         let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 55),
