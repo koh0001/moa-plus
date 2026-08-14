@@ -27,6 +27,7 @@ final class KeyboardSettings: ObservableObject {
         static let showDetailedHints = "showDetailedHints"
         static let autoBracketEnabled = "autoBracketEnabled"
         static let wordDeleteEnabled = "wordDeleteEnabled"
+        static let gestureDebugLogEnabled = "gestureDebugLogEnabled"
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
@@ -209,6 +210,12 @@ final class KeyboardSettings: ObservableObject {
     /// Word-level delete on long backspace press
     @Published var wordDeleteEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(wordDeleteEnabled, forKey: Keys.wordDeleteEnabled) }
+    }
+
+    /// 실측용 제스처 상세 로그 (입력 기록 보드 → 개발자 리포트 동봉).
+    /// 입력한 자모가 그대로 기록되므로 **기본 OFF 옵트인** — GestureDebugLog 참고.
+    @Published var gestureDebugLogEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(gestureDebugLogEnabled, forKey: Keys.gestureDebugLogEnabled) }
     }
 
     /// Backspace repeat speed: 0=slow(0.12s), 1=normal(0.08s), 2=fast(0.05s)
@@ -426,6 +433,7 @@ final class KeyboardSettings: ObservableObject {
         assign(\.showDetailedHints, defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false)
         assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
         assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
+        assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? false)
         assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
         assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
@@ -483,6 +491,7 @@ final class KeyboardSettings: ObservableObject {
         consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true
+        gestureDebugLogEnabled = false
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true
