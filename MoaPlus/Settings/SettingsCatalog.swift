@@ -178,7 +178,7 @@ enum SettingsCatalog {
             title: "스페이스 드래그 커서 이동",
             icon: "arrow.left.arrow.right",
             destination: .inputBehavior,
-            keywords: ["커서", "스페이스", "드래그", "이동", "연속", "상하", "위아래", "줄이동", "트랙패드"]
+            keywords: ["커서", "스페이스", "드래그", "이동", "연속"]
         ),
         SettingsEntry(
             title: "괄호 자동 닫기 · 더블 스페이스 마침표",
