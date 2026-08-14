@@ -451,18 +451,29 @@ class GestureAnalyzer {
         guard segments.count >= 3 else { return segments }
 
         var result = segments
-        // 순수 키폭 비례 (기본 설정 기준 키폭 42%). edgeNoiseCap 처럼
-        // `directionChangeThreshold * 0.8`(고정 12pt) 바닥을 섞으면 SE 급
-        // 좁은 키(키폭 ~38pt)에서 고정 바닥이 이겨 흡수 창이 키폭 대비
-        // 과대해진다 — 반전 등록 임계(키폭 28%)는 이미 키폭 비례라 그대로
-        // 1.5배만 쓴다.
-        let bounceCap = effectiveReversalThreshold * 1.5
+        // 순수 키폭 비례. edgeNoiseCap 처럼 `directionChangeThreshold * 0.8`
+        // (고정 12pt) 바닥을 섞으면 SE 급 좁은 키(키폭 ~38pt)에서 고정 바닥이
+        // 이겨 흡수 창이 키폭 대비 과대해진다 — 반전 등록 임계(키폭 28%)는
+        // 이미 키폭 비례라 그 배수만 쓴다.
+        //
+        // 상한은 **위치별로 다르다**:
+        //   - index 1 (첫 되돌림 자리): 1.5배 (키폭 42%). 여기의 작은 반전은
+        //     ㅕ(↑↓←)/ㅘ(↑↓→) 의 **의도적 되돌림**일 수 있어 보수적으로 둔다 —
+        //     [↑60,↓25,←60] 의 ↓25 를 흡수하면 ㅕ 가 ㅗ 로 깨진다.
+        //   - index ≥ 2 (모서리 자리): 2.5배 (키폭 70%). ↑↓ 뒤 →/← 로 꺾는
+        //     모서리의 위쪽 갈고리는 실기기에서 키폭 40~60% 크기로도 관찰됐다
+        //     (실측 스크린샷: ↑↓[갈고리]→ 가 ㅛ 로 등록). 이 자리의 작은 획이
+        //     의도적인 경우는 ↑↓↑↓=ㅠ 의 3획째뿐인데, 그건 양옆과 크기가
+        //     비슷해 비율 가드(50%)가 지킨다.
+        let returnPositionCap = effectiveReversalThreshold * 1.5
+        let cornerPositionCap = effectiveReversalThreshold * 2.5
         var index = 1
 
         while index < result.count - 1 {
             let previous = result[index - 1]
             let current = result[index]
             let next = result[index + 1]
+            let bounceCap = index >= 2 ? cornerPositionCap : returnPositionCap
 
             let gapToPrevious = current.direction.angularGap(to: previous.direction)
             let isReversalBounce = gapToPrevious >= 135
