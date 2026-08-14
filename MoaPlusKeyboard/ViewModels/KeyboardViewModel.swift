@@ -997,6 +997,21 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func handleKoreanModeGesture(row: Int, column: Int) {
+        // 옵트인 실측 로그용 원시 획(트림 전) — finalize 는 상태를 바꾸지 않으므로
+        // 호출 순서와 무관하게 유효하다. 로깅이 꺼져 있으면 비용 0 에 가깝게.
+        let debugLogEnabled = KeyboardSettings.shared.gestureDebugLogEnabled
+        let debugRawStrokes = debugLogEnabled ? gestureAnalyzer.currentStrokeInfos() : []
+        let debugFinalStrokes = debugLogEnabled ? gestureAnalyzer.finalizedStrokeInfos() : []
+
+        func debugLog(keyLabel: String, result: String) {
+            guard debugLogEnabled, !debugRawStrokes.isEmpty else { return }
+            GestureDebugLog.append(keyLabel: keyLabel,
+                                   raw: debugRawStrokes,
+                                   finalized: debugFinalStrokes,
+                                   keyWidth: gestureAnalyzer.keyWidth,
+                                   result: result)
+        }
+
         let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
 
         guard let content = KeyboardMetrics.keyContent(at: row, column: column, mode: .korean, layout: KeyboardSettings.shared.layoutCustomization) else { return }
@@ -1016,6 +1031,8 @@ class KeyboardViewModel: ObservableObject {
                 if let vowel {
                     inputVowel(vowel)
                 }
+                debugLog(keyLabel: String(describing: consonant),
+                         result: vowel.map { String($0.compatibilityCharacter) } ?? "(무효)")
             }
 
         case .symbol(let symbol):
@@ -1030,8 +1047,11 @@ class KeyboardViewModel: ObservableObject {
             } else {
                 if let vowel = resolveVowelFromPrimitiveDrag(primitive: primitive, directions: directions) {
                     inputVowel(vowel)
+                    debugLog(keyLabel: String(describing: primitive),
+                             result: String(vowel.compatibilityCharacter))
                 } else {
                     inputVowelPrimitive(primitive)
+                    debugLog(keyLabel: String(describing: primitive), result: "(폴백 탭)")
                 }
             }
 

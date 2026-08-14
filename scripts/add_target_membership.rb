@@ -35,6 +35,7 @@ FILES_TO_ADD = [
   'Utilities/HangulConstants.swift',
   'Utilities/KeyboardMetrics.swift',
   'Utilities/GestureSettings.swift',
+  'Utilities/GestureDebugLog.swift',
 ]
 
 project = Xcodeproj::Project.open(PROJECT_PATH)

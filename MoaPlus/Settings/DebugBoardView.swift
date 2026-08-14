@@ -69,9 +69,16 @@ final class DebugBoardStore: ObservableObject {
         레이아웃: slotA \(s.layoutCustomization.slotA.rawValue) / slotB \(s.layoutCustomization.slotB.rawValue)
         """
         let records = entries.isEmpty ? "(저장된 기록 없음)" : exportText
+        let gestureLog = GestureDebugLog.recentLines()
+        let gestureSection = gestureLog.isEmpty
+            ? "(제스처 상세 기록 없음 — 보드의 '제스처 상세 기록'을 켜면 획별 계측이 쌓입니다)"
+            : gestureLog.joined(separator: "\n")
         return """
         [입력 기록]
         \(records)
+
+        [제스처 상세 로그 (최근 \(gestureLog.count)건)]
+        \(gestureSection)
 
         \(settingsSummary)
         \(FeedbackContext.defaultBody())
@@ -92,7 +99,9 @@ final class DebugBoardStore: ObservableObject {
 
 struct DebugBoardView: View {
     @StateObject private var store = DebugBoardStore()
+    @ObservedObject private var settings = KeyboardSettings.shared
     @State private var draft = ""
+    @State private var gestureLogCount = GestureDebugLog.count
     @FocusState private var editorFocused: Bool
     @State private var showingMailComposer = false
     @State private var showingMailUnavailableAlert = false
@@ -135,6 +144,27 @@ struct DebugBoardView: View {
                 Text("입력 보드")
             } footer: {
                 Text("모아+ 키보드로 자유롭게 입력해 보세요. 오타가 나면 그대로 저장해 두면 나중에 사례로 대조할 수 있습니다. 기록은 이 기기에만 저장됩니다.")
+            }
+
+            Section {
+                Toggle("제스처 상세 기록", isOn: $settings.gestureDebugLogEnabled)
+                if gestureLogCount > 0 {
+                    HStack {
+                        Text("쌓인 계측")
+                        Spacer()
+                        Text("\(gestureLogCount)건")
+                            .foregroundColor(.secondary)
+                        Button("비우기", role: .destructive) {
+                            GestureDebugLog.clear()
+                            gestureLogCount = 0
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+            } header: {
+                Text("제스처 상세 기록")
+            } footer: {
+                Text("켜면 키보드가 긋기마다 획별 방향·크기·각도(트림 전/후)와 결과 글자를 기록하고, 개발자 리포트에 함께 담습니다. 입력한 자모가 그대로 남으니 실측할 때만 켜세요.")
             }
 
             if !store.entries.isEmpty {
@@ -191,6 +221,7 @@ struct DebugBoardView: View {
         }
         .navigationTitle("입력 기록 보드")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { gestureLogCount = GestureDebugLog.count }
         .toolbar {
             if !store.entries.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
