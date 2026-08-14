@@ -213,8 +213,9 @@ final class KeyboardSettings: ObservableObject {
     }
 
     /// 실측용 제스처 상세 로그 (입력 기록 보드 → 개발자 리포트 동봉).
-    /// 입력한 자모가 그대로 기록되므로 **기본 OFF 옵트인** — GestureDebugLog 참고.
-    @Published var gestureDebugLogEnabled: Bool = false {
+    /// 기본 ON — 기록은 기기 로컬(App Group, 최근 200건 순환)에만 남고,
+    /// 전송은 사용자가 리포트 보내기를 눌러야만 일어난다. GestureDebugLog 참고.
+    @Published var gestureDebugLogEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(gestureDebugLogEnabled, forKey: Keys.gestureDebugLogEnabled) }
     }
 
@@ -433,7 +434,7 @@ final class KeyboardSettings: ObservableObject {
         assign(\.showDetailedHints, defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false)
         assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
         assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
-        assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? false)
+        assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? true)
         assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
         assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
@@ -491,7 +492,7 @@ final class KeyboardSettings: ObservableObject {
         consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true
-        gestureDebugLogEnabled = false
+        gestureDebugLogEnabled = true
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
         cursorMoveBySpaceDragEnabled = true

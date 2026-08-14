@@ -71,7 +71,7 @@ final class DebugBoardStore: ObservableObject {
         let records = entries.isEmpty ? "(저장된 기록 없음)" : exportText
         let gestureLog = GestureDebugLog.recentLines()
         let gestureSection = gestureLog.isEmpty
-            ? "(제스처 상세 기록 없음 — 보드의 '제스처 상세 기록'을 켜면 획별 계측이 쌓입니다)"
+            ? "(제스처 상세 기록 없음)"
             : gestureLog.joined(separator: "\n")
         return """
         [입력 기록]
@@ -164,7 +164,7 @@ struct DebugBoardView: View {
             } header: {
                 Text("제스처 상세 기록")
             } footer: {
-                Text("켜면 키보드가 긋기마다 획별 방향·크기·각도(트림 전/후)와 결과 글자를 기록하고, 개발자 리포트에 함께 담습니다. 입력한 자모가 그대로 남으니 실측할 때만 켜세요.")
+                Text("키보드가 긋기마다 획별 방향·크기·각도(트림 전/후)와 결과 글자를 기록하고, 개발자 리포트에 함께 담습니다. 기록은 이 기기에만 남고(최근 200건 순환), 리포트를 직접 보낼 때만 전송됩니다.")
             }
 
             if !store.entries.isEmpty {
