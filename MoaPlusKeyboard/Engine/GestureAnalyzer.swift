@@ -427,8 +427,58 @@ class GestureAnalyzer {
 
         var collapsed = collapseConsecutiveDuplicates(segments)
         collapsed = collapseTinyOscillations(collapsed)
+        collapsed = collapseCornerBounces(collapsed)
         collapsed = trimTinyLeadingAndTrailingNoise(collapsed)
         return collapsed
+    }
+
+    /// 모서리 튕김 흡수 — v2.0 실기기 실측(build 17 이후 잔여 오타) 대응.
+    ///
+    /// 세로 체인에서 ↓ 를 긋고 →(ㅘ)/←(ㅕ) 로 꺾는 모서리에서 손가락이 살짝
+    /// 위로 들리며 작은 ↑ 가 등록되면 ↑↓**↑**→ 가 되고, 트라이가 ㅛ 에서 멈춰
+    /// ㅘ/ㅕ 를 가로챈다. 릴리즈 꼬리와 달리 **중간** 획이라 후행 트림이 못
+    /// 걷어낸다.
+    ///
+    /// 순정 판정 모델(실측: turn ≤55° 흡수 + net 변위 즉시 재판정)에서는 이런
+    /// 전환부 움직임이 다음 획의 net 벡터에 흡수된다. 여기서는 그 등가로,
+    /// **양옆 획보다 훨씬 작은(50% 미만 + 절대 상한) 중간 획**을 다음 획에
+    /// 벡터째 합친다. 의도적 체인(↑↓↑↓=ㅠ 등)은 획 크기가 서로 비슷해 비율
+    /// 가드에 걸리지 않는다. 대상은 두 갈래:
+    ///   - 반전 튕김(직전과 ≥135°): ↓ 끝의 ↑ 들림
+    ///   - 인접 곡선(양옆 모두와 ≤45°): ↓→ 코너를 ↘ 로 스치는 경우
+    /// 직전==다음(왕복 복귀)은 `collapseTinyOscillations` 소관이라 제외.
+    private func collapseCornerBounces(_ segments: [DirectionSegment]) -> [DirectionSegment] {
+        guard segments.count >= 3 else { return segments }
+
+        var result = segments
+        let bounceCap = max(effectiveReversalThreshold, directionChangeThreshold * 0.8) * 1.5
+        var index = 1
+
+        while index < result.count - 1 {
+            let previous = result[index - 1]
+            let current = result[index]
+            let next = result[index + 1]
+
+            let gapToPrevious = current.direction.angularGap(to: previous.direction)
+            let isReversalBounce = gapToPrevious >= 135
+            let isAdjacentCurve = current.direction.isAdjacentTo(previous.direction)
+                && current.direction.isAdjacentTo(next.direction)
+            let isSmall = current.magnitude <= bounceCap
+                && current.magnitude < min(previous.magnitude, next.magnitude) * 0.5
+
+            if (isReversalBounce || isAdjacentCurve) && isSmall
+                && next.direction != previous.direction {
+                result[index + 1].vector.dx += current.vector.dx
+                result[index + 1].vector.dy += current.vector.dy
+                let mergedLength = sqrt(result[index + 1].vector.dx * result[index + 1].vector.dx
+                                        + result[index + 1].vector.dy * result[index + 1].vector.dy)
+                result[index + 1].magnitude = max(next.magnitude, mergedLength)
+                result.remove(at: index)
+                continue
+            }
+            index += 1
+        }
+        return result
     }
 
     private func collapseConsecutiveDuplicates(_ segments: [DirectionSegment]) -> [DirectionSegment] {

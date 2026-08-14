@@ -115,6 +115,40 @@ final class DeviceMeasuredTailRegressionTests: XCTestCase {
         XCTAssertEqual(run(key: Self.nieunKey, path), "녀", "←→← 끝 13pt 오른쪽 꼬리는 노이즈 — ㅖ 로 승격되면 안 됨")
     }
 
+    // MARK: - a5 잔여(build 17 실측): 모서리 튕김이 ㅘ/ㅕ 를 ㅛ 로 가로챔
+
+    /// ↑↓ 후 →/← 로 꺾는 모서리에서 손가락이 살짝 위로 들리며 작은 ↑ 가
+    /// 등록되면 ↑↓↑→ 가 되어 트라이가 ㅛ 에서 멈춘다 ("ㅘ·ㅕ를 ㅛ가 가로챔").
+    /// 릴리즈 꼬리와 달리 중간 획이라 후행 트림 소관이 아님 — corner bounce
+    /// 흡수 패스가 다음 획에 벡터째 합쳐야 한다.
+    func test_a5_cornerBounceBeforeRight_doesNotInterceptWa() {
+        for bounce in [CGFloat(15), 18, 20] {
+            let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 55),
+                        CGVector(dx: 0, dy: -bounce), CGVector(dx: 55, dy: 0)]
+            XCTAssertEqual(run(path), "와", "↑↓ 모서리 ↑\(bounce)pt 튕김 후 → 는 '와' 여야 함 (ㅛ 가로채기 금지)")
+        }
+    }
+
+    func test_a5_cornerBounceBeforeLeft_doesNotInterceptYeo() {
+        let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 55),
+                    CGVector(dx: 0, dy: -18), CGVector(dx: -55, dy: 0)]
+        XCTAssertEqual(run(path), "여", "↑↓ 모서리 ↑18pt 튕김 후 ← 는 '여' 여야 함")
+    }
+
+    func test_a5_adjacentCurveCorner_doesNotBreakWa() {
+        // ↓→ 코너를 ↘ 로 스치는 곡선 전환 — 인접 곡선 흡수 갈래.
+        let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 55),
+                    CGVector(dx: 13, dy: 13), CGVector(dx: 55, dy: 0)]
+        XCTAssertEqual(run(path), "와", "↓→ 코너의 ↘ 스침은 다음 획에 흡수돼야 함")
+    }
+
+    /// 의도적 ↑↓↑↓(ㅠ) 체인은 획 크기가 비슷해 흡수 대상이 아니다.
+    func test_verticalChainYu_notCollapsedByBounceGuard() {
+        let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 55),
+                    CGVector(dx: 0, dy: -50), CGVector(dx: 0, dy: 50)]
+        XCTAssertEqual(run(path), "유", "비슷한 크기의 체인 획은 흡수되면 안 됨")
+    }
+
     // MARK: - 회귀 가드: 의도적 입력은 그대로 살아야 한다
 
     /// 세로 체인(v2.0 신규 경로) 자체는 온전해야 한다 — 실측 a5 에서 "입력은 되나"
