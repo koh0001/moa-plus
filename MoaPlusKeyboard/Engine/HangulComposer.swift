@@ -376,6 +376,12 @@ class HangulComposer {
         // 무한 토글한다. 없으면 ㆍ 연타 시 조합이 끊겨 별개 클러스터로 떨어진다.
         case (.ㅛ, .ㆍ): return .ㅗ
         case (.ㅠ, .ㆍ): return .ㅜ
+        // 순정 adb 실측(2026-08-14): ㅐ↔ㅒ / ㅔ↔ㅖ 도 같은 무한 토글이다
+        // (애→얘→애…, 에→예→에… 확인). v2.0 실기기 체크리스트 a6 갭.
+        case (.ㅐ, .ㆍ): return .ㅒ
+        case (.ㅒ, .ㆍ): return .ㅐ
+        case (.ㅔ, .ㆍ): return .ㅖ
+        case (.ㅖ, .ㆍ): return .ㅔ
         default: return nil
         }
     }

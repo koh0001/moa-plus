@@ -14,11 +14,16 @@ struct GestureSettings: Codable, Equatable {
 
     /// Fraction of the effective swipe threshold to use for opposite-
     /// direction reversals (↑→↓, ←→→, etc.). Reversals get a smaller
-    /// threshold so multi-stroke vowels (ㅚ/ㅞ) stay fluid, but the value
-    /// now scales with the user's swipeLength preset — previously this
-    /// was a hardcoded 10pt and would not respond to "긋기 길이 길게".
-    /// Default 0.5 keeps the historical 20pt → 10pt ratio.
-    var reversalThresholdRatio: CGFloat = 0.5
+    /// threshold so multi-stroke vowels (ㅚ/ㅞ) stay fluid, and the value
+    /// scales with the user's swipeLength preset.
+    ///
+    /// 기본 0.70 = 보통 길이(키폭 40%) 기준 **키폭의 28%**. 순정 모아키 adb
+    /// 정밀 실측(2026-08-14, 갤럭시 S22+ 터치 주입)의 되돌림 인정 하한
+    /// **42px = 키 너비 150px 의 28%** 에 맞춘 값이다 (41px 미등록 / 42px 등록,
+    /// 진입 획 길이 무관 = 절대 임계). 이전 기본 0.5(키폭 20%)는 순정보다
+    /// 민감해, v2.0 실기기 실측에서 손 떼는 꼬리가 획으로 등록돼
+    /// ㅚ→ㅛ(a5)·ㅕ→ㅖ(b6) 승격 오타를 만들었다.
+    var reversalThresholdRatio: CGFloat = 0.70
 
     /// 멀티스트로크 모음(ㅛ ㅑ ㅕ 등)을 원점 복귀 없이 "큰 각도 방향 전환"만으로
     /// 인식하는 민감도. 0 = 끔(기본 — ㅗ/ㅜ/ㅏ/ㅓ 단일 안정성 최우선, 기존 동작 보존),
@@ -100,7 +105,11 @@ extension GestureSettings {
         swipeProfile = try c.decodeIfPresent(SwipeProfile.self, forKey: .swipeProfile) ?? .bothHands
         columnOverrides = try c.decodeIfPresent([ColumnGestureOverride].self, forKey: .columnOverrides) ?? ColumnGestureOverride.defaults
         directionChangeThreshold = try c.decodeIfPresent(CGFloat.self, forKey: .directionChangeThreshold) ?? KeyboardMetrics.directionChangeThreshold
-        reversalThresholdRatio = try c.decodeIfPresent(CGFloat.self, forKey: .reversalThresholdRatio) ?? 0.5
+        // 마이그레이션: 0.5 는 v2.0 까지의 기본값이고 이 값을 바꿀 UI 가 없으므로,
+        // 저장된 0.5 는 "사용자 선택"이 아니라 옛 기본값이다 — 새 기본(0.70,
+        // 순정 adb 실측 정합)으로 승격해 기존 설치에도 튜닝이 도달하게 한다.
+        let storedReversal = try c.decodeIfPresent(CGFloat.self, forKey: .reversalThresholdRatio)
+        reversalThresholdRatio = (storedReversal == nil || storedReversal == 0.5) ? 0.70 : storedReversal!
         multiStrokeTurnSensitivity = try c.decodeIfPresent(Int.self, forKey: .multiStrokeTurnSensitivity) ?? 0
     }
 }
