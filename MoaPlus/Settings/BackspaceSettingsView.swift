@@ -15,7 +15,9 @@ struct BackspaceSettingsView: View {
             } header: {
                 Text("반복 속도")
             } footer: {
-                Text("길게 누를 때 글자가 반복 삭제되는 속도입니다.")
+                // 실기기 실측 D4: "한 자소씩" 안내가 단어 삭제 OFF 푸터에만 있어
+                // 기본 상태(단어 삭제 ON)에서는 보이지 않았다 — 상시 노출로 이동.
+                Text("길게 누를 때 글자가 반복 삭제되는 속도입니다. 삭제는 항상 한 자소씩(받침 → 모음 → 자음) 이뤄집니다 — 순정 모아키와 같은 기본 동작입니다.")
             }
 
             Section {
@@ -33,7 +35,7 @@ struct BackspaceSettingsView: View {
                 Text("단어 단위 삭제")
             } footer: {
                 if settings.wordDeleteEnabled {
-                    Text("백스페이스를 \(settings.wordDeleteDelay, specifier: "%.1f")초 이상 누르면 공백 단위로 빠르게 삭제합니다.")
+                    Text("백스페이스를 \(settings.wordDeleteDelay, specifier: "%.1f")초 이상 누르면 공백 단위로 빠르게 삭제합니다. 그 전까지는 한 자소씩 삭제합니다.")
                 } else {
                     Text("백스페이스를 길게 눌러도 한 자소씩(받침 → 모음 → 자음) 삭제합니다.")
                 }

@@ -48,13 +48,17 @@ struct GestureSettingsView: View {
 
             // 자음 대각선 진입 파생 (순정 모아키 vs 확장)
             Section {
-                Picker("복합모음 입력", selection: $settings.consonantDiagonalDerivationEnabled) {
+                // 실기기 실측 D4: .inline 피커의 라벨 행("복합모음 입력")이 옵션
+                // 행과 같은 모양으로 렌더돼 세 번째 선택지처럼 오인됐다 — 라벨을
+                // 숨기고 섹션 헤더가 그 역할을 대신한다.
+                Picker("복합모음 입력 방식", selection: $settings.consonantDiagonalDerivationEnabled) {
                     Text("순정 모아키").tag(false)
                     Text("확장 (대각선 진입)").tag(true)
                 }
                 .pickerStyle(.inline)
+                .labelsHidden()
             } header: {
-                Text("입력 방식")
+                Text("복합모음 입력 방식")
             } footer: {
                 Text(settings.consonantDiagonalDerivationEnabled
                      ? "자음을 대각선(↗↖ = ㅣ / ↙↘ = ㅡ)으로 그은 뒤 이어서 그으면 천지인 방식으로 복합모음이 만들어집니다. 순정에 없는 확장 기능이라, 긋기 끝의 작은 흔들림이 '으'를 '워'로 바꾸는 오타가 생길 수 있습니다."

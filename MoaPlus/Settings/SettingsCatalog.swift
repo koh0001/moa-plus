@@ -11,14 +11,14 @@ import SwiftUI
 /// 리뷰에서 관찰된 표현은 주석으로 출처를 남겨 뒀다 — 지우지 말 것.
 enum SettingsDestination: String, Hashable, CaseIterable {
     case layout, size, gesture, gestureTest, longPress, backspace, inputBehavior
-    case appearance, feedback, abbreviation
+    case appearance, feedback, abbreviation, debugBoard
 
     /// 탐색 경로 표시용. 검색 결과에서 "어디에 있는 설정인지"를 알려준다.
     var breadcrumb: String {
         switch self {
         case .layout, .size, .gesture, .gestureTest, .longPress, .backspace, .inputBehavior:
             return "설정 › 키보드"
-        case .appearance, .feedback, .abbreviation:
+        case .appearance, .feedback, .abbreviation, .debugBoard:
             return "설정"
         }
     }
@@ -36,6 +36,7 @@ enum SettingsDestination: String, Hashable, CaseIterable {
         case .appearance: AppearanceSettingsView()
         case .feedback: FeedbackSettingsView()
         case .abbreviation: AbbreviationSettingsView()
+        case .debugBoard: DebugBoardView()
         }
     }
 }
@@ -160,10 +161,18 @@ enum SettingsCatalog {
             keywords: ["롱프레스", "길게", "꾹", "보조", "매핑", "팝업"]
         ),
         SettingsEntry(
-            title: "백스페이스 속도 · 단어 삭제",
+            // 실기기 실측 D4: "자소"로 검색해도 제목에 그 말이 없어 결과를
+            // 지나치기 쉬웠다 — 제목에 자소 단위 삭제를 드러낸다.
+            title: "백스페이스 · 자소/단어 삭제",
             icon: "delete.left",
             destination: .backspace,
-            keywords: ["백스페이스", "지우기", "삭제", "속도", "단어", "자소", "받침"]
+            keywords: ["백스페이스", "지우기", "삭제", "속도", "단어", "자소", "한자소", "낱자", "받침"]
+        ),
+        SettingsEntry(
+            title: "입력 기록 보드",
+            icon: "note.text",
+            destination: .debugBoard,
+            keywords: ["기록", "보드", "메모", "디버그", "실측", "오타기록", "테스트입력"]
         ),
         SettingsEntry(
             title: "스페이스 드래그 커서 이동",
