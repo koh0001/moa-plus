@@ -451,7 +451,12 @@ class GestureAnalyzer {
         guard segments.count >= 3 else { return segments }
 
         var result = segments
-        let bounceCap = max(effectiveReversalThreshold, directionChangeThreshold * 0.8) * 1.5
+        // 순수 키폭 비례 (기본 설정 기준 키폭 42%). edgeNoiseCap 처럼
+        // `directionChangeThreshold * 0.8`(고정 12pt) 바닥을 섞으면 SE 급
+        // 좁은 키(키폭 ~38pt)에서 고정 바닥이 이겨 흡수 창이 키폭 대비
+        // 과대해진다 — 반전 등록 임계(키폭 28%)는 이미 키폭 비례라 그대로
+        // 1.5배만 쓴다.
+        let bounceCap = effectiveReversalThreshold * 1.5
         var index = 1
 
         while index < result.count - 1 {
