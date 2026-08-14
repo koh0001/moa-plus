@@ -17,33 +17,81 @@ struct NewFeaturesModalView: View {
         let detail: String
     }
 
-    private let features: [Feature] = [
-        Feature(
-            icon: "arrow.up.and.down.and.arrow.left.and.right",
-            tint: .blue,
-            title: "키보드 높이 조절",
-            detail: "설정 → 키보드 → 크기 · 전환 키에서 키보드 높이를 85%~135%로 조절할 수 있습니다. 미리보기를 보면서 맞추고, 언제든 기본값으로 되돌릴 수 있습니다."
-        ),
-        Feature(
-            icon: "globe",
-            tint: .green,
-            title: "키보드 전환 키",
-            detail: "설정 → 키보드 → 크기 · 전환 키에서 '키보드 전환 키 표시'를 켜면 기능 행 맨 왼쪽에 지구본 키가 생겨 애플 기본 키보드 등으로 바로 전환합니다. 기본은 꺼져 있고, iOS 26 아이폰은 시스템이 키보드 아래에 지구본 바를 직접 표시합니다."
-        ),
-        Feature(
-            icon: "dial.medium",
-            tint: .orange,
-            title: "각도가 안 맞으면 조절하세요",
-            detail: "오타가 잦다면 설정 → 키보드 → 제스처에서 8방향 좌·우 각도를 따로 넓히거나 4방향 전용 모드를 켜 보세요. 긋기 테스트에서 실시간으로 확인할 수 있습니다."
-        ),
+    fileprivate struct FeatureGroup: Identifiable {
+        let id = UUID()
+        let title: String
+        let features: [Feature]
+    }
+
+    /// v2.0 — 갤럭시 순정 모아키 정합 릴리스. 항목이 많아 그룹 헤더로 나눈다.
+    private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "입력 방식 — 갤럭시 모아키 손버릇 그대로", features: [
+            Feature(
+                icon: "arrow.uturn.down",
+                tint: .blue,
+                title: "대각선 왕복으로 ㅐ·ㅔ·ㅢ",
+                detail: "↗로 나갔다 ↙로 되돌아오면 ㅐ, ↖↘는 ㅔ, ↙↗는 ㅢ. 갤럭시에서 쓰던 왕복 손버릇이 그대로 통합니다."
+            ),
+            Feature(
+                icon: "arrow.up.arrow.down",
+                tint: .indigo,
+                title: "ㅚ에서 이어 긋는 세로 체인",
+                detail: "위·아래(ㅚ)로 긋고 →면 ㅘ, →←면 ㅙ, ←면 ㅕ. 고→괴→과→괘처럼 떼지 않고 이어집니다."
+            ),
+            Feature(
+                icon: "circle.grid.cross",
+                tint: .purple,
+                title: "ㆍ 조합 확장",
+                detail: "외+ㆍ=와, 위+ㆍ=워, 애+ㆍ=얘, 오+ㆍ=요↔오 토글까지 — 천지인 ㆍ 조합이 순정처럼 이어집니다."
+            ),
+            Feature(
+                icon: "delete.left",
+                tint: .teal,
+                title: "한 자소씩 지우기",
+                detail: "백스페이스가 받침 → 모음 → 자음 순서로 지웁니다. '한'에서 한 번 지우면 '하', '가'에서 지우면 'ㄱ'이 남습니다."
+            ),
+            Feature(
+                icon: "checkmark.shield",
+                tint: .green,
+                title: "오타 완화",
+                detail: "순정 모아키를 실측해 인식 기준을 맞췄습니다. 손을 뗄 때 튕기는 꼬리, 방향을 꺾는 모서리의 흔들림이 엉뚱한 모음으로 바뀌는 오타가 줄었습니다."
+            ),
+        ]),
+        FeatureGroup(title: "새 도구", features: [
+            Feature(
+                icon: "graduationcap",
+                tint: .orange,
+                title: "튜토리얼 · 연습 새 단장",
+                detail: "새 입력 경로에 맞춰 튜토리얼과 타이핑 연습을 다시 짰습니다. 왕복 ㅐ·ㅔ·ㅢ와 세로 체인을 여기서 익혀보세요."
+            ),
+            Feature(
+                icon: "scope",
+                tint: .pink,
+                title: "긋기 테스트 — 획별 수치",
+                detail: "설정 → 키보드 → 긋기 → 실시간 테스트에서 획마다 방향·각도·길이가 숫자로 보입니다. 어디서 오타가 나는지 직접 확인할 수 있습니다."
+            ),
+            Feature(
+                icon: "note.text",
+                tint: .brown,
+                title: "입력 기록 보드",
+                detail: "설정 하단의 보드에서 자유롭게 입력해 보고, 오타 사례를 저장해 개발자에게 메일로 바로 보낼 수 있습니다. 획별 계측이 함께 담겨 오타 분석이 빨라집니다."
+            ),
+        ]),
     ]
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(features) { featureRow($0) }
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(groups) { group in
+                        Text(group.title)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.top, 6)
+                        ForEach(group.features) { featureRow($0) }
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 4)

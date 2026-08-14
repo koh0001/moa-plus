@@ -1,7 +1,19 @@
-A bug-fix update for more reliable typing.
+Moa+ 2.0 — a major update that matches the original Galaxy MoaKey input, verified by measuring the real thing.
 
-[Bug fixes]
-- Fixed an issue where, after tapping to move the cursor while composing a syllable, the previous character was inserted again at the new position.
-- Fixed an issue where pressing space right after a text shortcut expanded would insert an unwanted period. The double-space period shortcut now behaves correctly afterward.
+[Input — just like MoaKey on Galaxy]
+- Diagonal round-trips for ㅐ·ㅔ·ㅢ: swipe out ↗ and back ↙ for ㅐ, ↖↘ for ㅔ, ↙↗ for ㅢ — the same muscle memory you used on Samsung.
+- Vertical chains from ㅚ: swipe up-down, then → for ㅘ, →← for ㅙ, ← for ㅕ. Compose 고→괴→과→괘 without lifting your finger.
+- Horizontal stroke plus a right-angle turn also makes ㅐ/ㅔ.
+- Extended ㆍ combos: 외+ㆍ=와, 위+ㆍ=워, 애+ㆍ=얘, and 오↔요 toggling — Cheonjiin dot combos flow like the original.
+- Jamo-by-jamo backspace: deletes final consonant → vowel → consonant ('한'→'하', '가'→'ㄱ').
+
+[Fewer typos]
+- Recognition thresholds now match the original MoaKey, confirmed by on-device measurement. Flick tails on release and corner wobbles no longer turn into the wrong vowel (ㅛ etc.) as often.
+
+[New tools]
+- Tutorial and typing practice rebuilt around the new input paths.
+- Live gesture test: see direction, angle, and length of every stroke as numbers.
+- Input log board: save typo examples and email them to the developer in one tap — reports include per-stroke measurements and your gesture settings, so fixes come faster.
+- Polished settings search and descriptions.
 
 Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.
