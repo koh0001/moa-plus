@@ -110,6 +110,50 @@ final class KeyboardViewModelCursorTests: XCTestCase {
         XCTAssertEqual(delegate.composingUpdates.last?.previous, "",
                        "composition starts fresh, not from the stale ㅂ")
     }
+
+    // MARK: - 상하 줄 이동 (스페이스 드래그 세로 축 — 순정 모아키 커서 이동 모드)
+    // 하드 줄바꿈(\n) 기준 열 보존 환산. 오프셋 산식:
+    //   위: -(현재 열 + 1 + (이전 줄 길이 - 목표 열))
+    //   아래: 현재 줄 잔여 + 1 + 목표 열
+
+    func testMoveCursorLineUp_movesToSameColumnOfPreviousLine() {
+        delegate.contextBefore = "가나다\n라마"   // 커서: 2번째 줄, 열 2
+        viewModel.moveCursorLine(by: -1)
+        XCTAssertEqual(delegate.cursorMoves, [-4], "2 + 1 + (3-2) = 4 후퇴")
+    }
+
+    func testMoveCursorLineUp_clampsColumnToShorterPreviousLine() {
+        delegate.contextBefore = "가\n라마바사"   // 열 4, 이전 줄 길이 1 → 목표 열 1
+        viewModel.moveCursorLine(by: -1)
+        XCTAssertEqual(delegate.cursorMoves, [-5], "4 + 1 + (1-1) = 5 후퇴")
+    }
+
+    func testMoveCursorLineUp_withoutPreviousLineInContext_isNoOp() {
+        delegate.contextBefore = "가나다"
+        viewModel.moveCursorLine(by: -1)
+        XCTAssertTrue(delegate.cursorMoves.isEmpty, "컨텍스트에 이전 줄이 없으면 이동하지 않음")
+    }
+
+    func testMoveCursorLineDown_movesToSameColumnOfNextLine() {
+        delegate.contextBefore = "가나"            // 열 2
+        delegate.contextAfter = "다라\n마바사아"    // 잔여 2, 다음 줄 길이 4
+        viewModel.moveCursorLine(by: 1)
+        XCTAssertEqual(delegate.cursorMoves, [5], "2 + 1 + 2 = 5 전진")
+    }
+
+    func testMoveCursorLineDown_clampsToShorterNextLine() {
+        delegate.contextBefore = "가나다라"        // 열 4
+        delegate.contextAfter = "\n마"             // 잔여 0, 다음 줄 길이 1 → 목표 열 1
+        viewModel.moveCursorLine(by: 1)
+        XCTAssertEqual(delegate.cursorMoves, [2], "0 + 1 + 1 = 2 전진")
+    }
+
+    func testMoveCursorLineDown_withoutNextLineInContext_isNoOp() {
+        delegate.contextBefore = "가나"
+        delegate.contextAfter = "다라"
+        viewModel.moveCursorLine(by: 1)
+        XCTAssertTrue(delegate.cursorMoves.isEmpty, "뒤 컨텍스트에 줄바꿈이 없으면 이동하지 않음")
+    }
 }
 
 private final class MockKeyboardDelegate: KeyboardViewModelDelegate {
@@ -124,6 +168,9 @@ private final class MockKeyboardDelegate: KeyboardViewModelDelegate {
     var switchKeyboardCount = 0
     var hapticCount = 0
     var cursorMoves: [Int] = []
+    /// 상하 줄 이동 테스트용 커서 앞/뒤 컨텍스트. nil = 호스트 컨텍스트 없음.
+    var contextBefore: String?
+    var contextAfter: String?
 
     func insertText(_ text: String) { insertedTexts.append(text) }
     func deleteBackward() { deleteCount += 1 }
@@ -133,4 +180,6 @@ private final class MockKeyboardDelegate: KeyboardViewModelDelegate {
     func switchToNextKeyboard() { switchKeyboardCount += 1 }
     func triggerHapticFeedback() { hapticCount += 1 }
     func moveCursor(by offset: Int) { cursorMoves.append(offset) }
+    func textBeforeCursor() -> String? { contextBefore }
+    func textAfterCursor() -> String? { contextAfter }
 }

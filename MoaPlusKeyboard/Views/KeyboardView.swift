@@ -83,6 +83,7 @@ struct KeyboardView: View {
             onPunctuation: { viewModel.inputSymbol($0, bypassAutoBracket: true) },
             onReturnPressed: { viewModel.inputReturn() },
             onCursorMoveDelta: { viewModel.moveCursor(by: $0) },
+            onCursorLineMoveDelta: { viewModel.moveCursorLine(by: $0) },
             symbolPage: viewModel.symbolPage,
             onSymbolPagePressed: { viewModel.toggleSymbolPage() },
             onLanguageSwitchPressed: { viewModel.switchKeyboard() },

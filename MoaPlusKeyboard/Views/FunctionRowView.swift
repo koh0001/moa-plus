@@ -9,6 +9,8 @@ struct FunctionRowView: View {
     let onPunctuation: (String) -> Void
     let onReturnPressed: () -> Void
     var onCursorMoveDelta: ((Int) -> Void)? = nil
+    /// 스페이스 드래그 상하 줄 이동 (±1 스텝). 설정 OFF 면 SpaceKeyView 가 호출하지 않는다.
+    var onCursorLineMoveDelta: ((Int) -> Void)? = nil
     /// Active symbol-keypad page. Drives the page-toggle key label (#+= / 123).
     var symbolPage: Int = 0
     /// Fired by the symbol-mode page-toggle key (slot B position). nil outside
@@ -121,7 +123,8 @@ struct FunctionRowView: View {
                 width: spaceWidth,
                 height: height,
                 onTap: onSpacePressed,
-                onCursorMove: onCursorMoveDelta ?? { _ in }
+                onCursorMove: onCursorMoveDelta ?? { _ in },
+                onLineMove: onCursorLineMoveDelta ?? { _ in }
             )
 
             FunctionKeyView(
@@ -216,7 +219,8 @@ struct FunctionRowView: View {
                 width: longSpaceWidth,
                 height: height,
                 onTap: onSpacePressed,
-                onCursorMove: onCursorMoveDelta ?? { _ in }
+                onCursorMove: onCursorMoveDelta ?? { _ in },
+                onLineMove: onCursorLineMoveDelta ?? { _ in }
             )
 
             FunctionKeyView(
@@ -270,7 +274,8 @@ struct FunctionRowView: View {
                 width: spaceWidth,
                 height: height,
                 onTap: onSpacePressed,
-                onCursorMove: onCursorMoveDelta ?? { _ in }
+                onCursorMove: onCursorMoveDelta ?? { _ in },
+                onLineMove: onCursorLineMoveDelta ?? { _ in }
             )
 
             // Slot B — punctuation (B2) or vowel key (B1) per layout customization.
@@ -364,7 +369,8 @@ struct FunctionRowView: View {
                 width: bimanualSpaceWidth,
                 height: height,
                 onTap: onSpacePressed,
-                onCursorMove: onCursorMoveDelta ?? { _ in }
+                onCursorMove: onCursorMoveDelta ?? { _ in },
+                onLineMove: onCursorLineMoveDelta ?? { _ in }
             )
 
             // Slot B — symbol-page toggle in symbol mode, else punctuation/vowel per customization.
@@ -726,10 +732,15 @@ struct SpaceKeyView: View {
     let height: CGFloat
     let onTap: () -> Void
     let onCursorMove: (Int) -> Void
+    /// 상하 줄 이동 (±1 씩만 발행 — 프록시 컨텍스트가 이동마다 바뀌므로
+    /// 한 스텝씩 처리해야 열 보존 환산이 유효하다). 설정 OFF 면 호출 안 됨.
+    var onLineMove: (Int) -> Void = { _ in }
 
     @State private var isPressed = false
     @State private var didDrag = false
     @State private var lastReportedOffset: CGFloat = 0
+    /// 세로 스텝 기준선 — 마지막으로 줄 이동을 발행한 시점의 translation.height.
+    @State private var lastReportedLineOffset: CGFloat = 0
     @State private var repeater = SpaceCursorRepeater()
     /// Which edge zone is currently driving auto-repeat (0 = none, -1 left,
     /// +1 right). Drives the edge-zone highlight so the user sees when the
@@ -738,6 +749,10 @@ struct SpaceKeyView: View {
 
     private static let dragThreshold: CGFloat = 8
     private static let pixelsPerStep: CGFloat = 12
+    /// 상하 줄 이동 스텝 (순정 모아키 커서 이동 모드의 세로 축 대응). 가로
+    /// 스텝(12pt)보다 훨씬 크게 잡아, 좌우 드래그 중의 세로 흔들림이 줄
+    /// 점프로 오인되지 않게 한다 (키 행 높이 ~52pt 의 약 70%).
+    private static let pixelsPerLineStep: CGFloat = 36
     /// Fraction of the space-bar width at each end that acts as the auto-repeat
     /// zone. Proportional (not absolute pt) so it scales to small phones —
     /// holding the finger in the outer 15% of the bar repeats in that direction.
@@ -808,11 +823,29 @@ struct SpaceKeyView: View {
                         // would otherwise suppress the onTap fallback in
                         // `onEnded`, dropping the space input on the floor.
                         guard KeyboardSettings.shared.cursorMoveBySpaceDragEnabled else { return }
+                        let verticalEnabled = KeyboardSettings.shared.spaceDragVerticalMoveEnabled
                         let dx = value.translation.width
-                        if !didDrag && abs(dx) >= Self.dragThreshold {
+                        let dy = value.translation.height
+                        // 세로 이동이 켜져 있으면 위/아래로만 끌어도 드래그 모드 진입.
+                        let entered = abs(dx) >= Self.dragThreshold
+                            || (verticalEnabled && abs(dy) >= Self.dragThreshold)
+                        if !didDrag && entered {
                             didDrag = true
                             lastReportedOffset = 0
+                            lastReportedLineOffset = 0
                             repeater.onStep = { onCursorMove($0) }
+                        }
+                        if didDrag, verticalEnabled {
+                            // 세로 줄 이동 — 가로 로직과 독립으로 누적 판정.
+                            // 프록시 컨텍스트가 이동마다 바뀌므로 한 번에 ±1 만
+                            // 발행하고 기준선을 스텝 단위로 전진시킨다.
+                            let stepsNow = Int(dy / Self.pixelsPerLineStep)
+                            let stepsLast = Int(lastReportedLineOffset / Self.pixelsPerLineStep)
+                            if stepsNow != stepsLast {
+                                onLineMove(stepsNow > stepsLast ? 1 : -1)
+                                lastReportedLineOffset += Self.pixelsPerLineStep
+                                    * CGFloat(stepsNow > stepsLast ? 1 : -1)
+                            }
                         }
                         if didDrag {
                             // Auto-repeat zone is defined by finger POSITION within
@@ -857,6 +890,7 @@ struct SpaceKeyView: View {
                         }
                         didDrag = false
                         lastReportedOffset = 0
+                        lastReportedLineOffset = 0
                     }
             )
     }
