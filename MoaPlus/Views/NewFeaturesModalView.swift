@@ -23,8 +23,35 @@ struct NewFeaturesModalView: View {
         let features: [Feature]
     }
 
-    /// v2.0 — 갤럭시 순정 모아키 정합 릴리스. 항목이 많아 그룹 헤더로 나눈다.
+    /// v2.1 — 단축어 개편. 사용자 제보(기호 트리거 미동작)에서 출발한 릴리스라
+    /// 새 항목을 맨 앞에 두고, v2.0 입력 엔진 항목은 뒤에 남겨 둔다.
     private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "단축어가 훨씬 자유로워졌어요", features: [
+            Feature(
+                icon: "text.badge.plus",
+                tint: .blue,
+                title: "기호가 들어간 단축어",
+                detail: "마침표나 물음표를 넣은 단축어를 쓸 수 있습니다. 앞에 붙여도(.ㄱㅅ) 뒤에 붙여도(ㅏ..) 동작하고, 문장 뒤에 바로 이어 써도 변환됩니다."
+            ),
+            Feature(
+                icon: "space",
+                tint: .indigo,
+                title: "변환 후 띄어쓰기 끄기",
+                detail: "단축어를 확정한 스페이스를 결과 뒤에 남기지 않도록 설정할 수 있습니다. 마침표 같은 기호는 문장에 필요한 입력이라 그대로 유지됩니다."
+            ),
+            Feature(
+                icon: "arrow.uturn.backward",
+                tint: .teal,
+                title: "되돌리기 켜고 끄기",
+                detail: "변환 직후 백스페이스를 누르면 원래 글자로 되돌아가는 동작을 설정에서 끌 수 있습니다."
+            ),
+            Feature(
+                icon: "shield.lefthalf.filled",
+                tint: .green,
+                title: "오변환 방지 · 트리거 제한",
+                detail: "너무 짧은 단축어는 의도치 않게 변환되기 쉬워 기본적으로 막아 둡니다. 원하시면 설정에서 제한을 풀 수 있고, 이미 등록해 둔 단축어는 그대로 동작합니다."
+            ),
+        ]),
         FeatureGroup(title: "입력 방식 — 갤럭시 모아키 손버릇 그대로", features: [
             Feature(
                 icon: "arrow.uturn.down",
