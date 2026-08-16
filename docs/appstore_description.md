@@ -31,10 +31,14 @@ https://github.com/koh0001/moa-plus/issues
 자음 키를 누르고 방향을 긋기만 하면 모음이 입력됩니다.
 모아+는 모아키 방식의 제스처 한글 입력을 iOS에서 구현한 키보드 앱입니다.
 
-### 제스처 입력
+### 제스처 입력 — 갤럭시 순정 모아키와 같은 손버릇
 - 자음 키 위에서 8방향으로 긋기만 하면 21개 모음을 모두 입력할 수 있습니다
 - 왕복 긋기로 ㅑ, ㅕ, ㅛ, ㅠ 등 Y-모음도 빠르게 입력
 - 방향을 꺾으면 ㅘ, ㅝ, ㅐ, ㅔ 등 복합 모음도 간단하게
+- 대각선으로 나갔다 되돌아오는 왕복 입력으로 ㅐ, ㅔ, ㅢ를 바로 입력
+- 위·아래로 왕복한 뒤 이어 긋는 조합(ㅘ, ㅙ, ㅕ, ㅖ, ㅠ 등)도 그대로 인식
+- 갤럭시 순정 모아키의 실제 입력 동작을 기기에서 프레임 단위로 실측해 인식 기준을 맞췄습니다. 쓰시던 손버릇을 다시 배울 필요가 없습니다
+- 지우기는 받침 → 모음 → 자음 순서로 한 자소씩 지워집니다
 
 ### 천지인 모음 입력
 - 우측 ㅣ, 점, ㅡ 세 키만으로 모든 한글 모음 조합
@@ -91,10 +95,14 @@ https://github.com/koh0001/moa-plus/issues
 Swipe on consonant keys to input vowels. That is all it takes.
 Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
-### Gesture Input
+### Gesture Input — the same muscle memory as Samsung MoaKey
 - Swipe in 8 directions on consonant keys to input all 21 Korean vowels
 - Back-and-forth swipes for Y-vowels (ㅑ, ㅕ, ㅛ, ㅠ)
 - Combine directions for compound vowels (ㅘ, ㅝ, ㅐ, ㅔ)
+- Diagonal out-and-back strokes for ㅐ, ㅔ and ㅢ
+- Vertical round-trip chains (ㅘ, ㅙ, ㅕ, ㅖ, ㅠ and more) are recognized as well
+- Recognition thresholds were matched to Samsung MoaKey by frame-by-frame analysis of real device recordings, so you do not have to relearn the strokes you already know
+- Backspace deletes one jamo at a time: final consonant, then vowel, then consonant
 
 ### Cheonjiin Vowel Input
 - Compose every Korean vowel using just three keys: ㅣ, dot, and ㅡ
