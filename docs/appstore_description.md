@@ -30,143 +30,56 @@ https://github.com/koh0001/moa-plus/issues
 
 ---
 
-## 한국어 설명
+## 설명 본문 (한국어 / English)
 
-자음 키를 누르고 방향을 긋기만 하면 모음이 입력됩니다.
-모아+는 모아키 방식의 제스처 한글 입력을 iOS에서 구현한 키보드 앱입니다.
+App Store Connect 에 붙여넣을 본문은 **이 파일에 두지 않는다.** 아래 텍스트 파일을 그대로
+복사해서 붙여넣을 것 — 마크다운 기호(`###`, `-`, `**`)가 섞이면 스토어에 그대로 노출되고
+줄바꿈이 깨진다.
 
-### 제스처 입력 — 순정 모아키와 같은 손버릇
-- 자음 키 위에서 8방향으로 긋기만 하면 21개 모음을 모두 입력할 수 있습니다
-- 왕복 긋기로 ㅑ, ㅕ, ㅛ, ㅠ 등 Y-모음도 빠르게 입력
-- 방향을 꺾으면 ㅘ, ㅝ, ㅐ, ㅔ 등 복합 모음도 간단하게
-- 대각선으로 나갔다 되돌아오는 왕복 입력으로 ㅐ, ㅔ, ㅢ를 바로 입력
-- 위·아래로 왕복한 뒤 이어 긋는 조합(ㅘ, ㅙ, ㅕ, ㅖ, ㅠ 등)도 그대로 인식
-- 순정 모아키의 실제 입력을 기기에서 프레임 단위로 실측해 인식 기준을 맞췄습니다. 쓰시던 손버릇을 다시 배울 필요가 없습니다
-- 지우기는 받침 → 모음 → 자음 순서로 한 자소씩 지워집니다
+| 필드 | 파일 |
+|------|------|
+| 앱 이름 | `docs/appstore/fields/01_name.txt` |
+| 부제목 | `docs/appstore/fields/02_subtitle.txt` |
+| 키워드 | `docs/appstore/fields/03_keywords.txt` |
+| 프로모션 텍스트 | `docs/appstore/fields/04_promo_ko.txt` |
+| 설명 (한국어) | `docs/appstore/fields/05_description_ko.txt` |
+| 설명 (English) | `docs/appstore/fields/06_description_en.txt` |
+| 무엇이 새로운지 (한국어) | `docs/appstore/fields/07_whatsnew_ko.txt` |
+| 무엇이 새로운지 (English) | `docs/appstore/fields/08_whatsnew_en.txt` |
 
-### 천지인 모음 입력
-- 우측 ㅣ, 점, ㅡ 세 키만으로 모든 한글 모음 조합
-- 점 누적 입력 (점+점+ㅣ → ㅕ) 등 천지인 표준 합성 지원
-- 자음 키 제스처와 자유롭게 섞어 쓸 수 있습니다
+터미널에서 클립보드로 바로 복사:
 
-### 영문 QWERTY 키보드
-- 한영 키로 한글과 영문을 즉시 전환
-- Shift 더블탭 또는 길게 누르기로 Caps Lock
-- 숫자 키 길게 누르면 ! @ # $ % 등 특수문자 입력
-
-### 편집 도우미
-- 스페이스바를 좌우로 드래그하면 커서가 그만큼 이동
-- 괄호 자동 짝 닫기 (`(`, `[`, `「` 등)
-- 백스페이스 길게 누르면 단어 단위 빠른 삭제
-
-### 롱프레스 보조 입력
-- 길게 누르면 숫자와 기호를 바로 입력
-- 누른 채로 드래그하면 다른 후보를 선택할 수 있습니다
-- 키별 매핑을 자유롭게 편집 가능
-- 심볼 키패드에서 기호 키를 길게 누르면 대체 기호 ($ → ₩ € £ ¥, ( → [ { < 등)
-
-### 단축어
-- 짧은 조합을 입력하고 스페이스를 누르면 긴 문장으로 자동 치환
-- 예: ㅇㅎ → 확인했습니다, ㄱㅅ → 감사합니다
-- 마침표나 물음표 같은 기호를 넣은 단축어도 사용 가능 (.ㄱㅅ 처럼 앞에 붙여도, ㅏ.. 처럼 뒤에 붙여도)
-- 문장에 바로 이어 붙여 써도 인식 (안녕.ㄱㅅ)
-- 변환 후 띄어쓰기를 남길지, 변환 직후 지우기로 되돌릴지 설정에서 선택
-- 후보 선택 방식으로 등록하면 변환 전에 확인하고 확정할 수 있습니다
-- 자주 쓰는 문구를 등록하면 입력 속도가 크게 향상됩니다
-
-### 나만의 키보드
-- 모던 / 클래식 / 확장형 3가지 레이아웃 프리셋 중 선택 (첫 실행 시 선택)
-- 스페이스 옆 키를 모음 입력 키로 전환 가능
-- 우측 컬럼·스페이스 옆 특수키를 각각 독립적으로 매핑
-- 5가지 색상 테마 프리셋 또는 직접 색상 선택
-- 배경 이미지를 선택하고 원하는 영역을 크롭
-- 키 배경 투명도를 조절하여 나만의 키보드 완성
-- 긋기 각도, 길이, 대각선 매핑, 열별 보정을 한 화면에서 통합 관리
-- 라이브 제스처 시각화 화면에서 실제 키보드와 똑같은 엔진으로 직접 시험
-
-### 타이핑 연습
-- 천지인, 영문 QWERTY, 커서 이동 등 33종 시나리오로 빠르게 익히기
-
-### 문의
-- 앱 정보 화면에서 바로 메일로 문의 — 앱·iOS·기기 정보가 자동 첨부되어 더 빠르게 해결합니다
-- 메일 계정이 없어도 신고 폼으로 의견을 보낼 수 있습니다
-
-### 프라이버시
-- 네트워크를 사용하지 않습니다
-- 입력 데이터를 수집하거나 저장하지 않습니다
-- 기본 입력은 전체 접근(Full Access) 없이 동작합니다. 햅틱 진동을 쓰려면 "전체 접근 허용"이 필요하지만(선택), 켜더라도 키 입력은 외부로 전송되지 않습니다
-
----
-
-## English Description
-
-Swipe on consonant keys to input vowels. That is all it takes.
-Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
-
-### Gesture Input — the same muscle memory as Samsung MoaKey
-- Swipe in 8 directions on consonant keys to input all 21 Korean vowels
-- Back-and-forth swipes for Y-vowels (ㅑ, ㅕ, ㅛ, ㅠ)
-- Combine directions for compound vowels (ㅘ, ㅝ, ㅐ, ㅔ)
-- Diagonal out-and-back strokes for ㅐ, ㅔ and ㅢ
-- Vertical round-trip chains (ㅘ, ㅙ, ㅕ, ㅖ, ㅠ and more) are recognized as well
-- Recognition thresholds were matched to Samsung MoaKey by frame-by-frame analysis of real device recordings, so you do not have to relearn the strokes you already know
-- Backspace deletes one jamo at a time: final consonant, then vowel, then consonant
-
-### Cheonjiin Vowel Input
-- Compose every Korean vowel using just three keys: ㅣ, dot, and ㅡ
-- Standard cheonjiin dot accumulation (dot+dot+ㅣ → ㅕ)
-- Mix freely with consonant-key gestures
-
-### English QWERTY Keyboard
-- Switch instantly between Korean and English with the language key
-- Double-tap or long-press Shift for Caps Lock
-- Long-press number keys for ! @ # $ % and more
-
-### Editing Helpers
-- Drag the space bar left or right to move the cursor by that distance
-- Auto bracket closing for `(`, `[`, `「` and more
-- Long-press backspace for fast word-by-word deletion
-
-### Long-Press Auxiliary Input
-- Hold a key to instantly type numbers and symbols
-- Drag while holding to select from candidate options
-- Fully customizable per-key mappings
-- Long-press symbol keys for alternates ($ → ₩ € £ ¥, ( → [ { <, and more)
-
-### Text Shortcuts
-- Type a short trigger then space to expand it into a full phrase
-- Example: ㅇㅎ → 확인했습니다 (Confirmed)
-- Triggers can include punctuation, at the beginning or at the end
-- A trigger is recognized even when typed directly after a word, with no space in between
-- Choose whether the confirming space stays, and whether backspace undoes the expansion
-- Register a trigger in suggestion mode to confirm each expansion before it applies
-
-### Personalization
-- Choose from Modern / Classic / Extended layout presets (selectable on first launch)
-- Turn the key beside the space bar into a vowel-input key
-- Map the right-column and space-side punctuation keys independently
-- 5 color theme presets or create your own with custom colors
-- Set a background image with crop and opacity control
-- Unified gesture settings: angle, length, diagonal mapping, per-column correction in one screen
-- Live gesture visualization driven by the real keyboard engine
-
-### Typing Practice
-- 33 scenarios covering cheonjiin, English QWERTY, and cursor movement
-
-### Support
-- Send feedback by mail right from the About screen — app/iOS/device info attached automatically for faster fixes
-- No mail account? Submit through the report form instead
-
-### Privacy First
-- No network access
-- No data collection whatsoever
-- Core input works without Full Access. Haptic feedback requires "Allow Full Access" (optional); keystrokes are never transmitted even when enabled
+```bash
+pbcopy < docs/appstore/fields/05_description_ko.txt
+```
 
 ---
 
 ## 새로운 기능 (업데이트 노트)
 
 > 실제 제출본 원본은 `docs/appstore/fields/` (01~08), 전체 이력은 `CHANGELOG.md` 참조. 아래는 아카이브.
+
+### v2.1.0
+
+[단축어]
+- 마침표나 물음표 같은 기호가 들어간 단축어 지원 (앞에 붙여도, 뒤에 붙여도)
+- 문장에 바로 이어 붙여 써도 인식 — 앞말과 띄어쓰지 않아도 됨
+- 변환 후 띄어쓰기를 남길지, 변환 직후 지우기로 되돌릴지 설정으로 분리
+- 너무 짧은 트리거는 신규 등록 시 기본 차단 (설정에서 해제 가능, 기존 등록분은 유지)
+
+[버그 수정]
+- 단축어 후보가 뜰 때 키보드 아래쪽이 잘리던 문제
+- 키보드를 연 채 다른 앱에 다녀오면 입력이 되지 않던 문제
+
+### v2.0.0
+
+[입력 방식 — 순정 모아키 정합]
+- 대각선 왕복으로 ㅐ·ㅔ·ㅢ, ㅚ에서 이어 긋는 세로 체인, 수평 뒤 직각 꺾기
+- ㆍ 조합 확장 (외+ㆍ=와, 오↔요 토글 등), 한 자소씩 지우기
+- 순정 모아키 관찰 영상 프레임 판독 + 기기 실측으로 인식 기준 확정
+
+[새 도구]
+- 튜토리얼·타이핑 연습 재구성, 긋기 실시간 테스트(획별 수치), 입력 기록 보드
 
 ### v1.8.0
 
