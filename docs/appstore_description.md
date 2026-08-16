@@ -1,5 +1,9 @@
 # App Store 제출 정보
 
+> ⚠️ **실제 제출에 붙여넣는 것은 `docs/appstore/fields/01~08` 이다.** 이 파일은 사람이 읽기
+> 좋은 정리본으로, 자모/화살표 표기가 필드 파일과 다를 수 있다. 문구를 고칠 때는
+> **fields/ 를 먼저 고치고** 이쪽을 맞출 것.
+
 ## 앱 이름
 모아+
 
@@ -31,13 +35,13 @@ https://github.com/koh0001/moa-plus/issues
 자음 키를 누르고 방향을 긋기만 하면 모음이 입력됩니다.
 모아+는 모아키 방식의 제스처 한글 입력을 iOS에서 구현한 키보드 앱입니다.
 
-### 제스처 입력 — 갤럭시 순정 모아키와 같은 손버릇
+### 제스처 입력 — 순정 모아키와 같은 손버릇
 - 자음 키 위에서 8방향으로 긋기만 하면 21개 모음을 모두 입력할 수 있습니다
 - 왕복 긋기로 ㅑ, ㅕ, ㅛ, ㅠ 등 Y-모음도 빠르게 입력
 - 방향을 꺾으면 ㅘ, ㅝ, ㅐ, ㅔ 등 복합 모음도 간단하게
 - 대각선으로 나갔다 되돌아오는 왕복 입력으로 ㅐ, ㅔ, ㅢ를 바로 입력
 - 위·아래로 왕복한 뒤 이어 긋는 조합(ㅘ, ㅙ, ㅕ, ㅖ, ㅠ 등)도 그대로 인식
-- 갤럭시 순정 모아키의 실제 입력 동작을 기기에서 프레임 단위로 실측해 인식 기준을 맞췄습니다. 쓰시던 손버릇을 다시 배울 필요가 없습니다
+- 순정 모아키의 실제 입력을 기기에서 프레임 단위로 실측해 인식 기준을 맞췄습니다. 쓰시던 손버릇을 다시 배울 필요가 없습니다
 - 지우기는 받침 → 모음 → 자음 순서로 한 자소씩 지워집니다
 
 ### 천지인 모음 입력
@@ -61,9 +65,13 @@ https://github.com/koh0001/moa-plus/issues
 - 키별 매핑을 자유롭게 편집 가능
 - 심볼 키패드에서 기호 키를 길게 누르면 대체 기호 ($ → ₩ € £ ¥, ( → [ { < 등)
 
-### 약어 확장
-- 자음 몇 개만 입력하고 스페이스를 누르면 긴 문장으로 자동 치환
+### 단축어
+- 짧은 조합을 입력하고 스페이스를 누르면 긴 문장으로 자동 치환
 - 예: ㅇㅎ → 확인했습니다, ㄱㅅ → 감사합니다
+- 마침표나 물음표 같은 기호를 넣은 단축어도 사용 가능 (.ㄱㅅ 처럼 앞에 붙여도, ㅏ.. 처럼 뒤에 붙여도)
+- 문장에 바로 이어 붙여 써도 인식 (안녕.ㄱㅅ)
+- 변환 후 띄어쓰기를 남길지, 변환 직후 지우기로 되돌릴지 설정에서 선택
+- 후보 선택 방식으로 등록하면 변환 전에 확인하고 확정할 수 있습니다
 - 자주 쓰는 문구를 등록하면 입력 속도가 크게 향상됩니다
 
 ### 나만의 키보드
@@ -125,10 +133,13 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 - Fully customizable per-key mappings
 - Long-press symbol keys for alternates ($ → ₩ € £ ¥, ( → [ { <, and more)
 
-### Abbreviation Expansion
-- Type a few consonants + space to auto-expand into full phrases
+### Text Shortcuts
+- Type a short trigger then space to expand it into a full phrase
 - Example: ㅇㅎ → 확인했습니다 (Confirmed)
-- Register your frequently used phrases for faster typing
+- Triggers can include punctuation, at the beginning or at the end
+- A trigger is recognized even when typed directly after a word, with no space in between
+- Choose whether the confirming space stays, and whether backspace undoes the expansion
+- Register a trigger in suggestion mode to confirm each expansion before it applies
 
 ### Personalization
 - Choose from Modern / Classic / Extended layout presets (selectable on first launch)

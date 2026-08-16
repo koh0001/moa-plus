@@ -1,18 +1,19 @@
 Swipe on consonant keys to input vowels. That is all it takes.
 Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
-[Gesture Input - the same muscle memory as Samsung MoaKey]
+[Gesture Input]
 - Swipe in 8 directions on consonant keys to input all 21 Korean vowels
 - Back-and-forth swipes for the y-vowel series
 - Combine directions for compound vowels
 - Diagonal out-and-back strokes for ae, e and ui
 - Vertical round-trip chains (wa, wae, yeo, ye, yu and more) are recognized as well
-- Recognition thresholds were matched to Samsung MoaKey by frame-by-frame analysis of real device recordings, so you do not have to relearn the strokes you already know
+- Recognition thresholds were matched to the original MoaKey by frame-by-frame analysis of real device recordings, so you do not have to relearn the strokes you already know
 - Backspace deletes one jamo at a time: final consonant, then vowel, then consonant
 
 [Cheonjiin Vowel Input]
 - Compose every Korean vowel from three keys: vertical stroke, dot, horizontal stroke
 - Standard cheonjiin dot accumulation
+- Tapping the dot key repeatedly toggles o/yo and u/yu
 - Mix freely with consonant-key gestures
 
 [English QWERTY Keyboard]
@@ -22,6 +23,7 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
 [Editing Helpers]
 - Drag the space bar left or right to move the cursor
+- Hold the drag at either end of the space bar to keep the cursor moving
 - Auto-close brackets when you type an opening bracket
 - Long-press backspace for fast word-by-word deletion
 
@@ -31,9 +33,12 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 - Fully customizable per-key mappings
 - Long-press symbol keys for currency signs and other alternates
 
-[Abbreviation Expansion]
-- Type a few consonants then space to auto-expand into full phrases
-- Register frequently used phrases as short consonant triggers
+[Text Shortcuts]
+- Type a short trigger then space to expand it into a full phrase
+- Triggers can include punctuation such as periods and question marks, at the beginning or at the end
+- A trigger is recognized even when typed directly after a word, with no space in between
+- Choose whether the confirming space stays, and whether backspace undoes the expansion
+- Register a trigger in suggestion mode to confirm each expansion before it applies
 
 [Personalization]
 - Choose from Modern, Classic, or Extended layout presets (selectable on first launch)
@@ -41,6 +46,7 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 - Map the right-column and space-side punctuation keys independently
 - Five color theme presets or create your own with custom colors
 - Set a background image with crop and opacity control
+- Adjust the keyboard height to your liking
 - Unified gesture settings in one screen
 - Live gesture visualization driven by the real keyboard engine
 
@@ -49,6 +55,7 @@ Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
 [Support]
 - Send feedback by mail right from the About screen with app, iOS, and device info attached
+- Save mistyped examples on the input log board and send them as they are
 - No mail account? Submit through the report form instead
 
 [Privacy First]
