@@ -274,6 +274,10 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── secondaryKeyActions: [SecondaryKeyAction]  (한글 자음 19키 + 영문 숫자 10키)
 ├── shortcutExpansionStore: ShortcutExpansionStore
 ├── abbreviationEnabled: Bool               (약어 확장 마스터 토글)
+├── abbreviationUndoOnBackspaceEnabled: Bool (확장 직후 백스페이스 되돌리기, 기본 ON)
+├── abbreviationKeepConfirmSpaceEnabled: Bool (확정 스페이스를 결과 뒤에 남길지, 기본 ON
+│                                             — 기호·엔터는 설정 무관 항상 유지)
+├── abbreviationTriggerPolicy: .safe/.free  (신규 트리거 등록 제한 — 메인 앱 검증 전용)
 ├── periodOnDoubleSpaceEnabled: Bool        (더블 스페이스 → 마침표)
 ├── layoutCustomization: LayoutCustomization (프리셋/슬롯/펑크 구성)
 ├── rememberLastKeyboardMode: Bool + lastKeyboardLetterMode: String (한/영 모드 복원)
@@ -314,6 +318,27 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ↖ ↗ = ㅣ,  ↙ ↘ = ㅡ  (설정에서 변경 가능)
 ```
 모음 제스처 전체 표: [README.md](README.md) 참조
+
+### 약어(단축어) 트리거 매칭 규칙
+- 구분자는 두 종류다. **경계 구분자**(`" "` `"\n"`)는 버퍼를 리셋하고, **내용 겸 확정
+  구분자**(`.` `,` `!` `?` `;` `:`)는 버퍼에 누적되면서 확정 판정도 트리거한다. 덕분에
+  `.ㅎㅌ` `ㅏ..` 같은 기호 트리거가 성립한다
+- **트리거에 공백은 넣을 수 없다** — 스페이스가 확정 신호를 겸하면 짧은 트리거가 긴 트리거를
+  가로채고(`ㅋ` vs `ㅋ ㅋ`) 삭제 개수 규칙이 갈라진다. 등록 UI에서 차단
+- 매칭은 ①버퍼 전체 정확 매칭 → 실패 시 ②**최장 접미** 매칭 순. 접미 매칭은 **내용 구분자를
+  포함한 트리거로 한정**한다. 이 제한을 풀면 평범한 `ㅎㅌ` 가 "안녕ㅎㅌ" 끝에서도 터져
+  기존 사용자가 전부 깨진다 (`testExpansion_plainTrigger_doesNotFireMidWord` 가드)
+- 지울 길이는 **매칭된 트리거** 기준이다. 버퍼 길이로 지우면 접미 매칭에서 앞 글자를 먹는다
+- 확장 직전 `textBeforeCursor()` 가 트리거로 끝나는지 확인하고, 아니면 **확장을 포기**한다.
+  델리게이트가 `Bool` 을 반환해 엔진이 되돌리기 상태를 세우지 않도록 한다 — 포기했는데
+  엔진만 "확장함" 으로 남으면 사용자가 누른 구분자가 삼켜진다
+- 확정 구분자를 결과 뒤에 남길지는 `abbreviationKeepConfirmSpaceEnabled` 가 정하는데
+  **스페이스에만 적용**한다. 기호는 사용자가 의도한 문장부호, 엔터는 줄바꿈/전송이라 빼면
+  입력을 삼키는 셈이다. 이 설정을 끄면 되돌리기 삭제 길이도 `replacement.count` 로 줄어야
+  한다 — 안 넣은 구분자를 넣은 것으로 계산하면 앞 글자를 한 자 더 먹는다
+  (`testBackspace_afterExpansionWithoutConfirmSpace_restoresTrigger` 가드)
+- 등록 제한(`abbreviationTriggerPolicy`)은 **메인 앱 UI 전용**이다. 엔진에 길이 필터를 넣으면
+  이미 등록된 1글자 단축어가 죽는다(소급 적용 없음)
 
 ### 커서 이동 / 약어 리셋 패턴
 ```swift

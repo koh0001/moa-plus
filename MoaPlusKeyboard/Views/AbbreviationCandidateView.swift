@@ -50,7 +50,7 @@ struct AbbreviationCandidateView: View {
             .padding(.trailing, 4)
         }
         .padding(.horizontal, 8)
-        .frame(height: 36)
+        .frame(height: KeyboardMetrics.abbreviationCandidateBarHeight)
         .background(Color(.secondarySystemBackground))
         .overlay(
             Rectangle()

@@ -101,7 +101,15 @@ struct KeyboardView: View {
                 columnCount: viewModel.keyboardMode == .english ? 10 : 7,
                 mode: viewModel.keyboardMode
             )
-            let keyHeight = KeyboardMetrics.keyHeight(for: geometry.size.height)
+            // 약어 후보 바가 차지하는 몫은 그리드 계산에서 **먼저 빼야** 한다.
+            // `keyHeight(for:)` 는 주어진 높이를 그리드 행에 전부 나눠주므로, 컨테이너만
+            // 키워 두면 늘어난 높이를 키들이 그대로 흡수해 버리고 후보 바는 여전히
+            // 아래로 넘쳐 기능행이 잘린다(실기기 확인).
+            let candidateBarFootprint: CGFloat = viewModel.isAbbreviationCandidateVisible
+                ? KeyboardMetrics.abbreviationCandidateBarFootprint
+                : 0
+            let keyHeight = KeyboardMetrics.keyHeight(
+                for: geometry.size.height - candidateBarFootprint)
             let screen = UIScreen.main.bounds
             let screenShort = min(screen.width, screen.height)
             let screenLong = max(screen.width, screen.height)
@@ -123,9 +131,11 @@ struct KeyboardView: View {
 
                 ZStack {
                     VStack(spacing: KeyboardMetrics.keySpacing) {
-                        // Abbreviation candidate bar
-                        if viewModel.isAbbreviationCandidateVisible,
-                           !viewModel.abbreviationCandidates.isEmpty {
+                        // Abbreviation candidate bar.
+                        // 표시 조건은 `isAbbreviationCandidateVisible` **하나만** 본다 —
+                        // KeyboardViewController 의 높이 보정이 같은 플래그를 구독하므로,
+                        // 여기에 조건을 더 붙이면 둘이 어긋나 높이가 안 맞는다.
+                        if viewModel.isAbbreviationCandidateVisible {
                             AbbreviationCandidateView(
                                 trigger: viewModel.abbreviationCandidates.first?.trigger ?? "",
                                 candidates: viewModel.abbreviationCandidates,
@@ -183,7 +193,10 @@ struct KeyboardView: View {
                             : 0
                         let xInGrid = keyXPosition(column: activeCol, row: activeRow, centerKeyWidth: popupCenterKeyWidth, spacing: sp, totalWidth: popupGridWidth)
                         let x = xInGrid + moakiLeftInset
-                        let y = CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
+                        // 후보 바가 떠 있으면 그리드가 그만큼 아래로 밀리므로 팝업 좌표도
+                        // 같이 밀어야 한다 — 안 그러면 팝업이 키 위가 아닌 곳에 뜬다.
+                        let y = candidateBarFootprint
+                            + CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
                         let rawCandidates = popupState.candidates
                         let selectedIdx = popupState.selectedIndex

@@ -28,6 +28,19 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// already re-applies on every show; this covers the split-screen /
     /// side-by-side case where no re-appearance happens.
     private var heightScaleCancellable: AnyCancellable?
+    /// 약어 후보 바는 키보드 VStack 안에 끼어들어가므로, 컨테이너 높이를 그만큼
+    /// 늘리지 않으면 아래쪽 기능행이 잘린다(실기기 확인). 표시 상태를 여기서 들고 있다가
+    /// 모든 높이 계산 지점에 반영한다.
+    private var isCandidateBarVisible = false
+    private var candidateBarCancellable: AnyCancellable?
+    /// 호스트 앱의 백그라운드 ↔ 포그라운드 전환 관찰자.
+    ///
+    /// 익스텐션에는 `UIApplication` 이 없으므로 `NSExtensionHost*` 알림을 쓴다.
+    /// 키보드를 **띄운 채** 앱만 전환하고 돌아오면 뷰가 사라진 적이 없어
+    /// `viewDidAppear` 가 불리지 않는다 → 거기 있던 터치 복구 토글도 안 돈다.
+    /// 그 결과 키보드가 살아 보이는데 입력이 먹지 않는다(카카오톡 실기기 확인).
+    private var hostForegroundObserver: NSObjectProtocol?
+    private var hostBackgroundObserver: NSObjectProtocol?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -71,6 +84,8 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         KeyboardSettings.shared.loadAll()
         setupKeyboardView()
         observeHeightScale()
+        observeCandidateBar()
+        observeHostLifecycle()
         // Audio session warmup removed: it ignored clickSoundEnabled and
         // played an unconditional click on every keyboard show, audible
         // even to users who disabled sounds and inconsistent with normal
@@ -131,6 +146,69 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         return KeyboardMetrics.keyboardHeight(
             isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong,
             scale: KeyboardSettings.shared.keyboardHeightScale)
+            + candidateBarExtraHeight
+    }
+
+    /// 후보 바가 떠 있는 동안 컨테이너에 더해 줄 높이.
+    private var candidateBarExtraHeight: CGFloat {
+        isCandidateBarVisible ? KeyboardMetrics.abbreviationCandidateBarFootprint : 0
+    }
+
+    /// 호스트 앱이 포그라운드로 돌아올 때 터치 전달을 되살린다.
+    ///
+    /// iOS 키보드 익스텐션은 호스트가 백그라운드를 다녀오면 호스팅 뷰가 터치를 더 이상
+    /// 받지 않는 상태로 남을 수 있다. `viewDidAppear` 에 이미 같은 복구가 있지만,
+    /// 키보드를 **닫지 않고** 앱만 전환하면 뷰 생명주기 콜백이 아예 오지 않아 그 경로가
+    /// 돌지 않는다. 그래서 익스텐션용 호스트 알림으로 같은 복구를 건다.
+    private func observeHostLifecycle() {
+        hostForegroundObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NSExtensionHostDidBecomeActive,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.recoverTouchDelivery()
+        }
+
+        // 백그라운드로 갈 때는 진행 중이던 제스처/반복 타이머를 정리한다.
+        // `viewWillDisappear` 의 정리와 같은 목적인데, 키보드를 띄운 채 앱을 전환하면
+        // 그쪽도 불리지 않아 백스페이스 반복이 보이지 않는 필드에 계속 먹힐 수 있다.
+        hostBackgroundObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NSExtensionHostDidEnterBackground,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.viewModel.resetGestureState()
+        }
+    }
+
+    private func recoverTouchDelivery() {
+        if let hostingView = keyboardView?.view {
+            hostingView.isUserInteractionEnabled = false
+            hostingView.isUserInteractionEnabled = true
+        }
+        // 전환 중 손가락이 떠 있었을 수 있으니 제스처 상태도 초기화한다.
+        viewModel.resetGestureState()
+    }
+
+    deinit {
+        if let hostForegroundObserver {
+            NotificationCenter.default.removeObserver(hostForegroundObserver)
+        }
+        if let hostBackgroundObserver {
+            NotificationCenter.default.removeObserver(hostBackgroundObserver)
+        }
+    }
+
+    /// 후보 바 표시/숨김에 맞춰 키보드 높이를 늘렸다 줄인다.
+    /// 이게 없으면 바가 뜨는 순간 기능행(스페이스·엔터)이 화면 밖으로 밀려 잘린다.
+    private func observeCandidateBar() {
+        candidateBarCancellable = viewModel.$isAbbreviationCandidateVisible
+            .removeDuplicates()
+            .sink { [weak self] visible in
+                guard let self, self.isCandidateBarVisible != visible else { return }
+                self.isCandidateBarVisible = visible
+                self.heightConstraint?.constant = self.computedKeyboardHeight()
+            }
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -146,6 +224,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             self.heightConstraint?.constant = KeyboardMetrics.keyboardHeight(
                 isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong,
                 scale: KeyboardSettings.shared.keyboardHeightScale)
+                + self.candidateBarExtraHeight
         })
     }
 

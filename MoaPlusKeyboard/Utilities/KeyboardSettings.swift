@@ -34,6 +34,9 @@ final class KeyboardSettings: ObservableObject {
         static let cursorRepeatSpeed = "cursorRepeatSpeed"
         static let periodOnDoubleSpace = "periodOnDoubleSpace"
         static let abbreviationEnabled = "abbreviationEnabled"
+        static let abbreviationUndoOnBackspace = "abbreviationUndoOnBackspace"
+        static let abbreviationKeepConfirmSpace = "abbreviationKeepConfirmSpace"
+        static let abbreviationTriggerPolicy = "abbreviationTriggerPolicy"
         static let layoutCustomization = "layoutCustomization"
         static let firstLaunchModalShown = "firstLaunchModalShown"
         static let rememberLastKeyboardMode = "rememberLastKeyboardMode"
@@ -125,6 +128,28 @@ final class KeyboardSettings: ObservableObject {
     /// user can opt out without losing their data.
     @Published var abbreviationEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(abbreviationEnabled, forKey: Keys.abbreviationEnabled) }
+    }
+
+    /// 확장 직후 백스페이스 한 번으로 원래 트리거를 되살릴지 (iOS 텍스트 대치와 동일한 undo).
+    /// 사용자 제보상 "띄어쓰기를 지우면 단축어가 사라진다" 로 인지되는 동작이라 끌 수 있게 뒀다.
+    @Published var abbreviationUndoOnBackspaceEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; writePrimitive(abbreviationUndoOnBackspaceEnabled, forKey: Keys.abbreviationUndoOnBackspace) }
+    }
+
+    /// 확장을 확정한 **스페이스**를 결과 뒤에 남길지.
+    ///
+    /// 기호(`.` `,` `!` …)와 엔터는 이 설정과 무관하게 항상 남긴다 — 기호는 사용자가 의도한
+    /// 문장부호이고 엔터는 줄바꿈/전송이라, 빼면 입력을 삼키는 것이 된다. 순수한 확정
+    /// 신호인 스페이스만 대상이다.
+    @Published var abbreviationKeepConfirmSpaceEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; writePrimitive(abbreviationKeepConfirmSpaceEnabled, forKey: Keys.abbreviationKeepConfirmSpace) }
+    }
+
+    /// 신규 단축어 등록 시 허용할 트리거 강도. **메인 앱 등록 검증 전용**이며 익스텐션
+    /// 런타임 매칭에는 관여하지 않는다 — 이미 저장된 짧은 트리거는 계속 동작해야 하므로
+    /// 엔진에 길이 필터를 넣으면 기존 사용자가 깨진다.
+    @Published var abbreviationTriggerPolicy: AbbreviationTriggerPolicy = .safe {
+        didSet { guard !isLoading else { return }; writePrimitive(abbreviationTriggerPolicy.rawValue, forKey: Keys.abbreviationTriggerPolicy) }
     }
 
     // MARK: - Display Settings
@@ -422,6 +447,11 @@ final class KeyboardSettings: ObservableObject {
         assign(\.secondaryKeyActions, load([SecondaryKeyAction].self, forKey: Keys.secondaryKeyActions) ?? SecondaryKeyAction.defaults)
         assign(\.shortcutExpansionStore, load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore())
         assign(\.abbreviationEnabled, defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true)
+        assign(\.abbreviationUndoOnBackspaceEnabled, defaults.object(forKey: Keys.abbreviationUndoOnBackspace) as? Bool ?? true)
+        assign(\.abbreviationKeepConfirmSpaceEnabled, defaults.object(forKey: Keys.abbreviationKeepConfirmSpace) as? Bool ?? true)
+        assign(\.abbreviationTriggerPolicy,
+               (defaults.object(forKey: Keys.abbreviationTriggerPolicy) as? String)
+                   .flatMap(AbbreviationTriggerPolicy.init(rawValue:)) ?? .safe)
         assign(\.showGesturePreview, defaults.bool(forKey: Keys.showGesturePreview))
         assign(\.showSecondaryHints, defaults.object(forKey: Keys.showSecondaryHints) as? Bool ?? true)
         assign(\.hintSize, defaults.object(forKey: Keys.hintSize) as? Int ?? 1)
@@ -480,6 +510,9 @@ final class KeyboardSettings: ObservableObject {
         secondaryKeyActions = SecondaryKeyAction.defaults
         shortcutExpansionStore = ShortcutExpansionStore()
         abbreviationEnabled = true
+        abbreviationUndoOnBackspaceEnabled = true
+        abbreviationKeepConfirmSpaceEnabled = true
+        abbreviationTriggerPolicy = .safe
         showGesturePreview = false
         showSecondaryHints = true
         hintSize = 1
