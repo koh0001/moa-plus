@@ -1,19 +1,23 @@
-Moa+ 2.0 — a major update that matches the original Galaxy MoaKey input, verified by measuring the real thing.
+Moa+ 2.1 makes text shortcuts far more flexible. This update started from user reports.
 
-[Input — just like MoaKey on Galaxy]
-- Diagonal round-trips for ㅐ·ㅔ·ㅢ: swipe out ↗ and back ↙ for ㅐ, ↖↘ for ㅔ, ↙↗ for ㅢ — the same muscle memory you used on Samsung.
-- Vertical chains from ㅚ: swipe up-down, then → for ㅘ, →← for ㅙ, ← for ㅕ. Compose 고→괴→과→괘 without lifting your finger.
-- Horizontal stroke plus a right-angle turn also makes ㅐ/ㅔ.
-- Extended ㆍ combos: 외+ㆍ=와, 위+ㆍ=워, 애+ㆍ=얘, and 오↔요 toggling — Cheonjiin dot combos flow like the original.
-- Jamo-by-jamo backspace: deletes final consonant → vowel → consonant ('한'→'하', '가'→'ㄱ').
+[Shortcuts]
+- Shortcuts can now include punctuation such as periods and question marks, at the beginning or at the end.
+- A shortcut is recognized even when you type it directly after a word, with no space in between.
+- You can choose whether the space that confirms a shortcut stays after the replacement. Punctuation is always kept, since it belongs to your sentence.
+- Undo on backspace right after a replacement can now be turned on or off in settings.
+- Very short shortcuts trigger by accident easily, so new ones are limited by default. You can lift the limit in settings, and shortcuts you already saved keep working.
 
-[Fewer typos]
-- Recognition thresholds now match the original MoaKey, confirmed by on-device measurement. Flick tails on release and corner wobbles no longer turn into the wrong vowel (ㅛ etc.) as often.
+[Bug fixes]
+- Fixed the keyboard being cut off at the bottom while the shortcut suggestion bar was showing.
+- Fixed typing not responding after returning from another app with the keyboard still open.
 
-[New tools]
-- Tutorial and typing practice rebuilt around the new input paths.
-- Live gesture test: see direction, angle, and length of every stroke as numbers.
-- Input log board: save typo examples and email them to the developer in one tap — reports include per-stroke measurements and your gesture settings, so fixes come faster.
-- Polished settings search and descriptions.
+[The 2.0 input overhaul is still here]
+Version 2.0 matched typing behavior to the original Samsung MoaKey, based on frame-by-frame analysis of real device recordings. If you have not tried it yet, here is what came with it.
+- Type ae, e and ui with a diagonal out-and-back stroke.
+- Vertical round-trip chains (wa, wae, yeo, ye, yu and more) are recognized exactly like the original.
+- Swipe sideways then bend up or down to get ae or e.
+- Tapping the dot key repeatedly toggles o/yo and u/yu.
+- Backspace deletes one jamo at a time: final consonant, then vowel, then consonant.
+- The rebuilt tutorial, typing practice, live stroke test and input log board arrived with it as well.
 
 Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.

@@ -1,10 +1,14 @@
 Swipe on consonant keys to input vowels. That is all it takes.
 Moa+ brings gesture-based Korean (Hangul) input to iOS using the Moaki method.
 
-[Gesture Input]
+[Gesture Input - the same muscle memory as Samsung MoaKey]
 - Swipe in 8 directions on consonant keys to input all 21 Korean vowels
 - Back-and-forth swipes for the y-vowel series
 - Combine directions for compound vowels
+- Diagonal out-and-back strokes for ae, e and ui
+- Vertical round-trip chains (wa, wae, yeo, ye, yu and more) are recognized as well
+- Recognition thresholds were matched to Samsung MoaKey by frame-by-frame analysis of real device recordings, so you do not have to relearn the strokes you already know
+- Backspace deletes one jamo at a time: final consonant, then vowel, then consonant
 
 [Cheonjiin Vowel Input]
 - Compose every Korean vowel from three keys: vertical stroke, dot, horizontal stroke
