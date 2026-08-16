@@ -41,6 +41,16 @@ enum KeyboardMetrics {
 
     // Key sizing
     static let keySpacing: CGFloat = 4
+
+    /// 약어 후보 바 높이. `AbbreviationCandidateView` 의 `.frame(height:)` 와
+    /// `KeyboardViewController` 의 높이 보정이 **같은 값**을 봐야 한다 — 따로 두면
+    /// 후보 바가 뜰 때 그 차이만큼 키보드 아래가 잘린다.
+    static let abbreviationCandidateBarHeight: CGFloat = 36
+
+    /// 후보 바가 떠 있을 때 키보드 컨테이너에 더해야 할 높이 (바 + VStack 간격).
+    static var abbreviationCandidateBarFootprint: CGFloat {
+        abbreviationCandidateBarHeight + keySpacing
+    }
     static let keyCornerRadius: CGFloat = 8
 
     // Width ratio for side symbol keys (relative to center keys)

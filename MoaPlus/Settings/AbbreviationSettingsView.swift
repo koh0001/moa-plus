@@ -23,6 +23,27 @@ struct AbbreviationSettingsView: View {
             }
 
             Section {
+                Toggle("변환 후 띄어쓰기 유지", isOn: $settings.abbreviationKeepConfirmSpaceEnabled)
+                Toggle("백스페이스로 되돌리기", isOn: $settings.abbreviationUndoOnBackspaceEnabled)
+            } footer: {
+                Text("‘변환 후 띄어쓰기 유지’ 를 끄면 변환을 확정한 스페이스가 결과 뒤에 남지 않습니다. 마침표 같은 기호와 엔터는 문장에 필요한 입력이라 이 설정과 관계없이 그대로 유지됩니다.\n\n‘백스페이스로 되돌리기’ 는 변환된 직후 백스페이스를 한 번 누르면 원래 트리거로 되돌립니다. 끄면 일반 삭제처럼 한 글자씩 지워집니다.")
+            }
+
+            Section {
+                Picker("트리거 제한", selection: $settings.abbreviationTriggerPolicy) {
+                    ForEach(AbbreviationTriggerPolicy.allCases, id: \.self) { policy in
+                        Text(policy.displayName).tag(policy)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("트리거 제한")
+            } footer: {
+                Text(settings.abbreviationTriggerPolicy.footerText
+                     + "\n이미 등록한 단축어는 이 설정을 바꿔도 그대로 동작합니다.")
+            }
+
+            Section {
                 if filteredExpansions.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "text.badge.plus")
@@ -166,6 +187,13 @@ struct EditAbbreviationView: View {
         return nil
     }
 
+    /// 트리거가 현재 정책을 통과하지 못하는 사유. 통과하면 `nil`.
+    /// 빈 입력은 아직 아무것도 안 친 상태라 사유를 띄우지 않는다.
+    private var triggerValidationMessage: String? {
+        guard !trigger.isEmpty else { return nil }
+        return KeyboardSettings.shared.abbreviationTriggerPolicy.validationMessage(for: trigger)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -174,7 +202,14 @@ struct EditAbbreviationView: View {
                 } header: {
                     Text("트리거")
                 } footer: {
-                    Text("이 문자를 입력하면 아래 문구로 치환됩니다.")
+                    // 막히는 이유를 반드시 보여준다 — 저장 버튼만 흐려지면
+                    // 사용자는 왜 안 되는지 알 수 없다.
+                    if let message = triggerValidationMessage {
+                        Text(message)
+                            .foregroundColor(.red)
+                    } else {
+                        Text("이 문자를 입력하면 아래 문구로 치환됩니다. 마침표 같은 기호도 넣을 수 있습니다(예: `.ㅎㅌ`). 띄어쓰기는 넣을 수 없습니다.")
+                    }
                 }
 
                 Section {
@@ -227,7 +262,9 @@ struct EditAbbreviationView: View {
                         onSave(expansion)
                         dismiss()
                     }
-                    .disabled(trigger.isEmpty || replacement.isEmpty)
+                    .disabled(replacement.isEmpty
+                              || KeyboardSettings.shared.abbreviationTriggerPolicy
+                                  .validationMessage(for: trigger) != nil)
                 }
             }
             .onAppear {

@@ -197,6 +197,10 @@ class KeyboardViewModel: ObservableObject {
     private let vowelResolver = VowelResolver()
     private let abbreviationEngine = AbbreviationEngine()
 
+    /// 직전 확장이 확정 구분자를 화면에 남겼는지. 되돌리기(`shouldRestore`)가 지울 길이를
+    /// 정하는 데 쓴다 — 엔진은 확장 직후에만 복원을 요청하므로 이 값은 항상 짝이 맞는다.
+    private var lastExpansionKeptDelimiter: Bool = true
+
     private var lastExpansionCount: Int = -1
 
     /// Reload abbreviation engine when settings change.
@@ -206,6 +210,7 @@ class KeyboardViewModel: ObservableObject {
     private func reloadAbbreviationEngine() {
         abbreviationEngine.delegate = self
         abbreviationEngine.isEnabled = KeyboardSettings.shared.abbreviationEnabled
+        abbreviationEngine.isUndoOnBackspaceEnabled = KeyboardSettings.shared.abbreviationUndoOnBackspaceEnabled
 
         let currentCount = KeyboardSettings.shared.shortcutExpansionStore.expansions.count
         guard currentCount != lastExpansionCount else { return }
@@ -1405,7 +1410,8 @@ extension KeyboardViewModelDelegate {
 // MARK: - AbbreviationEngineDelegate
 
 extension KeyboardViewModel: AbbreviationEngineDelegate {
-    func abbreviationEngine(_ engine: AbbreviationEngine, shouldReplace trigger: String, with replacement: String, delimiter: Character) {
+    @discardableResult
+    func abbreviationEngine(_ engine: AbbreviationEngine, shouldReplace trigger: String, with replacement: String, delimiter: Character) -> Bool {
         // Suggestion-mode candidates are confirmed *after* the user typed
         // the delimiter, which by then was already inserted into the proxy
         // (`inputSpace`/`inputReturn` only suppresses insertion when the
@@ -1413,8 +1419,29 @@ extension KeyboardViewModel: AbbreviationEngineDelegate {
         // trailing delimiter first so the deletion arithmetic matches both
         // confirmation paths. `.onDelimiter` confirmations skipped the
         // insertText, so this branch is a no-op there.
-        if let vc = delegate as? KeyboardViewController,
-           let before = vc.textDocumentProxy.documentContextBeforeInput,
+        // NOTE: read the host context through `delegate?.textBeforeCursor()`, not
+        // `delegate as? KeyboardViewController`. On device the two are identical
+        // (KeyboardViewController.textBeforeCursor() returns
+        // documentContextBeforeInput verbatim), but the cast made this guard —
+        // and the second-pass guard below — dead code in every unit test, so the
+        // deletion arithmetic shipped unexercised.
+        //
+        // Before deleting anything, make sure the screen actually ends with the
+        // trigger. The engine's buffer and the host text can drift apart —
+        // `processBackspace()` shrinks the buffer by one while the composer may
+        // eat a composing glyph instead, so the buffer can end up a *subsequence*
+        // of what is on screen. Deleting `trigger.count` characters blind in that
+        // state eats user text. When the host gives us no context at all (secure
+        // fields, test stubs) we have no evidence either way and proceed as before.
+        let hostContext = delegate?.textBeforeCursor()
+        if let before = hostContext,
+           !before.hasSuffix(trigger),
+           !before.hasSuffix(trigger + String(delimiter)) {
+            // Screen and buffer disagree — skip the replacement rather than
+            // corrupt the user's text. The delimiter the user typed stays put.
+            return false
+        }
+        if let before = hostContext,
            before.hasSuffix(trigger + String(delimiter)) {
             delegate?.deleteBackward()
         }
@@ -1437,16 +1464,28 @@ extension KeyboardViewModel: AbbreviationEngineDelegate {
         // never more than that, and never on a partial suffix. Deleting partial
         // suffixes risked eating user-typed characters that happened to share a
         // prefix with the trigger.
-        if let vc = delegate as? KeyboardViewController,
-           let before = vc.textDocumentProxy.documentContextBeforeInput,
+        if let before = delegate?.textBeforeCursor(),
            before.hasSuffix(trigger) {
             for _ in 0..<trigger.count {
                 delegate?.deleteBackward()
             }
         }
-        // Insert the replacement + delimiter
-        delegate?.insertText(replacement + String(delimiter))
+        // Insert the replacement, and the confirming delimiter unless the user
+        // asked us to swallow it (space only — see shouldKeepConfirmDelimiter).
+        let keepsDelimiter = shouldKeepConfirmDelimiter(delimiter)
+        lastExpansionKeptDelimiter = keepsDelimiter
+        delegate?.insertText(keepsDelimiter ? replacement + String(delimiter) : replacement)
         HapticManager.shared.playAbbreviationConfirm()
+        return true
+    }
+
+    /// 확정 구분자를 결과 뒤에 남길지.
+    ///
+    /// 설정 대상은 **스페이스뿐**이다. 기호(`.` `,` `!` …)는 사용자가 의도해서 찍은
+    /// 문장부호이고 엔터는 줄바꿈/전송이라, 빼면 입력을 삼키는 것이 된다.
+    private func shouldKeepConfirmDelimiter(_ delimiter: Character) -> Bool {
+        guard delimiter == " " else { return true }
+        return KeyboardSettings.shared.abbreviationKeepConfirmSpaceEnabled
     }
 
     func abbreviationEngine(_ engine: AbbreviationEngine, showCandidateFor expansion: ShortcutExpansion) {
@@ -1456,6 +1495,9 @@ extension KeyboardViewModel: AbbreviationEngineDelegate {
     }
 
     func abbreviationEngine(_ engine: AbbreviationEngine, showCandidatesFor expansions: [ShortcutExpansion]) {
+        // 빈 후보로 바를 띄우지 않는다 — 뷰와 컨트롤러(높이 보정)가 이 플래그 하나만
+        // 보므로, 내용 없는 바가 떠서 높이만 늘어나는 상태가 생기면 안 된다.
+        guard !expansions.isEmpty else { return }
         abbreviationCandidates = expansions
         abbreviationCandidate = expansions.first
         isAbbreviationCandidateVisible = true
@@ -1471,7 +1513,10 @@ extension KeyboardViewModel: AbbreviationEngineDelegate {
         // The expansion inserted `replacement + delimiter` on screen. Restore
         // must remove the delimiter too — deleting only `replacement` leaves
         // the delimiter behind and appends the trigger after it ("♥ㅎㅌ" bug).
-        let footprint = replacement.count + String(delimiter).count
+        // Unless the confirming space was swallowed, in which case the footprint
+        // is the replacement alone — deleting one more would eat a real character.
+        let footprint = replacement.count
+            + (lastExpansionKeptDelimiter ? String(delimiter).count : 0)
         for _ in 0..<footprint {
             delegate?.deleteBackward()
         }
