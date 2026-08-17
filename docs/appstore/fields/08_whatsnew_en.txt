@@ -1,23 +1,21 @@
-Moa+ 2.1 makes text shortcuts far more flexible. This update started from user reports.
+Moa+ 2.1.1 makes haptic feedback feel immediate.
 
-[Shortcuts]
-- Shortcuts can now include punctuation such as periods and question marks, at the beginning or at the end.
+[Improved]
+- Haptic feedback now fires the moment you press a key, not when you lift your finger. Moa+ is a swipe keyboard, so your finger stays down while you draw a stroke; buzzing only at the end felt late. It now responds on touch down, like the system keyboard. (Reported in GitHub issue #23)
+
+[From 2.1: text shortcuts]
+- Shortcuts can include punctuation such as periods and question marks, at the beginning or at the end.
 - A shortcut is recognized even when you type it directly after a word, with no space in between.
-- You can choose whether the space that confirms a shortcut stays after the replacement. Punctuation is always kept, since it belongs to your sentence.
-- Undo on backspace right after a replacement can now be turned on or off in settings.
+- You can choose whether the space that confirms a shortcut stays after the replacement.
+- Undo on backspace right after a replacement can be turned on or off in settings.
 - Very short shortcuts trigger by accident easily, so new ones are limited by default. You can lift the limit in settings, and shortcuts you already saved keep working.
+- Fixed the keyboard being cut off while the suggestion bar was showing, and typing not responding after returning from another app.
 
-[Bug fixes]
-- Fixed the keyboard being cut off at the bottom while the shortcut suggestion bar was showing.
-- Fixed typing not responding after returning from another app with the keyboard still open.
-
-[The 2.0 input overhaul is still here]
-Version 2.0 matched typing behavior to the original Samsung MoaKey, based on frame-by-frame analysis of real device recordings. If you have not tried it yet, here is what came with it.
-- Type ae, e and ui with a diagonal out-and-back stroke.
-- Vertical round-trip chains (wa, wae, yeo, ye, yu and more) are recognized exactly like the original.
-- Swipe sideways then bend up or down to get ae or e.
-- Tapping the dot key repeatedly toggles o/yo and u/yu.
+[From 2.0: input overhaul]
+Typing behavior was matched to the original MoaKey through frame-by-frame analysis of real device recordings.
+- Diagonal out-and-back strokes for ae, e and ui.
+- Vertical round-trip chains (wa, wae, yeo, ye, yu and more).
+- Dot key combinations, including the o/yo and u/yu toggle.
 - Backspace deletes one jamo at a time: final consonant, then vowel, then consonant.
-- The rebuilt tutorial, typing practice, live stroke test and input log board arrived with it as well.
 
 Core typing works without Full Access. Haptic feedback requires iOS Full Access (optional); your input is never transmitted off your device even when it is enabled.

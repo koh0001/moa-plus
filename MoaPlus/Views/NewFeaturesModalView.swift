@@ -26,6 +26,14 @@ struct NewFeaturesModalView: View {
     /// v2.1 — 단축어 개편. 사용자 제보(기호 트리거 미동작)에서 출발한 릴리스라
     /// 새 항목을 맨 앞에 두고, v2.0 입력 엔진 항목은 뒤에 남겨 둔다.
     private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "진동 반응이 빨라졌어요", features: [
+            Feature(
+                icon: "hand.tap",
+                tint: .orange,
+                title: "누르는 순간 진동",
+                detail: "키를 뗄 때가 아니라 누르는 순간 진동이 옵니다. 긋기 입력은 손가락이 붙어 있는 시간이 길어서, 획을 다 긋고 뗄 때 울리면 반응이 늦게 느껴졌습니다."
+            ),
+        ]),
         FeatureGroup(title: "단축어가 훨씬 자유로워졌어요", features: [
             Feature(
                 icon: "text.badge.plus",

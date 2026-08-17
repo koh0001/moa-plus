@@ -514,6 +514,8 @@ struct FunctionRowView: View {
 /// 5개 슬롯(tap/←/→/↑/↓)을 외부에서 주입받는 긋기 펑크 키.
 /// 빈 문자열("") 슬롯은 미리보기에서 숨김 + 드래그/탭 시 입력 무시.
 struct PunctuationSwipeKey: View {
+    /// 누르는 순간의 햅틱 (이슈 #23). 생성 지점이 많아 환경 값으로 주입한다.
+    @Environment(\.keyPressFeedback) private var keyPressFeedback
     let width: CGFloat
     let height: CGFloat
     let slots: PunctuationSlots
@@ -579,7 +581,7 @@ struct PunctuationSwipeKey: View {
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
-                    if !isPressed { isPressed = true }
+                    if !isPressed { isPressed = true; keyPressFeedback() }
                     if !didDrag {
                         let dx = value.translation.width
                         let dy = value.translation.height
@@ -722,6 +724,8 @@ final class SpaceCursorRepeater {
 }
 
 struct SpaceKeyView: View {
+    /// 누르는 순간의 햅틱 (이슈 #23). 생성 지점이 많아 환경 값으로 주입한다.
+    @Environment(\.keyPressFeedback) private var keyPressFeedback
     let width: CGFloat
     let height: CGFloat
     let onTap: () -> Void
@@ -802,7 +806,7 @@ struct SpaceKeyView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        if !isPressed { isPressed = true }
+                        if !isPressed { isPressed = true; keyPressFeedback() }
                         // When the cursor-by-drag toggle is off, never enter
                         // drag mode — small finger movements (≥ dragThreshold)
                         // would otherwise suppress the onTap fallback in
@@ -863,6 +867,8 @@ struct SpaceKeyView: View {
 }
 
 struct FunctionKeyView: View {
+    /// 누르는 순간의 햅틱 (이슈 #23). 생성 지점이 많아 환경 값으로 주입한다.
+    @Environment(\.keyPressFeedback) private var keyPressFeedback
     let content: AnyView
     let width: CGFloat
     let height: CGFloat
@@ -891,6 +897,7 @@ struct FunctionKeyView: View {
                     .onChanged { _ in
                         if !isPressed {
                             isPressed = true
+                            keyPressFeedback()
                         }
                     }
                     .onEnded { _ in

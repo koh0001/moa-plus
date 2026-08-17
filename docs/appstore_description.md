@@ -59,6 +59,12 @@ pbcopy < docs/appstore/fields/05_description_ko.txt
 
 > 실제 제출본 원본은 `docs/appstore/fields/` (01~08), 전체 이력은 `CHANGELOG.md` 참조. 아래는 아카이브.
 
+### v2.1.1
+
+[개선]
+- 키를 뗄 때가 아니라 누르는 순간 진동이 오도록 변경 (GitHub 이슈 #23).
+  긋기 키보드는 press→release 간격이 길어 확정 시점 진동이 늦게 체감된다
+
 ### v2.1.0
 
 [단축어]

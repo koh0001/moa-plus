@@ -138,6 +138,13 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 - `KeyboardViewController`는 UIKit, 나머지는 SwiftUI
 - 롱프레스 팝업은 KeyboardView 최상위 ZStack에서 렌더링 (z-order 클리핑 방지)
 - `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음
+- **햅틱은 키를 누르는 순간 울린다** (이슈 #23). 입력 확정(손 뗄 때)이 아니다 — 긋기 키보드는
+  press→release 간격이 길어 확정 시점에 울리면 반응이 늦게 느껴진다. 그리드 키는
+  `gestureStarted`, 슬롯B는 `slotBVowelGestureStarted` 가 `keyPressFeedback()` 을 부르고,
+  기능행 키는 `EnvironmentValues.keyPressFeedback`(KeyboardView.swift 정의)으로 주입받는다.
+  **입력 메서드(`inputConsonant`/`inputSpace`/`toggleLetterMode` 등)에 햅틱을 되살리지 말 것**
+  — 키 하나에 진동 두 번이 된다 (`KeyboardViewModelHapticTimingTests` 가드).
+  백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함)
 - 클릭 사운드는 `AudioServicesPlaySystemSound(1104)` 사용 (`playInputClick`은 익스텐션에서 불안정)
 - `clickSoundEnabled`는 ThemeSettings 밖에 독립 Bool로 저장 (Codable 디코딩 실패 방지)
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)

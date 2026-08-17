@@ -267,6 +267,10 @@ struct KeyboardView: View {
         // which half of the keyboard the user touched. Production keyboard
         // ignores this — the value is only consumed in preview mode.
         .coordinateSpace(name: "keyboardPreview")
+        // 기능행 키들이 누르는 순간 울릴 수 있게 주입 (이슈 #23).
+        // 그리드 키와 슬롯B 는 `gestureStarted` / `slotBVowelGestureStarted` 가
+        // 이미 터치 다운에서 불리므로 ViewModel 쪽에서 처리한다.
+        .environment(\.keyPressFeedback) { viewModel.keyPressFeedback() }
         .onAppear { loadBackgroundIfNeeded() }
         .onChange(of: settings.themeSettings.backgroundImageId) { loadBackgroundIfNeeded() }
     }
@@ -323,4 +327,23 @@ struct KeyboardView: View {
     let vm = KeyboardViewModel()
     KeyboardView(viewModel: vm, gestureState: vm.gestureState, popupState: vm.popupState)
         .frame(height: 280)
+}
+
+// MARK: - 누름 시점 햅틱 주입 (이슈 #23)
+
+/// 키를 **누르는 순간** 울릴 피드백. 손을 뗄 때(입력 확정)가 아니라 터치 다운에서
+/// 울려야 긋기 입력에서도 반응이 즉각적으로 느껴진다.
+///
+/// 기능행 키(`FunctionKeyView` / `SpaceKeyView` / `PunctuationSwipeKey`)는 생성 지점이
+/// 20곳이 넘어 인자로 넘기면 한두 곳을 빠뜨리기 쉽다. 환경 값으로 한 번만 주입한다.
+/// 기본값은 no-op 이라 미리보기·테스트는 영향을 받지 않는다.
+private struct KeyPressFeedbackKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var keyPressFeedback: () -> Void {
+        get { self[KeyPressFeedbackKey.self] }
+        set { self[KeyPressFeedbackKey.self] = newValue }
+    }
 }

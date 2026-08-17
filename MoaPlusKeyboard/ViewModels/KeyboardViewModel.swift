@@ -270,7 +270,6 @@ class KeyboardViewModel: ObservableObject {
         commitCurrent()
         symbolPage = 0   // 심볼 진입/이탈 시 항상 page 0 에서 시작
         keyboardMode = keyboardMode.toggleSymbol()
-        triggerHapticFeedback()
     }
 
     /// Flip the symbol keypad between page 0 and page 1. No-op unless we're
@@ -278,7 +277,6 @@ class KeyboardViewModel: ObservableObject {
     func toggleSymbolPage() {
         guard keyboardMode.isSymbol else { return }
         symbolPage = (symbolPage + 1) % KeyboardMetrics.symbolPageCount
-        triggerHapticFeedback()
     }
 
     func toggleLetterMode() {
@@ -292,7 +290,6 @@ class KeyboardViewModel: ObservableObject {
         abbreviationEngine.resetBuffer()
         shiftState = .off  // reset shift when switching language mode
         persistLetterModeIfEnabled()
-        triggerHapticFeedback()
     }
 
     /// Persist the current letter mode to UserDefaults if the user opted in.
@@ -323,7 +320,6 @@ class KeyboardViewModel: ObservableObject {
             case .locked: shiftState = .off
             }
         }
-        triggerHapticFeedback()
     }
 
     /// Set caps-lock unconditionally. Wired to long-press on the shift
@@ -336,7 +332,6 @@ class KeyboardViewModel: ObservableObject {
         shiftState = (shiftState == .locked) ? .off : .locked
         lastShiftTapTimestamp = nil
         didHandleShiftLongPressInCurrentGesture = true
-        triggerHapticFeedback()
     }
 
     /// Apply shift to a letter symbol. Auto-releases .on to .off after consuming one letter.
@@ -360,14 +355,12 @@ class KeyboardViewModel: ObservableObject {
         freezeComposerIfCaretMoved()
         let action = composer.inputChoseong(consonant)
         handleComposerAction(action)
-        triggerHapticFeedback()
     }
 
     func inputVowel(_ vowel: Jungseong) {
         freezeComposerIfCaretMoved()
         let action = composer.inputJungseong(vowel)
         handleComposerAction(action)
-        triggerHapticFeedback()
     }
 
     /// Backstop for a stale composing glyph after the user moved the caret by
@@ -429,6 +422,7 @@ class KeyboardViewModel: ObservableObject {
     // Tap (no drag) → ㆍ.
 
     func slotBVowelGestureStarted(at point: CGPoint) {
+        keyPressFeedback()
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
         // Slot B is not associated with any consonant column override.
@@ -530,7 +524,6 @@ class KeyboardViewModel: ObservableObject {
         if resolved.count == 1, let char = resolved.first {
             abbreviationEngine.processCharacter(char)
         }
-        triggerHapticFeedback()
     }
 
     func inputNumber(_ number: String) {
@@ -541,7 +534,6 @@ class KeyboardViewModel: ObservableObject {
         } else {
             delegate?.insertText(number)
         }
-        triggerHapticFeedback()
     }
 
     /// Insert opening bracket + closing bracket, then move cursor back between them.
@@ -693,7 +685,6 @@ class KeyboardViewModel: ObservableObject {
                 delegate?.insertText(" ")
             }
         }
-        triggerHapticFeedback()
     }
 
     /// Double-space → period. When the user presses space and the text already
@@ -720,7 +711,6 @@ class KeyboardViewModel: ObservableObject {
         if !abbreviationEngine.canRestoreLastExpansion {
             delegate?.insertText("\n")
         }
-        triggerHapticFeedback()
     }
 
     func switchKeyboard() {
@@ -800,6 +790,7 @@ class KeyboardViewModel: ObservableObject {
     // MARK: - Gesture Handling
 
     func gestureStarted(row: Int, column: Int, at point: CGPoint) {
+        keyPressFeedback()
         didHandleLongPressNumberInCurrentGesture = false
         didHandleShiftLongPressInCurrentGesture = false
         activeKey = (row, column)
@@ -1312,6 +1303,20 @@ class KeyboardViewModel: ObservableObject {
 
     private func triggerHapticFeedback() {
         delegate?.triggerHapticFeedback()
+    }
+
+    /// 키를 **누르는 순간** 울리는 피드백 (이슈 #23).
+    ///
+    /// 모아+ 는 긋기 키보드라 손가락이 붙어 있는 시간이 길다. 입력이 확정되는 시점
+    /// (= 손을 뗄 때)에 울리면 획을 긋는 내내 아무 반응이 없다가 마지막에 한 번
+    /// 울려서 "반응이 늦다" 로 느껴진다. iOS 기본 키보드와 마찬가지로 누르는 순간
+    /// 울리고, 획이 끝날 때는 다시 울리지 않는다 (키 하나에 진동 하나).
+    ///
+    /// 백스페이스는 예외적으로 `deleteBackward()` 안에 남겨 뒀다 — 누른 즉시 한 번
+    /// 지우고 자동 반복으로 이어지는 구조라, 반복 틱마다 울려야 하기 때문이다.
+    func keyPressFeedback() {
+        if previewMode { return }
+        triggerHapticFeedback()
     }
 
     private func startBackspaceRepeat() {
