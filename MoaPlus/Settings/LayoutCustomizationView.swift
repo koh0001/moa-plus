@@ -224,7 +224,8 @@ struct LayoutCustomizationView: View {
                     ))
                     if punctEnabled {
                         slotBRadioRow(.punctuation, title: "특수문자", desc: "tap=. ←=? →=! ↑=, ↓=.")
-                        slotBRadioRow(.vowelKey, title: "모음 키", desc: "tap=ㆍ + 8방향 모음")
+                        slotBRadioRow(.vowelKey, title: "모음 키",
+                                      desc: settings.layoutCustomization.vowelKeyBehavior.shortDescription)
                     }
                 }
 
@@ -259,6 +260,23 @@ struct LayoutCustomizationView: View {
                     Text("OFF 시 스페이스바·엔터가 확장되고 엔터가 백스페이스에 2셀 정렬됩니다.")
                 } else {
                     Text("스페이스바 옆 키 동작.")
+                }
+            }
+
+            // 모음 키 동작 — 모음 키가 실제로 화면에 있을 때만 노출.
+            // 확장형은 slotB 값과 무관하게 우측 컬럼에 모음 키를 임베드하므로
+            // 슬롯 B 라디오가 숨겨져 있어도 이 섹션은 보여야 한다.
+            let vowelKeyVisible = isFullPackage
+                || (settings.layoutCustomization.koreanPunctuationEnabled
+                    && settings.layoutCustomization.slotB == .vowelKey)
+            if vowelKeyVisible {
+                Section {
+                    vowelKeyBehaviorRow(.gestureMulti)
+                    vowelKeyBehaviorRow(.cheonjiin)
+                } header: {
+                    Text("모음 키 동작")
+                } footer: {
+                    Text("순정 모아키 방식은 좌우로만 그어 ㅣ·ㅡ 를 내고 나머지 모음은 ㆍ 로 쌓아 만듭니다(천지인). 대각선 긋기를 쓰지 않으므로 ‘4방향 전용 모드’와도 함께 쓸 수 있습니다.")
                 }
             }
 
@@ -427,6 +445,26 @@ struct LayoutCustomizationView: View {
                 }
                 Spacer()
                 if settings.layoutCustomization.slotB == preset {
+                    Image(systemName: "checkmark").foregroundColor(.accentColor)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func vowelKeyBehaviorRow(_ behavior: VowelKeyBehavior) -> some View {
+        Button(action: {
+            var c = settings.layoutCustomization
+            c.vowelKeyBehavior = behavior
+            settings.layoutCustomization = c
+        }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(behavior.displayName).foregroundColor(.primary)
+                    Text(behavior.shortDescription).font(.caption).foregroundColor(.secondary)
+                }
+                Spacer()
+                if settings.layoutCustomization.vowelKeyBehavior == behavior {
                     Image(systemName: "checkmark").foregroundColor(.accentColor)
                 }
             }

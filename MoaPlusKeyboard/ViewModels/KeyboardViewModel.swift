@@ -107,6 +107,36 @@ class KeyboardViewModel: ObservableObject {
     /// `onPreviewVowelDetailed` callback when the gesture ends.
     private var slotBVowelStartPoint: CGPoint = .zero
 
+    /// Last point seen during the current slot-B-vowel gesture. `.cheonjiin`
+    /// 모드가 손 뗀 위치로 3분할을 판정하므로 필요하다 — `slotBVowelGestureEnded()`
+    /// 는 인자를 받지 않고(뷰 4곳 + 테스트가 그 시그니처에 묶여 있다) `DragGesture`
+    /// 는 `minimumDistance: 0` 이라 탭에서도 `onChanged` 가 시작점으로 한 번 온다.
+    private var slotBVowelLastPoint: CGPoint = .zero
+
+    /// 현재 설정의 모음 키 동작.
+    private var vowelKeyBehavior: VowelKeyBehavior {
+        KeyboardSettings.shared.layoutCustomization.vowelKeyBehavior
+    }
+
+    /// `.cheonjiin` 3분할 판정의 가로 변위 임계. 순정 팝업에서 가운데(ㆍ) 칸과
+    /// 옆 칸의 경계는 키 폭의 절반쯤인데, 사용자가 이미 조절하는 "긋기 길이"
+    /// (짧게 24% / 보통 40% / 길게 60% × 중앙키 폭)와 성격이 같아 그 값을 그대로
+    /// 쓴다. 기기 폭에 비례하므로 SE~Pro Max, 기능행/확장형 임베드 어디서나 동일.
+    private var cheonjiinHorizontalThreshold: CGFloat {
+        KeyboardSettings.shared.gestureSettings.swipeProfile.swipeLength
+            .threshold(keyWidth: gestureAnalyzer.keyWidth)
+    }
+
+    /// 손 뗀 지점의 가로 순변위로 ㅣ/ㆍ/ㅡ 를 고른다. 세로 성분은 보지 않는다 —
+    /// 순정 팝업의 3칸이 가로로만 나뉘어 있어 ↖ 도 ㅣ, ↑ 는 가운데(ㆍ)다.
+    /// 중간에 아무리 헤매도 **최종 위치**만 반영되는 선택기(selector) 의미론이다.
+    private func cheonjiinPrimitive(dx: CGFloat) -> Jungseong {
+        let threshold = cheonjiinHorizontalThreshold
+        if dx <= -threshold { return .ㅣ }
+        if dx >= threshold { return .ㅡ }
+        return .ㆍ
+    }
+
     private var lastShiftTapTimestamp: Date?
     private static let doubleTapInterval: TimeInterval = 0.3
 
@@ -412,14 +442,17 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Slot B Vowel Key (multi-stroke)
+    // MARK: - Slot B Vowel Key (동작은 layoutCustomization.vowelKeyBehavior)
     //
-    // Mirrors the consonant-key gesture pipeline (gestureStarted/Moved/Ended)
-    // but produces a bare vowel — no consonant prefix. Routes points through
-    // the same GestureAnalyzer + VowelResolver so the resolved Jungseong
-    // covers ALL patterns (basic ㅏ/ㅓ/ㅗ/ㅜ/ㅡ/ㅣ, y-vowels ㅑ/ㅕ/ㅛ/ㅠ,
-    // diphthongs ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ, ㅐ/ㅒ/ㅔ/ㅖ, ㅢ).
-    // Tap (no drag) → ㆍ.
+    // `.gestureMulti` (기본): consonant-key gesture pipeline
+    // (gestureStarted/Moved/Ended) 을 그대로 태우되 초성 없는 모음만 낸다.
+    // GestureAnalyzer + VowelResolver 를 공유하므로 한 번의 긋기로 모든 패턴
+    // (basic ㅏ/ㅓ/ㅗ/ㅜ/ㅡ/ㅣ, y-vowels ㅑ/ㅕ/ㅛ/ㅠ, diphthongs
+    // ㅘ/ㅙ/ㅚ/ㅝ/ㅞ/ㅟ, ㅐ/ㅒ/ㅔ/ㅖ, ㅢ) 이 나온다. Tap (no drag) → ㆍ.
+    //
+    // `.cheonjiin` (순정/삼성 모아키, 이슈 #25): 분석기를 태우지 않고 손 뗀
+    // 지점의 **가로 순변위**만 본다 — ← = ㅣ, → = ㅡ, 그 외(탭·상하) = ㆍ.
+    // 나머지 모음은 천지인 합성으로 쌓는다.
 
     func slotBVowelGestureStarted(at point: CGPoint) {
         keyPressFeedback()
@@ -432,6 +465,7 @@ class KeyboardViewModel: ObservableObject {
         gestureAnalyzer.reset()
         gestureAnalyzer.addPoint(point)
         slotBVowelStartPoint = point
+        slotBVowelLastPoint = point
         // Feed gestureState so GestureOverlayView activates for slot B too.
         // Sentinel (-1, -1) marks "slot B vowel key" (not a grid cell). The
         // overlay only checks startPoint + directions, so the row/col value
@@ -444,6 +478,26 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func slotBVowelGestureMoved(to point: CGPoint) {
+        slotBVowelLastPoint = point
+        if vowelKeyBehavior == .cheonjiin {
+            // 미리보기는 기존 `GestureOverlayView` 경로를 그대로 쓴다. 오버레이는
+            // `directions` 가 비면 아무것도 그리지 않으므로, 좌/우로 확정된
+            // 구간에서만 ←/→ 한 획을 넣는다. 가운데(ㆍ)는 탭과 같은 상태라
+            // 기존 8방향 모드의 탭처럼 미리보기가 없는 게 일관적이다.
+            let dx = point.x - slotBVowelStartPoint.x
+            switch cheonjiinPrimitive(dx: dx) {
+            case .ㅣ:
+                gestureDirections = [.left]
+                previewVowel = .ㅣ
+            case .ㅡ:
+                gestureDirections = [.right]
+                previewVowel = .ㅡ
+            default:
+                gestureDirections = []
+                previewVowel = nil
+            }
+            return
+        }
         gestureAnalyzer.addPoint(point)
         let directions = gestureAnalyzer.getDirections()
         gestureDirections = directions
@@ -455,6 +509,21 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func slotBVowelGestureEnded() {
+        if vowelKeyBehavior == .cheonjiin {
+            let dx = slotBVowelLastPoint.x - slotBVowelStartPoint.x
+            let primitive = cheonjiinPrimitive(dx: dx)
+            gestureAnalyzer.reset()
+            activeKey = nil
+            gestureStartPoint = nil
+            gestureDirections = []
+            previewVowel = nil
+            if previewMode {
+                emitPreviewVowel(primitive)
+            } else {
+                inputVowel(primitive)
+            }
+            return
+        }
         let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
         gestureAnalyzer.reset()
         // Clear gestureState so the overlay disappears.

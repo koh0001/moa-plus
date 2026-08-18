@@ -7,7 +7,7 @@ private let expansionDelimiters: Set<Character> = [" ", "\n", ".", ",", "!", "?"
 ///
 /// 공백이 트리거 내용까지 겸하면 확정 신호와 역할이 겹쳐서, 짧은 트리거가 긴 트리거를
 /// 가로채고(`ㅋ` vs `ㅋ ㅋ`) 삭제 개수 규칙도 갈라진다. 그래서 공백 포함 트리거는
-/// 지원하지 않기로 했다 (docs/ABBREVIATION_FEEDBACK_PLAN.md §확정된 결정 4).
+/// 지원하지 않기로 했다 (CLAUDE.md §약어 트리거 매칭 규칙).
 private let boundaryDelimiters: Set<Character> = [" ", "\n"]
 
 /// 내용 겸 확정 구분자 — 버퍼에 **누적**되면서 동시에 확정 판정을 트리거한다.
@@ -324,7 +324,7 @@ final class AbbreviationEngine {
     ///    포함한 트리거만** 대상이다. 이 제한이 없으면 평범한 `ㅎㅌ` 가 "안녕ㅎㅌ" 끝에서도
     ///    터져 기존 사용자가 전부 깨진다. 기호 트리거는 반대로 `안녕.ㅎㅌ` 처럼 앞말에
     ///    붙여 쓰는 것이 전형적 사용이라 어절 중간에서도 발동시킨다
-    ///    (docs/ABBREVIATION_FEEDBACK_PLAN.md §확정된 결정 8).
+    ///    (CLAUDE.md §약어 트리거 매칭 규칙).
     private func findMatch() -> (trigger: String, expansions: [ShortcutExpansion])? {
         let exact = lookupTrie(buffer)
         if !exact.isEmpty {
