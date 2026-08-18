@@ -217,6 +217,26 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
 - 심볼 모드 전용 행: `[한글/ABC] [한/영] [#+= / 123] [space] [⏎]` — 페이지 토글이 **스페이스 왼쪽**(구 슬롯 B 위치), 긋기 펑크 대신 렌더
 
+### 모음 키 동작 (`LayoutCustomization.vowelKeyBehavior`, v2.1.1 build 20 / 이슈 #25)
+모음 키(`SlotBVowelKey`, 라벨 `ㅣㆍㅡ / 모음`)는 **두 곳**에 뜬다 — 스페이스 옆
+슬롯 B(`slotB == .vowelKey`)와 확장형(`fullPackage`) 그리드 col 6 row 1 임베드.
+확장형은 `slotB` 값과 무관하게 임베드하므로 동작 설정을 `SlotBPreset` 케이스로
+넣으면 확장형에서 도달하지 못한다 — **반드시 별도 필드로 둘 것**.
+- `.gestureMulti` (기본, 기존 동작) — tap=ㆍ + `GestureAnalyzer`/`VowelResolver`
+  전체 파이프라인(8방향·멀티스트로크). **기본값을 바꾸지 말 것** — 업데이트만으로
+  기존 사용자의 모음 키가 다른 자판이 된다 (`LayoutCustomizationTests` 가드)
+- `.cheonjiin` (순정/삼성 모아키) — 분석기를 **아예 태우지 않고** 손 뗀 지점의
+  **가로 순변위**만 본다: ← = ㅣ, → = ㅡ, 그 외(탭·↑·↓·임계 미만) = ㆍ.
+  임계는 `swipeProfile.swipeLength.threshold(keyWidth:)` 재사용(기기 폭 비례).
+  순정은 키 위에 `ㅣ · ㅡ` 3칸 팝업을 띄우고 손가락이 놓인 칸을 고르게 하는
+  **선택기**라, 지나간 경로가 아니라 최종 위치가 결과다 — 획 시퀀스로 바꾸면
+  "헤매다 가운데로 돌아오면 ㆍ" 가 깨진다 (`KeyboardViewModelCheonjiinVowelKeyTests`)
+- 미리보기는 새 컴포넌트 없이 기존 `GestureOverlayView` 경로 재사용. 오버레이는
+  `directions` 가 비면 그리지 않으므로 좌/우 확정 구간에서만 `[.left]`/`[.right]`
+  한 획을 넣는다. 가운데(ㆍ)는 탭과 같은 상태 = 미리보기 없음
+- 부수 효과: 순정 방식은 대각선을 안 쓰므로 `fourWayMode`(4방향 전용)와 공존한다.
+  8방향 동작에서 클래식/확장형의 ㅣ/ㅡ 가 ↗/↘ 로만 들어와 막히던 제약이 사라진다
+
 ### 심볼 키패드 페이지 (2페이지)
 - `KeyboardMetrics.symbolLayout(_:page:)` — page 0 = 숫자 + 상용 문장부호(왼쪽 열 `. , ' "`), page 1 = 괄호/통화/수학/타이포 기호. `symbolPageCount = 2`
 - 상태: `KeyboardViewModel.symbolPage`(Int). `toggleSymbolPage()`가 `% symbolPageCount` 순환. 심볼 진입/이탈(`toggleSymbolMode`/`toggleLetterMode`) 시 항상 0 리셋
@@ -286,7 +306,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 │                                             — 기호·엔터는 설정 무관 항상 유지)
 ├── abbreviationTriggerPolicy: .safe/.free  (신규 트리거 등록 제한 — 메인 앱 검증 전용)
 ├── periodOnDoubleSpaceEnabled: Bool        (더블 스페이스 → 마침표)
-├── layoutCustomization: LayoutCustomization (프리셋/슬롯/펑크 구성)
+├── layoutCustomization: LayoutCustomization (프리셋/슬롯/펑크 구성 + vowelKeyBehavior)
 ├── rememberLastKeyboardMode: Bool + lastKeyboardLetterMode: String (한/영 모드 복원)
 ├── clickSoundEnabled: Bool                 (독립 저장)
 ├── longPressDelay: Double                  (0.2~1.0초)
@@ -307,7 +327,9 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ```
 
 ### 순정 모아키 입력 스펙 (기준 — 2026-08 영상 실측으로 확정)
-출처: `docs/moakey_ios_custom_docs/assets/03_gesture_angle_reference.png` + **관찰 영상 40편 판독** (`docs/MOAKEY_VIDEO_FINDINGS.md`, 미해결 항목은 `docs/MOAKEY_RESHOOT_LIST.md`).
+출처: `docs/moakey_ios_custom_docs/assets/03_gesture_angle_reference.png` + **관찰 영상 40편 판독**.
+판독 전문(`docs/MOAKEY_VIDEO_FINDINGS.md`)과 작업 핸드오프(`docs/HANDOFF.md`)는 **로컬 보관
+문서로 저장소에 추적되지 않는다** — 클론한 머신에는 없을 수 있다. 아래 요약이 실질적 기준이다.
 - 자음 8방향 단독: `↑=ㅗ ↓=ㅜ →=ㅏ ←=ㅓ`, `↖↗=ㅣ`, `↙↘=ㅡ` (17회 예외 없음)
 - 복합모음 **방향 조합**: `ㅘ=↑→` `ㅝ=↓←` `ㅚ=↑↓` `ㅟ=↓↑` `ㅐ=→←` `ㅔ=←→` `ㅛ=↑↓↑` `ㅠ=↓↑↓` `ㅑ=→←→` `ㅕ=←→←` `ㅙ=↑→←` `ㅞ=↓←→` + **자음 키에서도 `ㅒ=→←→←` `ㅖ=←→←→` 성립** + **세로 체인 `ㅘ=↑↓→` `ㅙ=↑↓→←` `ㅠ=↑↓↑↓`** (팝업 체인 고→괴→과→괘 실측)
 - **첫 획 재해석 (v1.8.x 도입)**: 순정은 첫 대각선 획을 8방향 잠정 분류 후 **후속 획이 오면 실제 각도의 4방향으로 재해석**한다 — ↗ 왕복=ㅐ(리뷰 "ㅐ 방향 다름"의 원인이었음), ↖↘=ㅔ, ↙↑↓=ㅠ. 단 ↙↗/↘↖ 반전은 천지인 ㅡ+ㅣ=ㅢ 우선. 구현: `finalizeGestureDetailed()`의 firstStrokeCardinal + `VowelResolver` 2-pass(간선 수 비교, 동률=기존 해석). `MoakeyVideoVerifiedSpecTests` 가드 — **변경 시 순정 이탈 주의**

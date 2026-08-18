@@ -44,3 +44,12 @@ screenshots/
 # 개발 설계 기록 (brainstorming specs/plans — 로컬 보관, 저장소 미추적)
 docs/superpowers/
 moakey_screen_recording/
+
+# 내부 작업 문서 (로컬 보관, 저장소 미추적)
+# 저장소 docs/ 에는 GitHub Pages 사이트(index/privacy/styles)와 원본 참고문서만 둔다.
+docs/HANDOFF.md
+docs/KNOWN_ISSUES.md
+docs/MOAKEY_VIDEO_FINDINGS.md
+docs/appstore/
+docs/appstore_description.md
+docs/appstore_submission.txt

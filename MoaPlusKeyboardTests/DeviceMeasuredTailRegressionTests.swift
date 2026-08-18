@@ -1,7 +1,7 @@
 import XCTest
 @testable import MoaPlusKeyboard
 
-/// v2.0 실기기 실측(2026-08, V2_DEVICE_TEST_CHECKLIST 결과)에서 보고된
+/// v2.0 실기기 실측(2026-08, 실기기 체크리스트 결과)에서 보고된
 /// **손 떼는 꼬리(release tail) 승격 오타**의 회귀 테스트.
 ///
 /// 실측 결과:

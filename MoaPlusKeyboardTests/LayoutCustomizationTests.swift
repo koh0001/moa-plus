@@ -7,7 +7,18 @@ final class LayoutCustomizationTests: XCTestCase {
         XCTAssertEqual(layout.slotA, .vowel)
         XCTAssertFalse(layout.slotABackspaceSwap)
         XCTAssertEqual(layout.slotB, .punctuation)
+        XCTAssertEqual(layout.vowelKeyBehavior, .gestureMulti)
         XCTAssertEqual(layout.slotC, ["~", "^", ";", "*"])
+    }
+
+    /// 모음 키 동작 필드가 없던 디스크 데이터(v2.1.1 이전 전체)는 기존 동작으로
+    /// 시작해야 한다. 여기서 기본값이 바뀌면 업데이트만으로 사용자의 모음 키가
+    /// 다른 자판이 된다.
+    func testVowelKeyBehaviorDefaultsToGestureMultiForLegacyData() throws {
+        let json = #"{"slotA":"classic11","slotB":"vowelKey","slotC":["~","^",";","*"]}"#
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(LayoutCustomization.self, from: data)
+        XCTAssertEqual(decoded.vowelKeyBehavior, .gestureMulti)
     }
 
     func testCodableRoundTrip() throws {
@@ -15,6 +26,7 @@ final class LayoutCustomizationTests: XCTestCase {
         original.slotA = .classic11
         original.slotABackspaceSwap = true
         original.slotB = .vowelKey
+        original.vowelKeyBehavior = .cheonjiin
         original.slotC = ["@", "#", "$", "%"]
 
         let data = try JSONEncoder().encode(original)

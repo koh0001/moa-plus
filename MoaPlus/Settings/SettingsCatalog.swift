@@ -136,6 +136,12 @@ enum SettingsCatalog {
             keywords: ["레이아웃", "배치", "모던", "클래식", "확장형", "백스페이스위치", "숫자패드"]
         ),
         SettingsEntry(
+            title: "모음 키 동작",
+            icon: "character.textbox",
+            destination: .layout,
+            keywords: ["모음키", "모음", "순정", "삼성", "모아키", "천지인", "ㆍ", "아래아", "ㅣ", "ㅡ", "8방향", "스와이프"]
+        ),
+        SettingsEntry(
             title: "4방향 전용 모드",
             icon: "arrow.up.arrow.down",
             destination: .layout,
