@@ -415,6 +415,77 @@ final class HangulComposerTests: XCTestCase {
         XCTAssertEqual(composer.currentComposingCharacter, "ㅐ")
     }
 
+    // MARK: ㅏ↔ㅑ / ㅓ↔ㅕ 토글 (실기기 제보 2026-08-18)
+    //
+    // 제보: "ㅣ ㆍ ㆍ 로 ㅣ→ㅏ→ㅑ 까지는 되는데, ㅑ 에서 ㆍ 를 한 번 더 누르면
+    // ㅏ 로 회귀하지 않고 ㅑㆍ 로 붙어버린다." 정방향(ㅏ+ㆍ=ㅑ)만 있고 역방향이
+    // 빠져 있어 `combineVowels` 가 nil 을 돌려주고 ㅑ 가 커밋됐다.
+
+    func test_standalone_iDotDotDot_togglesBackToA() {
+        // 제보 시나리오 그대로: ㅣ → ㅏ → ㅑ → ㅏ → ㅑ …
+        _ = composer.inputJungseong(.ㅣ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅣ")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅏ")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅑ")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅏ", "ㅑ + ㆍ = ㅏ 로 회귀해야 함")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "ㅑ")
+        XCTAssertTrue(composer.composedText.isEmpty, "토글 중 커밋되면 안 됨 (ㅑㆍ 로 떨어지던 증상)")
+    }
+
+    func test_aPlusDot_togglesYaAndBack() {
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅏ)
+        XCTAssertEqual(composer.currentComposingCharacter, "아")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "야")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "아")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "야")
+        XCTAssertTrue(composer.composedText.isEmpty)
+    }
+
+    func test_eoPlusDot_togglesYeoAndBack() {
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㅓ)
+        XCTAssertEqual(composer.currentComposingCharacter, "어")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "여")
+        _ = composer.inputJungseong(.ㆍ)
+        XCTAssertEqual(composer.currentComposingCharacter, "어")
+        XCTAssertTrue(composer.composedText.isEmpty)
+    }
+
+    /// base ↔ y 6쌍 전체의 대칭성을 한 번에 고정한다. 이 표가 반쪽만 채워지면
+    /// (ㅏ→ㅑ 는 되는데 ㅑ→ㅏ 는 안 되는 식) ㆍ 연타가 조용히 끊겨 커밋된다.
+    func test_dotToggle_everyBaseYPairRoundTrips() {
+        let pairs: [(base: Jungseong, y: Jungseong)] = [
+            (.ㅏ, .ㅑ), (.ㅓ, .ㅕ), (.ㅗ, .ㅛ), (.ㅜ, .ㅠ), (.ㅐ, .ㅒ), (.ㅔ, .ㅖ)
+        ]
+        for pair in pairs {
+            // `currentComposingCharacter` 는 `Character?` 다 — 기대값도 같은 타입으로
+            // 못 박아야 XCTAssertEqual 의 제네릭 추론이 갈리지 않는다.
+            let expectedBase: Character? = pair.base.compatibilityCharacter
+            let expectedY: Character? = pair.y.compatibilityCharacter
+            let baseText = String(pair.base.compatibilityCharacter)
+            let yText = String(pair.y.compatibilityCharacter)
+            let c = HangulComposer()
+
+            _ = c.inputJungseong(pair.base)
+            _ = c.inputJungseong(.ㆍ)
+            XCTAssertEqual(c.currentComposingCharacter, expectedY, baseText + " + ㆍ = " + yText)
+
+            _ = c.inputJungseong(.ㆍ)
+            XCTAssertEqual(c.currentComposingCharacter, expectedBase, yText + " + ㆍ = " + baseText + " 로 회귀")
+
+            XCTAssertTrue(c.composedText.isEmpty, baseText + "↔" + yText + " 토글 중 커밋되면 안 됨")
+        }
+    }
+
     func test_standalone_dotDotI_yieldsYeo() {
         // PR G5: ㆍ accumulates in dotPending. ㆍ+ㆍ+ㅣ → ㅕ (천지인 3-stroke).
         _ = composer.inputJungseong(.ㆍ)
