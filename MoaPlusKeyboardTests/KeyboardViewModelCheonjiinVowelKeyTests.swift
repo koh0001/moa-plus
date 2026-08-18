@@ -194,6 +194,40 @@ final class KeyboardViewModelCheonjiinVowelKeyTests: XCTestCase {
         XCTAssertEqual(vm.composingText, "ㅗ", "ㆍ + ㅡ = ㅗ")
     }
 
+    // MARK: dotPending — 순정 모드에서 ㅕ/ㅛ 로 가는 **유일한** 경로
+    //
+    // 8방향 모드라면 ㅕ 는 한 번의 긋기(←→←)로도 나오지만, 순정 모드는 좌우
+    // 3분할뿐이라 ㆍㆍ 누적(`HangulComposer.State.dotPending`)이 유일한 길이다.
+    // 이 경로가 막히면 순정 모드 사용자는 ㅕ·ㅛ·여 를 아예 입력할 수 없다.
+
+    func test_cheonjiin_dotDotBar_yieldsYeo() {
+        withVowelKeyBehavior(.cheonjiin) {
+            drag(dx: 0, dy: 0)           // ㆍ
+            drag(dx: 0, dy: 0)           // ㆍ (pending 2)
+            drag(dx: -Self.far, dy: 0)   // ㅣ
+        }
+        XCTAssertEqual(vm.composingText, "ㅕ", "ㆍ + ㆍ + ㅣ = ㅕ")
+    }
+
+    func test_cheonjiin_dotDotDash_yieldsYo() {
+        withVowelKeyBehavior(.cheonjiin) {
+            drag(dx: 0, dy: 0)           // ㆍ
+            drag(dx: 0, dy: 0)           // ㆍ (pending 2)
+            drag(dx: Self.far, dy: 0)    // ㅡ
+        }
+        XCTAssertEqual(vm.composingText, "ㅛ", "ㆍ + ㆍ + ㅡ = ㅛ")
+    }
+
+    func test_cheonjiin_consonantThenDotDotBar_yieldsYeoSyllable() {
+        withVowelKeyBehavior(.cheonjiin) {
+            vm.inputConsonant(.ㅇ)
+            drag(dx: 0, dy: 0)           // ㆍ
+            drag(dx: 0, dy: 0)           // ㆍ (pending 2)
+            drag(dx: -Self.far, dy: 0)   // ㅣ
+        }
+        XCTAssertEqual(vm.composingText, "여", "ㅇ + ㆍ + ㆍ + ㅣ = 여")
+    }
+
     func test_cheonjiin_consonantThenBarThenDot_yieldsGa() {
         withVowelKeyBehavior(.cheonjiin) {
             vm.inputConsonant(.ㄱ)
