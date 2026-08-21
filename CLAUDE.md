@@ -69,7 +69,7 @@ moa-plus/
 │       └── BackgroundImageManager.swift
 │
 ├── MoaPlusKeyboardTests/             # 유닛 테스트 23파일 (Composer/Gesture/Layout/Snapshot/SettingsCache + ViewModel: Cursor·CaretMove·Shift·VowelDrag·Abbreviation·Period·LongPress 등)
-├── "MoaPlusUITests /"                # ⚠️ 폴더명 끝에 공백. CI 미편입 — 실행하려면 우회 필요 (HANDOFF §1-4)
+├── MoaPlusUITests/                   # UI 테스트 (설정 검색 · 증상 라우터). v2.1.2에서 CI 편입
 ├── scripts/
 │   └── add_target_membership.rb       # xcodeproj 자동 멤버십 추가 (메인 앱 ↔ 익스텐션)
 └── docs/                             # 개발 문서
@@ -117,7 +117,20 @@ xcodebuild test \
   -project MoaPlus.xcodeproj \
   -scheme MoaPlus \
   -destination 'platform=iOS Simulator,name=iPhone 17'
+
+# 유닛 테스트만 (빠름)
+xcodebuild test ... -only-testing:MoaPlusKeyboardTests
+
+# UI 테스트만 — 유닛 테스트와 **다른 시뮬레이터**에서 돌릴 것
+xcodebuild test ... -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:MoaPlusUITests
 ```
+
+⚠️ **UI 테스트는 앱을 실행하고, 앱 실행은 App Group UserDefaults 에 기본값이 아닌
+제스처 설정을 쓴다.** 유닛 테스트가 같은 저장소를 읽으므로 같은 시뮬레이터에서 UI
+테스트를 먼저 돌리면 `KeyboardViewModelVowelDragTests` 등이 코드와 무관하게 깨진다.
+CI 는 유닛 → UI 순서로 분리해 이 문제를 피한다. 로컬에서 오염됐다면
+`xcrun simctl erase` 로 초기화할 것.
 
 실기기: `Cmd + R` → 아이폰에서 설정 → 키보드 → 새 키보드 추가 → 모아+
 

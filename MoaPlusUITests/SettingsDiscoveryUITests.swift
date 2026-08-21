@@ -16,22 +16,21 @@ import XCTest
 /// UserDefaults 를 건드리는데, 유닛 테스트용 iPhone 17 과 공유하면
 /// `KeyboardViewModelVowelDragTests` 등이 결정적으로 깨진다 (docs/HANDOFF.md §0-2).
 ///
-/// **실행법 — 그냥 `xcodebuild test` 로는 돌지 않는다.** 프로젝트 결함 2개를 우회해야 한다.
-/// 1. `MoaPlus.xcscheme` 의 `MoaPlusUITests` 가 `skipped = "YES"` 다. `-only-testing:` 으로는
-///    **우회되지 않고** "isn't a member of the specified test plan or scheme" 로 죽는다.
-///    임시로 `skipped = "NO"` 로 바꿔야 한다.
-/// 2. UITests 타겟의 `TEST_TARGET_NAME` 이 포크 이전 이름 `ios-moaki` 를 가리켜
-///    "UITargetAppPath should be provided" 로 죽는다. 아래처럼 오버라이드한다.
+/// **실행법**: 스킴에 편입돼 있으므로 그냥 돌아간다.
 ///
 /// ```bash
-/// # 1) 스킴에서 MoaPlusUITests 의 skipped 를 NO 로 (커밋하지 말 것 — CI 동작이 바뀐다)
-/// # 2)
 /// xcodebuild test -project MoaPlus.xcodeproj -scheme MoaPlus \
 ///   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-///   -only-testing:MoaPlusUITests/SettingsDiscoveryUITests \
-///   TEST_TARGET_NAME=MoaPlus -resultBundlePath ui.xcresult
-/// xcrun xcresulttool export attachments --path ui.xcresult --output-path att
+///   -only-testing:MoaPlusUITests
 /// ```
+///
+/// 과거에는 프로젝트 결함 2개(스킴의 `skipped = "YES"`, 포크 이전 이름을 가리키던
+/// `TEST_TARGET_NAME = ios-moaki`) 때문에 우회가 필요했다. 둘 다 v2.1.2 에서 고쳤다.
+///
+/// **`-uiTesting` 인자는 필수다.** 없으면 온보딩/"새로운 기능" 시트가 홈 화면을 덮어
+/// "모아키 설정" 이 hittable 하지 않고, 이 파일의 테스트가 **전부** `openSettings()`
+/// 한 줄에서 죽는다. 깨끗한 시뮬레이터에서 결정적으로 재현되므로 CI 에서는 항상 그렇다.
+///
 /// 첫 실행이 `xctrunner` 런치 실패로 한 번 죽고 재시도에서 붙는 경우가 있다 —
 /// 케이스가 전부 passed 인데 최종 상태만 FAILED 로 나오면 그 상황이다.
 final class SettingsDiscoveryUITests: XCTestCase {
@@ -88,6 +87,10 @@ final class SettingsDiscoveryUITests: XCTestCase {
 
     private func openSettings() -> XCUIApplication {
         let app = XCUIApplication()
+        // 온보딩 / "새로운 기능" 시트를 끈다. 안 끄면 시트가 홈 화면을 덮어
+        // "모아키 설정" 이 hittable 하지 않고, 여기 있는 테스트가 **전부** 이
+        // 한 줄에서 죽는다(깨끗한 시뮬레이터에서 결정적으로 재현).
+        app.launchArguments += ["-uiTesting"]
         app.launch()
         tap(app, "모아키 설정")
         return app

@@ -160,9 +160,9 @@
 			path = MoaPlusTests;
 			sourceTree = "<group>";
 		};
-		00A43D002F2A2F8E005FF0AB /* MoaPlusUITests  */ = {
+		00A43D002F2A2F8E005FF0AB /* MoaPlusUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "MoaPlusUITests ";
+			path = MoaPlusUITests;
 			sourceTree = "<group>";
 		};
 		00A43D152F2A349E005FF0AB /* MoaPlusKeyboard */ = {
@@ -228,7 +228,7 @@
 			children = (
 				00A43CE62F2A2F8C005FF0AB /* MoaPlus */,
 				00A43CF62F2A2F8E005FF0AB /* MoaPlusTests */,
-				00A43D002F2A2F8E005FF0AB /* MoaPlusUITests  */,
+				00A43D002F2A2F8E005FF0AB /* MoaPlusUITests */,
 				3A2FCBAF2FA210D9006847D0 /* MoaPlusKeyboardTests */,
 				00A43CE52F2A2F8C005FF0AB /* Products */,
 				00A43D152F2A349E005FF0AB /* MoaPlusKeyboard */,
@@ -311,7 +311,7 @@
 				00A43CFF2F2A2F8E005FF0AB /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				00A43D002F2A2F8E005FF0AB /* MoaPlusUITests  */,
+				00A43D002F2A2F8E005FF0AB /* MoaPlusUITests */,
 			);
 			name = MoaPlusUITests;
 			productName = "ios-moakiUITests";
@@ -780,7 +780,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "ios-moaki";
+				TEST_TARGET_NAME = MoaPlus;
 			};
 			name = Debug;
 		};
@@ -800,7 +800,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "ios-moaki";
+				TEST_TARGET_NAME = MoaPlus;
 			};
 			name = Release;
 		};
