@@ -100,6 +100,12 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear {
+            // UI 테스트에서는 모달을 아예 띄우지 않는다. 시트가 홈 화면을 덮으면
+            // "모아키 설정" 버튼이 hittable 하지 않아 **어떤 화면에도 도달할 수 없고**,
+            // CI 는 항상 깨끗한 시뮬레이터라 이 실패가 결정적으로 재현된다.
+            // (버전을 올릴 때마다 What's New 조건까지 켜져 기존 상태에서도 뜬다.)
+            guard !Self.isUITesting else { return }
+
             let settings = KeyboardSettings.shared
             if !settings.firstLaunchModalShown {
                 // 신규 사용자: 레이아웃 선택 모달만 보여주고, "새로운 기능" 모달은
@@ -124,6 +130,14 @@ struct ContentView: View {
         .sheet(isPresented: $showWhatsNewModal) {
             NewFeaturesModalView()
         }
+    }
+
+    /// UI 테스트가 넘기는 실행 인자. 프로덕션 실행 경로에는 영향이 없다 —
+    /// 인자가 없으면 항상 `false`.
+    static let uiTestingLaunchArgument = "-uiTesting"
+
+    private static var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains(uiTestingLaunchArgument)
     }
 
     /// 현재 앱 버전. `NewFeaturesModalView.appVersion` 과 같은 값을 써야 모달이

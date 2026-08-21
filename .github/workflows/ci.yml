@@ -76,19 +76,38 @@ jobs:
             -derivedDataPath build \
             -quiet
 
-      - name: Run tests
+      # 유닛 테스트를 UI 테스트보다 **먼저** 돌린다.
+      # UI 테스트는 앱을 실행하고, 앱 실행은 App Group UserDefaults
+      # (group.com.moaki.keyboard)에 기본값이 아닌 제스처 설정을 쓴다. 유닛
+      # 테스트는 같은 저장소를 KeyboardSettings.shared 로 읽으므로, 순서가
+      # 뒤집히면 KeyboardViewModelVowelDragTests 등 임계값에 민감한 테스트가
+      # 코드와 무관하게 깨진다. 러너는 매 실행 새 컨테이너라 순서만 지키면 된다.
+      - name: Run unit tests
         run: |
           xcodebuild test-without-building \
             -project MoaPlus.xcodeproj \
             -scheme MoaPlus \
             -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.device }}" \
             -derivedDataPath build \
+            -only-testing:MoaPlusKeyboardTests \
             -resultBundlePath TestResults.xcresult
+
+      - name: Run UI tests
+        run: |
+          xcodebuild test-without-building \
+            -project MoaPlus.xcodeproj \
+            -scheme MoaPlus \
+            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.device }}" \
+            -derivedDataPath build \
+            -only-testing:MoaPlusUITests \
+            -resultBundlePath UITestResults.xcresult
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: TestResults.xcresult
+          path: |
+            TestResults.xcresult
+            UITestResults.xcresult
           retention-days: 7
