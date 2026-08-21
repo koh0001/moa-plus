@@ -93,6 +93,67 @@ enum KeyboardMetrics {
                            keyboardHeightScaleRange.upperBound))
     }
 
+    // MARK: - 하단 여백 (홈 인디케이터 회피)
+    // 물리 홈 버튼이 없는 아이폰에서 스페이스바가 화면 맨 아래 홈 제스처 구역에
+    // 붙어, 스페이스를 누르다 홈 화면으로 튕기는 제보. 키보드 콘텐츠를 그만큼
+    // 위로 올리되 **컨테이너 높이도 같이 키워** 키 크기는 그대로 유지한다.
+
+    /// 홈 인디케이터 아이폰의 하단 안전영역 폴백값(세로 / 가로).
+    /// 런타임 `view.safeAreaInsets.bottom` 을 읽지 못했을 때만 쓴다.
+    static let homeIndicatorBottomInset: CGFloat = 34
+    static let homeIndicatorBottomInsetLandscape: CGFloat = 21
+    /// 홈 인디케이터 아이패드는 세로/가로 모두 21pt 남짓.
+    static let iPadHomeIndicatorBottomInset: CGFloat = 20
+
+    /// 자동 여백 **위에** 사용자가 더 얹는 추가 여백 범위.
+    ///
+    /// 상한을 홈 인디케이터 높이와 같은 34pt 로 둔 이유: 자동 여백은 iOS 가
+    /// 보고하는 실측 안전영역에만 의존하는데(아래 `estimatedBottomSafeInset`
+    /// 주석 참조), 어떤 호스트/기기 조합에서 그 값이 0 으로 오면 자동이 무동작이
+    /// 된다. 그때도 사용자가 **수동만으로** 홈 제스처 구역을 전부 비울 수 있어야
+    /// 한다 — 이 상한이 그 탈출구다.
+    static let extraBottomInsetRange: ClosedRange<Double> = 0...34
+    static let defaultExtraBottomInset: Double = 0
+
+    /// NaN 은 `min`/`max` 를 모두 통과해 그대로 전파되고, 그러면 높이 제약
+    /// constant 가 NaN 이 되어 레이아웃이 통째로 깨진다. `clampedHeightScale`
+    /// 과 같은 이유로 비교 전에 먼저 걸러낸다.
+    static func clampedExtraBottomInset(_ value: Double) -> CGFloat {
+        guard value.isFinite else { return CGFloat(extraBottomInsetRange.lowerBound) }
+        return CGFloat(min(max(value, extraBottomInsetRange.lowerBound),
+                           extraBottomInsetRange.upperBound))
+    }
+
+    /// 기기 하단 안전영역 **추정값**. 화면 장/단변 비율로 홈 인디케이터 기기를 가른다.
+    ///
+    /// **키보드 익스텐션에서는 쓰지 않는다.** 익스텐션은 실측
+    /// `view.safeAreaInsets.bottom` 만 믿는다 — 그 값이 0 이면 우리 뷰가 애초에
+    /// 홈 인디케이터 구역까지 내려가 있지 않다는 뜻이라, 추정치를 더하면 여백이
+    /// 이중으로 들어간다. 이 함수는 익스텐션이 없는 **메인 앱**(`DeviceSafeArea`)
+    /// 에서 앱 창조차 아직 없을 때의 마지막 폴백 전용이다.
+    /// 아이폰은 홈 버튼 모델 ≈1.78 : 홈 인디케이터 모델 ≈2.16 으로 확실히 갈리지만,
+    /// 아이패드는 12.9" Pro 가 홈 버튼 모델과 해상도(1024×1366)가 같아 비율로
+    /// 구분되지 않는다 — 그래서 아이패드는 명백한 비율만 처리하고 나머지는 0을
+    /// 돌려 런타임 값에 맡긴다.
+    static func estimatedBottomSafeInset(isPad: Bool, isLandscape: Bool,
+                                         screenShort: CGFloat, screenLong: CGFloat) -> CGFloat {
+        guard screenShort > 0, screenLong > 0, screenShort.isFinite, screenLong.isFinite else { return 0 }
+        let ratio = screenLong / screenShort
+        if isPad {
+            return ratio > 1.40 ? iPadHomeIndicatorBottomInset : 0
+        }
+        guard ratio > 2.0 else { return 0 }   // 홈 버튼 아이폰
+        return isLandscape ? homeIndicatorBottomInsetLandscape : homeIndicatorBottomInset
+    }
+
+    /// 실제 적용할 하단 여백 = (자동 ON ? 기기 안전영역 : 0) + 추가 여백.
+    /// `deviceInset` 은 런타임 실측값이 있으면 그것, 없으면
+    /// `estimatedBottomSafeInset(...)` 을 넘긴다.
+    static func resolvedBottomInset(autoEnabled: Bool, deviceInset: CGFloat, extra: Double) -> CGFloat {
+        let auto = autoEnabled && deviceInset.isFinite ? max(0, deviceInset) : 0
+        return auto + clampedExtraBottomInset(extra)
+    }
+
     /// 키보드 컨테이너 높이. 아이폰은 260, 아이패드는 화면 실측 기반이며,
     /// 둘 다 사용자 배율(`scale`)이 마지막에 곱해진다.
     /// `screenShort`/`screenLong` = `UIScreen.main.bounds` 의 min/max (방향 불변).

@@ -64,7 +64,19 @@ struct KeyboardPreviewView: View {
     /// scaled by the user's height setting so the height slider visibly
     /// changes the preview instead of only the live keyboard.
     private var kbAspect: CGFloat {
-        375.0 / (KeyboardMetrics.keyboardHeight * KeyboardMetrics.clampedHeightScale(settings.keyboardHeightScale))
+        let height = KeyboardMetrics.keyboardHeight
+            * KeyboardMetrics.clampedHeightScale(settings.keyboardHeightScale)
+            + previewBottomInset
+        return 375.0 / height
+    }
+
+    /// 미리보기에 반영할 하단 여백. 실기기 안전영역을 그대로 쓰므로 "설정을
+    /// 바꾸면 미리보기에 바로 반영됩니다" 문구가 하단 여백에도 유효하다.
+    private var previewBottomInset: CGFloat {
+        KeyboardMetrics.resolvedBottomInset(
+            autoEnabled: settings.keyboardAutoBottomInsetEnabled,
+            deviceInset: DeviceSafeArea.bottomInset,
+            extra: settings.keyboardExtraBottomInset)
     }
 
     var body: some View {
@@ -95,5 +107,8 @@ struct KeyboardPreviewView: View {
         viewModel.onPreviewConsonantGesture = onConsonantPreview
         viewModel.forceShowGesturePreview = forceShowGesturePreview
         viewModel.delegate = liveInputDelegate
+        // 익스텐션이 없는 메인 앱에서는 아무도 실측 안전영역을 밀어넣지 않는다.
+        // 앱 창의 값을 대신 넣어 미리보기가 실제 키보드와 같은 여백을 그리게 한다.
+        viewModel.bottomSafeAreaInset = DeviceSafeArea.bottomInset
     }
 }

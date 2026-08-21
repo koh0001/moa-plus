@@ -108,14 +108,27 @@ struct KeyboardView: View {
             let candidateBarFootprint: CGFloat = viewModel.isAbbreviationCandidateVisible
                 ? KeyboardMetrics.abbreviationCandidateBarFootprint
                 : 0
-            let keyHeight = KeyboardMetrics.keyHeight(
-                for: geometry.size.height - candidateBarFootprint)
             let screen = UIScreen.main.bounds
             let screenShort = min(screen.width, screen.height)
             let screenLong = max(screen.width, screen.height)
             let isPad = layoutOverride?.isPad ?? (UIDevice.current.userInterfaceIdiom == .pad)
             let isLandscape = layoutOverride?.isLandscape ?? KeyboardMetrics.isLandscapeKeyboard(
                 keyboardWidth: geometry.size.width, screenShort: screenShort, screenLong: screenLong)
+            // 하단 여백(홈 인디케이터 회피). 근거는 실측 안전영역 하나뿐이다 —
+            // 익스텐션은 `KeyboardViewController` 가, 호스트 앱 미리보기는
+            // `KeyboardPreviewView` 가 각자 실측값을 `bottomSafeAreaInset` 에
+            // 밀어넣는다. 여기서 화면 크기로 다시 추정하면 컨테이너 높이 계산
+            // (`KeyboardViewController.bottomInset()`)과 규칙이 갈려 기능행이 잘린다.
+            let bottomInset = KeyboardMetrics.resolvedBottomInset(
+                autoEnabled: settings.keyboardAutoBottomInsetEnabled,
+                deviceInset: viewModel.bottomSafeAreaInset,
+                extra: settings.keyboardExtraBottomInset)
+            // 후보 바와 **똑같은 이유**로 여백도 그리드 배분에서 먼저 빼야 한다.
+            // `keyHeight(for:)` 는 주어진 높이를 4행에 전부 나눠주므로, 컨테이너만
+            // 키우고 여기서 안 빼면 늘어난 높이를 키들이 흡수해 버리고 기능행은
+            // 여전히 아래로 넘쳐 잘린다.
+            let keyHeight = KeyboardMetrics.keyHeight(
+                for: geometry.size.height - candidateBarFootprint - bottomInset)
             let useSplit = KeyboardMetrics.usesIPadSplit(
                 isPad: isPad, isLandscape: isLandscape,
                 portraitSplitEnabled: settings.layoutCustomization.iPadPortraitSplitEnabled)
@@ -165,6 +178,7 @@ struct KeyboardView: View {
                         }
                     }
                     .padding(KeyboardMetrics.keySpacing)
+                    .padding(.bottom, bottomInset)
 
                     // Gesture overlay (shown when enabled or forced, and in Korean mode)
                     if (settings.showGesturePreview || viewModel.forceShowGesturePreview) && viewModel.keyboardMode == .korean {

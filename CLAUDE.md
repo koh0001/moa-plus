@@ -217,6 +217,46 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
 - 심볼 모드 전용 행: `[한글/ABC] [한/영] [#+= / 123] [space] [⏎]` — 페이지 토글이 **스페이스 왼쪽**(구 슬롯 B 위치), 긋기 펑크 대신 렌더
 
+### 하단 여백 / 홈 인디케이터 회피 (v2.1.2 build 21 / 리뷰 제보: 스페이스바 → 홈 화면 이탈)
+홈 버튼 없는 아이폰에서 기능행이 화면 맨 아래 홈 제스처 구역에 붙어, 스페이스를
+누르다 홈으로 빠져나간다는 제보. 여백 = `(자동 ON ? 안전영역 : 0) + 추가 여백`
+(`KeyboardMetrics.resolvedBottomInset`).
+- **원 제보는 앱스토어 리뷰이고 개발 기기에서 재현되지 않는다.** iOS 26 아이폰
+  실기기 확인(2026-08-21): 자동 ON/OFF 스크린샷이 완전히 동일 = 자동 여백 0pt.
+  iOS 26 은 키보드 **아래에** 지구본·마이크 바를 직접 그려 우리 입력 뷰가 홈
+  인디케이터 구역까지 내려가지 않기 때문이다. 즉 **여백이 필요 없는 환경에서는
+  자동이 무동작**이고, 이게 의도된 동작이다 — 여기서 화면 크기로 34pt 를 추정해
+  더했다면 필요 없는 빈 공간이 생겼을 것이다. 리뷰어의 구버전 iOS 에서는 안전영역이
+  0 이 아니어야 자동이 먹는다(미확인). 안 먹으면 추가 여백 슬라이더가 확실한 해법
+- **⚠️ 실측 판정 대기 중 (2026-08-21 기준).** 시뮬레이터에서는 서드파티 키보드를
+  UI 조작 없이 띄울 수 없다([[simulator-cannot-enable-custom-keyboard]] 메모).
+  판정에 필요한 값은
+  `설정 › 입력 기록 › 개발자 리포트`의 "키보드 실측" 줄
+  (`KeyboardViewController.recordGeometryDiagnostic`)에 남는다:
+  - `bounds.h == constraint` → 요청한 높이가 곧 실제 프레임. **현재 구현이 맞다**
+  - `bounds.h ≈ constraint + safeArea.bottom` → iOS 가 스트립을 위에 더 얹는 것.
+    이 경우 컨테이너를 키우면 34pt 가 이중으로 들어가므로 **패딩만** 넣어야 한다
+- 현재 결정: 자동 여백의 근거를 실측 `view.safeAreaInsets.bottom` 하나로 두고,
+  화면 크기로 34pt 를 추정해 더하는 폴백은 **익스텐션 경로에 넣지 않는다** — 그 값이
+  0 이라는 건 우리 뷰가 홈 인디케이터 구역까지 내려가 있지 않다는 뜻이라 추정치를
+  더하면 헛돈다. (위 이중 계산 케이스는 이 논리로 커버되지 않으므로 검증이 필요하다.)
+  `estimatedBottomSafeInset(...)` 은 익스텐션이 없는 **메인 앱**(`DeviceSafeArea`)의
+  마지막 폴백 전용
+- **메인 앱은 앱 창의 안전영역을 쓰면 안 된다.** 앱 창과 익스텐션의 값이 다르다 —
+  iOS 26 에서 앱 창은 34pt, 익스텐션은 0pt. 앱 창 값으로 설정/미리보기를 그리면
+  실제 키보드에 없는 여백을 있다고 표시한다. `DeviceSafeArea.bottomInset` 은
+  익스텐션이 App Group 에 남긴 실측값(`measuredKeyboardBottomInset`)을 최우선으로 쓴다
+- `viewSafeAreaInsetsDidChange` 는 값이 **바뀔 때만** 불린다. 처음부터 0 이고 계속
+  0 인 환경에서는 한 번도 호출되지 않으므로, 실측 기록/반영을 거기에만 걸면 영영
+  안 돈다 — `viewDidAppear` 에서도 `publishSafeAreaInset()` 을 부르는 이유
+- 컨테이너 높이에 여백을 **더하는 동시에** `keyHeight(for:)` 입력에서 **빼야** 한다.
+  한쪽만 하면 늘어난 높이를 키들이 흡수하고 기능행은 여전히 잘린다(약어 후보 바와
+  동일한 실패 모드). 가드 `KeyboardBottomInsetTests`
+- 높이 계산 지점이 셋이다 — `computedKeyboardHeight()`, `viewWillTransition`(인라인
+  중복), `KeyboardView`. 하나라도 빠지면 회전/후보 바에서 어긋난다
+- `extraBottomInsetRange` 상한 34pt 는 자동이 무동작일 때 **수동만으로** 홈 제스처
+  구역을 전부 비울 수 있게 하는 탈출구다. 좁히지 말 것
+
 ### 모음 키 동작 (`LayoutCustomization.vowelKeyBehavior`, v2.1.1 build 20 / 이슈 #25)
 모음 키(`SlotBVowelKey`, 라벨 `ㅣㆍㅡ / 모음`)는 **두 곳**에 뜬다 — 스페이스 옆
 슬롯 B(`slotB == .vowelKey`)와 확장형(`fullPackage`) 그리드 col 6 row 1 임베드.
@@ -315,6 +355,8 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── longPressDelay: Double                  (0.2~1.0초)
 ├── sideKeyWidthRatio: Double               (0.15~1.0, 기본 0.7 정사각)
 ├── keyboardHeightScale: Double             (0.85~1.35, 기본 1.0 — 기기 기본 높이에 곱함)
+├── keyboardAutoBottomInsetEnabled: Bool    (홈 인디케이터 구역 자동 회피, 기본 ON)
+├── keyboardExtraBottomInset: Double        (자동 여백 위에 더할 추가 여백 0~34pt, 기본 0)
 ├── showGlobeKey: Bool                      (기능행 지구본 키, 기본 OFF)
 ├── consonantDiagonalDerivationEnabled: Bool (자음 대각선 진입 파생, 기본 OFF=순정 모아키)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)

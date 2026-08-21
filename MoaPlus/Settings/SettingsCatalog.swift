@@ -117,6 +117,14 @@ enum SettingsCatalog {
             keywords: ["높이", "크기", "크다", "작다", "세로", "줄이", "키우"]
         ),
         SettingsEntry(
+            title: "하단 여백 (홈 인디케이터 피하기)",
+            icon: "iphone.gen3",
+            destination: .size,
+            // "홈버튼", "홈바" — 사용자는 홈 인디케이터를 이렇게 부른다.
+            keywords: ["하단", "아래", "여백", "홈", "홈바", "홈버튼", "홈인디케이터",
+                       "스페이스", "띄어쓰기", "나가짐", "홈화면", "튕김", "제스처"]
+        ),
+        SettingsEntry(
             title: "키보드 전환 (지구본) 키",
             icon: "globe",
             destination: .size,
@@ -245,6 +253,12 @@ enum SettingsCatalog {
             symptom: "다른 키보드로 못 바꾸겠어요",
             remedy: "키보드 전환(지구본) 키를 켜세요",
             icon: "globe",
+            destination: .size
+        ),
+        SettingsSymptom(
+            symptom: "스페이스바를 누르다 홈 화면으로 나가요",
+            remedy: "하단 여백을 늘려 홈 제스처 구역을 비우세요",
+            icon: "iphone.gen3",
             destination: .size
         ),
         SettingsSymptom(

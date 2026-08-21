@@ -49,6 +49,15 @@ class KeyboardViewModel: ObservableObject {
     /// Defaults to `true` for the host app's settings preview.
     @Published var canSwitchInputMode: Bool = true
 
+    /// 익스텐션 입력 뷰가 실제로 보고한 하단 안전영역(pt).
+    ///
+    /// `safeAreaInsets` 는 익스텐션 컨테이너에서만 읽히므로
+    /// `KeyboardViewController` 가 레이아웃 후 여기에 밀어넣는다. 0 이면
+    /// (호스트 앱 미리보기, 아직 레이아웃 전) 화면 비율 기반 추정값
+    /// `KeyboardMetrics.estimatedBottomSafeInset(...)` 로 폴백한다 —
+    /// 실측값이 항상 이긴다.
+    @Published var bottomSafeAreaInset: CGFloat = 0
+
     /// Preview mode flag — when true, the slot B vowel key gesture routes to
     /// `onPreviewVowel` instead of feeding the composer/delegate. Used by the
     /// settings preview (LayoutCustomizationView) so the user can try the
