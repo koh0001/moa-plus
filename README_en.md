@@ -6,7 +6,15 @@
 
 Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 8-directional gesture combinations.
 
-**New in v1.8.0**: Two-page symbol keypad (page 1 = digits + common punctuation `. , ' "`, page 2 = brackets/currency/math/typographic symbols), and space-bar hold-to-scroll cursor movement (push and hold toward either end to move continuously, with a direction indicator and a speed setting).
+**New in v2.1.2**: Bottom margin — on iPhones without a Home button the keyboard now clears the home gesture strip at the very bottom of the screen (on by default), so reaching for the space bar no longer drops you to the Home Screen. Key sizes stay the same and only the overall height grows; you can turn it off or add extra margin (0–34pt) in settings. If your device and iOS version already reserve that strip, nothing changes and the settings screen says so. (Reported in an App Store review)
+
+**v2.1.1**: Original-MoaKey vowel key option — the vowel key next to the space bar (Classic and Extended layouts) can be tap = dot, swipe left = i, swipe right = eu, with the remaining vowels built by cheonjiin combination. The existing 8-direction swipe stays the default. Because it uses no diagonals, it works together with 4-direction-only mode. Haptic feedback now fires on key **press** rather than release (issue #23), and the dot toggle on ya/yeo was fixed.
+
+**v2.1**: Text shortcut overhaul — triggers containing punctuation (`.ㄱㅅ`, `ㅏ..`), recognition directly after a word with no space (`안녕.ㄱㅅ`), a setting for whether the confirming space is kept, undo-on-backspace toggle, and a default limit on very short new triggers (existing ones keep working). Fixed the keyboard being cut off while the suggestion bar showed, and typing not responding after returning from another app.
+
+**v2.0**: Input engine matched to the original Samsung MoaKey through frame-by-frame analysis of 47 reference recordings. Diagonal out-and-back vowels (↗↙ = ae, ↖↘ = e, ↙↗ = ui), vertical chain extensions (↑↓→ = wa, ↑↓←→ = ye, ↑↓↑↓ = yu), right-angle turns after a horizontal stroke (→↓ = ae, ←↑ = e), dot toggles (yo + dot = o, yu + dot = u), and jamo-by-jamo backspace (final consonant → vowel → consonant). Tutorial and typing practice were rebuilt around the new input paths.
+
+**v1.8.0**: Two-page symbol keypad (page 1 = digits + common punctuation `. , ' "`, page 2 = brackets/currency/math/typographic symbols), and space-bar hold-to-scroll cursor movement (push and hold toward either end to move continuously, with a direction indicator and a speed setting).
 
 **v1.7.2**: Fixed duplicate insertion of the last composing syllable after tapping to move the caret; suppressed the double-space period misfire right after an abbreviation expansion.
 
@@ -63,6 +71,9 @@ Swipe on consonant keys to input vowels. All 21 Korean vowels through intuitive 
 - **Layout presets** (v1.4) — Choose from Modern, Classic, or Extended at Settings → Keyboard → Layout. A selection modal appears on first launch.
 - **Slot B vowel key** (v1.4) — Assign the key next to the space bar as a vowel input key. Supports the same multi-stroke gestures as consonant keys (ㅑ ㅕ ㅛ ㅠ ㅘ ㅙ ㅚ ㅝ ㅞ ㅟ ㅒ ㅖ ㅢ).
 - **Last-mode persistence** (v1.4) — Optionally restore the last used Korean/English mode on next launch (Settings → Keyboard → Input Behavior).
+- **Bottom margin** (v2.1.2) — Automatic home-gesture-strip avoidance (on by default) plus 0–34pt of extra margin. Key sizes are preserved; only the overall keyboard height grows (Settings → Keyboard → Size & switch key)
+- **Vowel key behavior** (v2.1.1) — Choose 8-direction swipe (default) or original-MoaKey style (tap = dot, left = i, right = eu) for the key next to the space bar (Settings → Keyboard → Layout)
+- **Keyboard height scale** (v1.9) — 85–135%, multiplied onto the per-device base height, reflected in the live preview
 - **Custom themes** — 5 presets + custom colors + background image + key opacity
 - **Unified gesture settings** (v1.2) — Angle, length, direction mapping, and per-column correction managed in one screen
 - **Per-side sector angle tuning** (v1.7) — Adjust the left/right width of each direction sector independently; gaps left by narrowing snap to the nearest direction (toggleable)
@@ -164,18 +175,21 @@ Select the `MoaPlus` scheme in Xcode → Choose device/simulator → `Cmd + R`
 
 > For device installation, see [Build & Install Guide](docs/moakey_ios_custom_docs/03_빌드_및_설치_가이드.md)
 
-## Settings Structure (v1.4)
+## Settings Structure
 
-The host app settings were reorganized into a flat 6-item structure:
+The host app settings root. A **search field** (`.searchable`) at the top finds entries by
+everyday wording rather than app terminology, and **"What do I do when…"** routes from a
+symptom straight to the setting that fixes it.
 
 | Section | Contents |
 |---------|----------|
-| Keyboard | Layout presets / Input behavior / Long-press / Backspace |
+| What do I do when… | Symptom → the setting that fixes it (typos, space bar dropping to Home Screen, etc.) |
+| Keyboard | Layout · Size & switch key · Gestures · Long-press · Backspace · Input behavior |
 | Appearance | Theme / Colors / Background image / Key opacity |
-| Feedback | Haptics / Click sound |
-| Abbreviations | Phrase CRUD + master ON/OFF |
-| Help | Tutorial replay + Typing practice |
-| About | Credits / License |
+| Sound & Haptics | Haptics / Click sound |
+| Abbreviations | Phrase CRUD + master ON/OFF + expansion behavior |
+| Input log board | Typo records + developer report (settings summary and diagnostics auto-attached) |
+| About | Credits / License / Tutorial replay |
 
 ## Project Structure
 
@@ -183,14 +197,15 @@ The host app settings were reorganized into a flat 6-item structure:
 moa-plus/
 ├── MoaPlus/                    # Main app (home, settings, tutorial, typing practice)
 │   ├── Practice/               # Typing practice (33 scenarios)
-│   └── Settings/               # Keyboard / Appearance / Feedback / Abbreviations / Help / About (v1.4 flat structure)
+│   └── Settings/               # Search + symptom router + Keyboard / Appearance / Sound & Haptics / Abbreviations / Log / About
 ├── MoaPlusKeyboard/            # Keyboard extension
 │   ├── Engine/                 # Hangul composer (with cheonjiin dotPending), gesture analyzer, abbreviation
 │   ├── Models/                 # Jamo, gesture, theme, shortcut, keyboard mode (Korean/English/Symbol)
 │   ├── ViewModels/             # Keyboard view model (mode/Shift/cursor management)
 │   ├── Views/                  # Keyboard UI (Korean 7-col, English 10-col, cheonjiin vowel keys)
 │   └── Utilities/              # Settings, metrics, haptics
-├── MoaPlusKeyboardTests/       # 16 unit test files (Composer/Gesture/Layout/Snapshot + Cursor·CaretMove·Abbreviation·Period, etc.)
+├── MoaPlusKeyboardTests/       # 28 unit test files (Composer/Gesture/Layout/Snapshot + Cursor·CaretMove·Abbreviation·Period·BottomInset, etc.)
+├── MoaPlusUITests/             # 3 UI test files (settings search, symptom router). Wired into CI in v2.1.2
 ├── scripts/                    # Build automation (target membership helpers)
 └── docs/                       # Development docs
 ```
