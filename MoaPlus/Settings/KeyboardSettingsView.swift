@@ -56,8 +56,14 @@ struct KeyboardSettingsView: View {
     }
 
     private var sizeSummary: String {
-        let percent = Int(settings.keyboardHeightScale * 100)
-        return settings.showGlobeKey ? "높이 \(percent)% · 지구본" : "높이 \(percent)%"
+        var parts = ["높이 \(Int(settings.keyboardHeightScale * 100))%"]
+        let inset = KeyboardMetrics.resolvedBottomInset(
+            autoEnabled: settings.keyboardAutoBottomInsetEnabled,
+            deviceInset: DeviceSafeArea.bottomInset,
+            extra: settings.keyboardExtraBottomInset)
+        if inset > 0 { parts.append("여백 \(Int(inset))pt") }
+        if settings.showGlobeKey { parts.append("지구본") }
+        return parts.joined(separator: " · ")
     }
 
     private var gestureSummary: String {

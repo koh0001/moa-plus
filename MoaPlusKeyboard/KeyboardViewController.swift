@@ -28,6 +28,10 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// already re-applies on every show; this covers the split-screen /
     /// side-by-side case where no re-appearance happens.
     private var heightScaleCancellable: AnyCancellable?
+    /// 하단 여백 두 설정(자동 토글 / 추가 여백)에 대한 구독.
+    /// `heightScaleCancellable` 과 같은 이유 — 호스트 앱에서 슬라이더를 드래그하는
+    /// 동안에도 컨테이너 높이가 따라가야 한다(스플릿 뷰에서는 재등장이 없다).
+    private var bottomInsetCancellables: Set<AnyCancellable> = []
     /// 약어 후보 바는 키보드 VStack 안에 끼어들어가므로, 컨테이너 높이를 그만큼
     /// 늘리지 않으면 아래쪽 기능행이 잘린다(실기기 확인). 표시 상태를 여기서 들고 있다가
     /// 모든 높이 계산 지점에 반영한다.
@@ -84,6 +88,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         KeyboardSettings.shared.loadAll()
         setupKeyboardView()
         observeHeightScale()
+        observeBottomInset()
         observeCandidateBar()
         observeHostLifecycle()
         // Audio session warmup removed: it ignored clickSoundEnabled and
@@ -103,6 +108,11 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // layout pass once avoids a visible double-layout flicker on first
         // appearance.
         KeyboardSettings.shared.loadAll()
+        // `viewDidLoad` 시점에는 아직 레이아웃 전이라 `safeAreaInsets.bottom` 이 0 이고,
+        // 첫 제약 상수가 여백만큼 짧게 잡힌다. `viewSafeAreaInsetsDidChange` 가
+        // 곧바로 키우므로 결과는 같지만 한 번의 정착 과정을 거친다 — 위 999 우선순위
+        // 주석이 설명하는 것과 같은 종류의 수렴이다.
+        viewModel.bottomSafeAreaInset = view.safeAreaInsets.bottom
         heightConstraint?.constant = computedKeyboardHeight()
         viewModel.canSwitchInputMode = needsInputModeSwitchKey
     }
@@ -118,6 +128,13 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             hostingView.isUserInteractionEnabled = true
         }
         hasAppearedOnce = true
+
+        // 안전영역 기록/반영은 **여기서도** 해야 한다. `viewSafeAreaInsetsDidChange`
+        // 는 값이 *바뀔 때만* 불리므로, 처음부터 0 이고 계속 0 인 환경(iOS 26 처럼
+        // 시스템이 키보드 아래에 지구본 바를 직접 그려 우리 뷰가 홈 인디케이터
+        // 구역까지 내려가지 않는 경우)에서는 한 번도 호출되지 않는다.
+        // 그러면 진단 기록이 영영 비어 있어 "먹었는지 / 이중인지"를 판정할 수 없다.
+        publishSafeAreaInset()
 
         // Reset any stuck gesture state (e.g., user was mid-drag when backgrounding)
         viewModel.resetGestureState()
@@ -147,6 +164,78 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong,
             scale: KeyboardSettings.shared.keyboardHeightScale)
             + candidateBarExtraHeight
+            + bottomInset()
+    }
+
+    /// 현재 기기/설정 기준 하단 여백.
+    ///
+    /// 자동 여백의 근거는 **실측 `view.safeAreaInsets.bottom` 뿐**이고 기기 추정에
+    /// 기대지 않는다. 이 값은 정의상 "이 뷰 하단에서 시스템 UI(홈 인디케이터)에
+    /// 가려지는 영역"이므로, iOS 가 0 을 보고하면 우리 뷰는 애초에 그 구역까지
+    /// 내려가 있지 않다는 뜻이다 — 홈 버튼 기기든, 시스템이 이미 띄워 준
+    /// 경우든 여백을 더하면 그만큼 헛돈다. **화면 크기로 34pt 를 추정해 더하는
+    /// 폴백을 넣지 말 것**: 여백이 이중으로 들어가는 유일한 경로다.
+    ///
+    /// `KeyboardView` 도 **같은 규칙**으로 계산해야 한다 — 컨테이너 높이와
+    /// 그리드 배분이 어긋나면 기능행이 잘린다.
+    private func bottomInset() -> CGFloat {
+        KeyboardMetrics.resolvedBottomInset(
+            autoEnabled: KeyboardSettings.shared.keyboardAutoBottomInsetEnabled,
+            deviceInset: view.safeAreaInsets.bottom,
+            extra: KeyboardSettings.shared.keyboardExtraBottomInset)
+    }
+
+    /// 익스텐션에서만 읽히는 실측 안전영역을 뷰 모델로 넘긴다(글로브 키의
+    /// `canSwitchInputMode` 와 같은 경로). SwiftUI 쪽 여백 계산이 이 값을 본다.
+    private func publishSafeAreaInset() {
+        let measured = view.safeAreaInsets.bottom
+        recordGeometryDiagnostic(measured: measured)
+        guard viewModel.bottomSafeAreaInset != measured else { return }
+        viewModel.bottomSafeAreaInset = measured
+        heightConstraint?.constant = computedKeyboardHeight()
+    }
+
+    /// 하단 여백이 실제로 먹었는지 / 이중으로 들어갔는지 판정할 수 있는 삼종세트를
+    /// App Group 에 남긴다. 시뮬레이터에서는 서드파티 키보드를 띄울 수 없어
+    /// 실기기 사용자가 "설정 › 입력 기록"에서 읽어 주는 경로가 유일한 관측 수단이다.
+    ///
+    /// 판독법: `bounds.height == constraint` 면 우리가 요청한 높이가 곧 실제
+    /// 프레임이고 여백은 정확히 한 번 들어간 것. `bounds.height ≈ constraint + 안전영역`
+    /// 이면 iOS 가 스트립을 위에 더 얹은 것이라 컨테이너를 키우면 안 되고
+    /// 패딩만 넣어야 한다.
+    /// 마지막으로 진단에 기록한 컨테이너 높이. `viewDidAppear` 시점의 값은 iOS 가
+    /// 아직 자기 잠정 높이로 잡아 둔 것이라 실제와 다르다(위 999 우선순위 주석 참조).
+    /// 레이아웃이 정착한 뒤 값이 바뀔 때마다 덮어써야 기록이 실제를 가리킨다.
+    private var lastDiagnosticBoundsHeight: CGFloat = -1
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard view.bounds.height != lastDiagnosticBoundsHeight else { return }
+        recordGeometryDiagnostic(measured: view.safeAreaInsets.bottom)
+    }
+
+    private static let diagnosticTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm:ss"
+        return f
+    }()
+
+    private func recordGeometryDiagnostic(measured: CGFloat) {
+        lastDiagnosticBoundsHeight = view.bounds.height
+        // 시각을 함께 남긴다 — 기록이 이번 실행에서 나온 것인지, 업데이트 전 빌드의
+        // 잔재인지 사용자가 구분할 수 있어야 판독이 성립한다.
+        let stamp = Self.diagnosticTimeFormatter.string(from: Date())
+        // 메인 앱 설정/미리보기가 앱 창 값 대신 이 실측값을 쓰도록 남긴다.
+        KeyboardSettings.shared.recordMeasuredBottomInset(Double(measured))
+        KeyboardSettings.shared.recordKeyboardGeometryDiagnostic(
+            String(format: "%@ bounds.h=%.1f constraint=%.1f safeArea.bottom=%.1f 여백=%.1f",
+                   stamp, view.bounds.height, heightConstraint?.constant ?? -1,
+                   measured, bottomInset()))
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        publishSafeAreaInset()
     }
 
     /// 후보 바가 떠 있는 동안 컨테이너에 더해 줄 높이.
@@ -225,6 +314,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
                 isPad: isPad, isLandscape: isLandscape, screenShort: screenShort, screenLong: screenLong,
                 scale: KeyboardSettings.shared.keyboardHeightScale)
                 + self.candidateBarExtraHeight
+                + self.bottomInset()
         })
     }
 
@@ -238,6 +328,28 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
                 guard let self else { return }
                 self.heightConstraint?.constant = self.computedKeyboardHeight()
             }
+    }
+
+    /// `loadAll()` 이 매 변경마다 모든 @Published 를 재대입하므로
+    /// `removeDuplicates()` 없이는 무관한 설정 편집에도 발화한다.
+    private func observeBottomInset() {
+        KeyboardSettings.shared.$keyboardAutoBottomInsetEnabled
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.heightConstraint?.constant = self.computedKeyboardHeight()
+            }
+            .store(in: &bottomInsetCancellables)
+
+        KeyboardSettings.shared.$keyboardExtraBottomInset
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.heightConstraint?.constant = self.computedKeyboardHeight()
+            }
+            .store(in: &bottomInsetCancellables)
     }
 
     private func setupKeyboardView() {

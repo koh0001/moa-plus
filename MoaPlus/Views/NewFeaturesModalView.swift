@@ -23,9 +23,18 @@ struct NewFeaturesModalView: View {
         let features: [Feature]
     }
 
-    /// v2.1 — 단축어 개편. 사용자 제보(기호 트리거 미동작)에서 출발한 릴리스라
-    /// 새 항목을 맨 앞에 두고, v2.0 입력 엔진 항목은 뒤에 남겨 둔다.
+    /// v2.1.2 — 하단 여백(홈 인디케이터 회피). 앱스토어 리뷰 제보에서 출발했고
+    /// **기본 ON 이라 기존 사용자 키보드 배치가 바뀌므로** 맨 앞에 두어 변화와
+    /// 끄는 경로를 함께 알린다. 이전 릴리스 항목들은 뒤에 남겨 둔다.
     private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "키보드가 홈 제스처 구역을 피합니다", features: [
+            Feature(
+                icon: "iphone.gen3",
+                tint: .pink,
+                title: "하단 여백 자동 확보",
+                detail: "홈 버튼이 없는 아이폰에서 스페이스바를 누르다 홈 화면으로 빠져나가는 일을 막기 위해, 화면 맨 아래 홈 제스처 구역을 비우고 키보드를 그만큼 올렸습니다. 키 크기는 그대로이고 키보드 전체 높이가 늘어납니다.\n\n예전 배치가 익숙하시면 설정 › 키보드 › 크기 · 전환 키 › 하단 여백에서 끌 수 있고, 더 올리고 싶으면 추가 여백으로 조절할 수 있습니다."
+            ),
+        ]),
         FeatureGroup(title: "진동 반응이 빨라졌어요", features: [
             Feature(
                 icon: "hand.tap",

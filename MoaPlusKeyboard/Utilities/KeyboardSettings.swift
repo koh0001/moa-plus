@@ -20,6 +20,10 @@ final class KeyboardSettings: ObservableObject {
         static let hintSize = "hintSize"
         static let sideKeyWidthRatio = "sideKeyWidthRatio"
         static let keyboardHeightScale = "keyboardHeightScale"
+        static let keyboardAutoBottomInset = "keyboardAutoBottomInset"
+        static let keyboardExtraBottomInset = "keyboardExtraBottomInset"
+        static let keyboardGeometryDiagnostic = "keyboardGeometryDiagnostic"
+        static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
         static let longPressDelay = "longPressDelay"
@@ -196,6 +200,24 @@ final class KeyboardSettings: ObservableObject {
     /// Requested repeatedly in App Store reviews (v1.8.0, 4 separate users).
     @Published var keyboardHeightScale: Double = KeyboardMetrics.defaultKeyboardHeightScale {
         didSet { guard !isLoading else { return }; writePrimitive(keyboardHeightScale, forKey: Keys.keyboardHeightScale) }
+    }
+
+    /// 홈 인디케이터(물리 홈 버튼 없는 기기) 영역을 자동으로 비운다.
+    ///
+    /// 기본 **ON**. 스페이스바가 화면 맨 아래 홈 제스처 구역에 붙어 있어
+    /// 스페이스를 누르다 홈 화면으로 튕긴다는 제보가 이 설정의 출발점이다.
+    /// 켜면 기기 하단 안전영역만큼 키보드 콘텐츠를 올리고 컨테이너 높이도 같이
+    /// 키워 키 크기는 유지한다. 홈 버튼 기기에서는 안전영역이 0이라 무동작.
+    @Published var keyboardAutoBottomInsetEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; writePrimitive(keyboardAutoBottomInsetEnabled, forKey: Keys.keyboardAutoBottomInset) }
+    }
+
+    /// 자동 여백 **위에** 더 얹는 추가 하단 여백(pt).
+    /// `KeyboardMetrics.extraBottomInsetRange` 로 클램프되므로 저장값이 손상돼도
+    /// 레이아웃이 깨지지 않는다. 자동을 꺼도 이 값은 그대로 적용된다 —
+    /// 즉 자동 OFF + 추가 여백만으로 완전 수동 지정이 된다.
+    @Published var keyboardExtraBottomInset: Double = KeyboardMetrics.defaultExtraBottomInset {
+        didSet { guard !isLoading else { return }; writePrimitive(keyboardExtraBottomInset, forKey: Keys.keyboardExtraBottomInset) }
     }
 
     /// Show the system keyboard-switch (globe) key in the function row.
@@ -457,6 +479,8 @@ final class KeyboardSettings: ObservableObject {
         assign(\.hintSize, defaults.object(forKey: Keys.hintSize) as? Int ?? 1)
         assign(\.sideKeyWidthRatio, defaults.object(forKey: Keys.sideKeyWidthRatio) as? Double ?? 0.7)
         assign(\.keyboardHeightScale, defaults.object(forKey: Keys.keyboardHeightScale) as? Double ?? KeyboardMetrics.defaultKeyboardHeightScale)
+        assign(\.keyboardAutoBottomInsetEnabled, defaults.object(forKey: Keys.keyboardAutoBottomInset) as? Bool ?? true)
+        assign(\.keyboardExtraBottomInset, defaults.object(forKey: Keys.keyboardExtraBottomInset) as? Double ?? KeyboardMetrics.defaultExtraBottomInset)
         assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
         assign(\.consonantDiagonalDerivationEnabled, defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false)
         assign(\.longPressDelay, defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5)
@@ -489,6 +513,38 @@ final class KeyboardSettings: ObservableObject {
     /// previously we relied on a UserDefaults.didChangeNotification observer,
     /// which created an echo loop with darwin notifications and caused
     /// SwiftUI view churn that leaked memory in the keyboard extension.
+    // MARK: - 진단 (하단 여백)
+
+    /// 익스텐션이 마지막으로 관측한 컨테이너 지오메트리. 하단 여백이 실제로
+    /// 먹었는지 / 이중으로 들어갔는지는 `bounds.height` 와 높이 제약 constant 를
+    /// 나란히 봐야 판정된다 — 시뮬레이터에서는 서드파티 키보드를 띄울 수 없어
+    /// 실기기 사용자가 "설정 › 입력 기록"에서 읽어 알려주는 경로가 필요하다.
+    ///
+    /// 설정이 아니라 **기록**이라 `@Published` / `loadAll()` 사이클 밖에 둔다.
+    /// 매 레이아웃마다 발행하면 키보드 트리가 통째로 재구성된다.
+    func recordKeyboardGeometryDiagnostic(_ text: String) {
+        defaults.set(text, forKey: Keys.keyboardGeometryDiagnostic)
+    }
+
+    var keyboardGeometryDiagnostic: String? {
+        defaults.string(forKey: Keys.keyboardGeometryDiagnostic)
+    }
+
+    /// 익스텐션이 마지막으로 실측한 하단 안전영역(pt). 아직 키보드를 한 번도
+    /// 띄우지 않았으면 `nil`.
+    ///
+    /// **메인 앱은 앱 창의 안전영역이 아니라 이 값을 써야 한다.** 둘은 다를 수
+    /// 있다 — iOS 26 은 키보드 아래에 지구본 바를 직접 그려 익스텐션의 안전영역이
+    /// 0 인데 앱 창은 여전히 34pt 를 보고한다. 앱 창 값으로 설정 화면과 미리보기를
+    /// 그리면 실제 키보드에 없는 여백을 있다고 표시하게 된다.
+    var measuredKeyboardBottomInset: Double? {
+        defaults.object(forKey: Keys.keyboardMeasuredBottomInset) as? Double
+    }
+
+    func recordMeasuredBottomInset(_ value: Double) {
+        defaults.set(value, forKey: Keys.keyboardMeasuredBottomInset)
+    }
+
     private func writePrimitive(_ value: Any, forKey key: String) {
         defaults.set(value, forKey: key)
         postCrossProcessChange()
@@ -521,6 +577,8 @@ final class KeyboardSettings: ObservableObject {
         clickSoundEnabled = false
         sideKeyWidthRatio = 0.7
         keyboardHeightScale = KeyboardMetrics.defaultKeyboardHeightScale
+        keyboardAutoBottomInsetEnabled = true
+        keyboardExtraBottomInset = KeyboardMetrics.defaultExtraBottomInset
         showGlobeKey = false
         consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
