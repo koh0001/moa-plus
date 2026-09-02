@@ -165,6 +165,32 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수
 - 일부 호스트(SwiftUI `TextField` 등)는 커서 탭 시 `selectionDidChange`를 발화하지 않음 → `handleExternalCursorMove`만으로는 부족. 입력 시점 백스톱 `freezeComposerIfCaretMoved()`가 `inputConsonant`/`inputVowel`/`deleteBackward` 진입 시 `textBeforeCursor()`가 조합 글자로 끝나지 않으면 조합을 리셋 (필드 맨 앞 = before nil 포함). 단 before/after 컨텍스트가 둘 다 nil인 호스트(시큐어 필드, 컨텍스트 미구현 테스트 스텁)는 no-op — 이 백스톱을 우회하는 변경 시 v1.7.2 커서 탭 중복 삽입 버그 회귀 주의 (`KeyboardViewModelCaretMoveTests`)
 
+### 영문 자동 대문자 — 호스트 신호의 함정 (v2.2.0 build 22 / 사용자 메일 제보)
+`englishAutoCapitalizeEnabled`(기본 OFF). iOS 는 호스트 필드의 대문자화 의사를
+서드파티 키보드로 **전달하지 않으므로** 직접 판정한다. 실기기 왕복으로 판정 근거를
+세 번 갈아탔다 — 시뮬레이터는 서드파티 키보드를 못 띄우므로
+([[simulator-cannot-enable-custom-keyboard]]) 아래 셋은 실측으로만 얻어지는 사실이다.
+**같은 함정을 다시 밟지 말 것.**
+- **`textDocumentProxy.autocapitalizationType` 은 판정에 쓸 수 없다.** 평범한 빈
+  입력창에서도 `.none` 이 온다(실측 `allows=false`, `kbType=0 autoCap=0`). 이걸 가드로
+  쓰면 기능이 어디서도 안 켜진다. 대신 `keyboardType` + `textContentType` 으로
+  이메일·URL·검색·숫자 필드만 제외한다
+- **빈 입력창은 `documentContextBeforeInput` 이 `""` 가 아니라 `nil`** 이다
+  (`textDidChange` 의 "필드가 비워졌나" 판정이 이미 같은 전제를 쓴다). `nil` 은 세 가지로
+  갈린다 — 빈 문서(`hasText` false) / 문서 맨 앞(뒤 문맥은 옴) / 문맥 미제공(앞뒤 모두 nil,
+  시큐어 필드). 앞 둘은 문장 시작, 마지막은 **판정 포기**. 뭉뚱그리면 빈 입력창에서
+  영영 안 켜지거나(A1) 비밀번호 필드에서 대문자가 켜진다
+- **호스트는 우리 자신의 삽입에 대해 `textDidChange` 를 발화하지 않는다.** 입력 메서드
+  (`inputSymbol`/`inputSpace`/`deleteBackward`/`moveCursor` …)마다
+  `scheduleAutoCapitalizationRefresh()` 백스톱이 필요하다. 또한 **콜백 안에서 바로**
+  프록시를 읽으면 방금 넣은 문자가 아직 반영되지 않아(". " 가 "." 로 읽힘) 간헐 실패한다
+  — 판정은 항상 **다음 런루프 틱**에서
+- 롱프레스 대문자(`englishLongPressUppercaseEnabled`, 기본 ON)의 확정은
+  `inputNumber` 가 아니라 `inputSymbol` 로 보낸다. `inputNumber` 는 대기 중 시프트를
+  소비하지 않아 다음 탭까지 대문자가 되고("QUick") 약어 트라이에도 안 흘러간다
+- 판독 경로: 설정 › 입력 기록 › 개발자 리포트의 **"자동 대문자"** 줄
+  (`KeyboardViewModel.recordAutoCapitalizeDiagnostic`)
+
 ### 모드 시스템
 ```swift
 enum KeyboardMode {
