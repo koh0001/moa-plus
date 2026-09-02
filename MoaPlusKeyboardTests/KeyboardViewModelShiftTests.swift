@@ -117,12 +117,198 @@ final class KeyboardViewModelShiftTests: XCTestCase {
         vm.gestureEnded(row: 3, column: 0)
         XCTAssertEqual(vm.shiftState, .on, "quick tap toggles to .on")
     }
+
+    // MARK: - 영문 문장 첫 글자 대문자 (기본 OFF)
+
+    private func withAutoCap(_ enabled: Bool, _ body: () -> Void) {
+        let settings = KeyboardSettings.shared
+        let saved = settings.englishAutoCapitalizeEnabled
+        settings.englishAutoCapitalizeEnabled = enabled
+        body()
+        settings.englishAutoCapitalizeEnabled = saved
+    }
+
+    func test_autoCapitalize_disabledByDefault() {
+        XCTAssertFalse(KeyboardSettings.shared.englishAutoCapitalizeEnabled)
+    }
+
+    func test_autoCapitalize_off_doesNotArmShift() {
+        withAutoCap(false) {
+            mockDelegate.before = ""
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .off)
+        }
+    }
+
+    func test_autoCapitalize_armsOnEmptyField() {
+        withAutoCap(true) {
+            mockDelegate.before = ""
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .on)
+            vm.inputSymbol("a")
+            XCTAssertEqual(mockDelegate.insertedTexts.last, "A")
+        }
+    }
+
+    func test_autoCapitalize_armsAfterTerminatorAndSpace() {
+        withAutoCap(true) {
+            mockDelegate.before = "Hi. "
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .on)
+        }
+    }
+
+    /// 종결부호 **직후**(공백 없음)에는 켜지면 안 된다 — "Hi.Q" 방지.
+    func test_autoCapitalize_notArmedRightAfterTerminator() {
+        withAutoCap(true) {
+            mockDelegate.before = "Hi."
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .off)
+        }
+    }
+
+    func test_autoCapitalize_notArmedMidSentence() {
+        withAutoCap(true) {
+            mockDelegate.before = "hello "
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .off)
+        }
+    }
+
+    func test_autoCapitalize_skippedInKoreanMode() {
+        withAutoCap(true) {
+            vm.keyboardMode = .korean
+            mockDelegate.before = ""
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .off)
+        }
+    }
+
+    func test_autoCapitalize_neverBreaksCapsLock() {
+        withAutoCap(true) {
+            vm.shiftState = .locked
+            mockDelegate.before = "hello "
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .locked)
+        }
+    }
+
+    /// 이메일·비밀번호 필드처럼 호스트가 대문자화를 원하지 않으면 무동작.
+    func test_autoCapitalize_respectsHostOptOut() {
+        withAutoCap(true) {
+            mockDelegate.allowsAutoCapitalization = false
+            mockDelegate.before = ""
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .off)
+        }
+    }
+
+    /// 앞뒤 문맥을 **모두** 안 주는 호스트(시큐어 필드)에서만 추측을 포기한다.
+    func test_autoCapitalize_noContextAtAll_isNoOp() {
+        withAutoCap(true) {
+            mockDelegate.before = nil
+            mockDelegate.after = nil
+            mockDelegate.hasText = true
+            vm.shiftState = .on
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .on)
+        }
+    }
+
+    /// 문서 맨 앞을 탭한 경우: 앞 문맥은 nil 이지만 뒤 문맥이 오므로 문장 시작이다.
+    /// 실기기 A6 회귀 가드 — 문장 시작을 눌러도 안 켜지던 증상.
+    func test_autoCapitalize_caretAtDocumentStart_arms() {
+        withAutoCap(true) {
+            mockDelegate.before = nil
+            mockDelegate.after = "hello world"
+            mockDelegate.hasText = true
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .on)
+        }
+    }
+
+    /// 빈 입력창은 문맥이 nil 로 오지만(호스트가 줄 게 없다) 문장 시작이 맞다.
+    /// 원 제보의 핵심 시나리오 — 이 갈래가 없으면 A1 이 영영 동작하지 않는다.
+    func test_autoCapitalize_nilContextEmptyDocument_arms() {
+        withAutoCap(true) {
+            mockDelegate.before = nil
+            mockDelegate.hasText = false
+            vm.refreshAutoCapitalization()
+            XCTAssertEqual(vm.shiftState, .on)
+        }
+    }
+
+    /// 한글로 진입해 영문으로 전환했을 때도 문장 시작이면 켜져야 한다.
+    func test_autoCapitalize_armsAfterSwitchingToEnglish() {
+        withAutoCap(true) {
+            vm.keyboardMode = .korean
+            mockDelegate.before = nil
+            mockDelegate.hasText = false
+            vm.toggleLetterMode()
+            XCTAssertEqual(vm.keyboardMode, .english)
+            XCTAssertEqual(vm.shiftState, .on)
+        }
+    }
+
+    /// 호스트가 우리 삽입에 대해 `textDidChange` 를 안 쏘는 경우의 백스톱.
+    /// 실기기 A3 실패(". " 뒤 재무장 안 됨)의 회귀 가드다.
+    func test_autoCapitalize_rearmsAfterOurOwnSpace() {
+        withAutoCap(true) {
+            mockDelegate.before = "Hi. "
+            vm.inputSpace()
+            // 판정은 다음 런루프 틱으로 미뤄진다(프록시 문맥이 아직 갱신 전일 수 있어서).
+            let settled = expectation(description: "auto-cap refresh settled")
+            DispatchQueue.main.async { settled.fulfill() }
+            wait(for: [settled], timeout: 1.0)
+            XCTAssertEqual(vm.shiftState, .on)
+        }
+    }
+
+    func test_autoCapitalize_disarmsAfterBackspaceIntoSentence() {
+        withAutoCap(true) {
+            vm.shiftState = .on
+            mockDelegate.before = "Hi"
+            vm.deleteBackward()
+            let settled = expectation(description: "auto-cap refresh settled")
+            DispatchQueue.main.async { settled.fulfill() }
+            wait(for: [settled], timeout: 1.0)
+            XCTAssertEqual(vm.shiftState, .off)
+        }
+    }
+
+    // MARK: - 영문 롱프레스 대문자 (기본 ON)
+
+    func test_longPressUppercase_enabledByDefault() {
+        XCTAssertTrue(KeyboardSettings.shared.englishLongPressUppercaseEnabled)
+    }
+
+    /// 롱프레스 대문자는 `inputSymbol` 경로를 타야 한다: 시프트 `.on` 을 소비하고
+    /// 약어 버퍼에 문자를 흘려야 다음 탭이 연달아 대문자가 되지 않는다.
+    func test_longPressUppercase_consumesPendingShift() {
+        vm.shiftState = .on
+        vm.inputLongPressNumber("Q")
+        vm.confirmPopupSelection()
+        XCTAssertEqual(mockDelegate.insertedTexts.last, "Q")
+        XCTAssertEqual(vm.shiftState, .off, "shift must not stay armed after a long-press capital")
+    }
+
+    func test_longPressUppercase_capsLockSurvives() {
+        vm.shiftState = .locked
+        vm.inputLongPressNumber("Q")
+        vm.confirmPopupSelection()
+        XCTAssertEqual(mockDelegate.insertedTexts.last, "Q")
+        XCTAssertEqual(vm.shiftState, .locked)
+    }
 }
 
 private final class MockShiftDelegate: KeyboardViewModelDelegate {
     var insertedTexts: [String] = []
     var deleteCount = 0
     var cursorMoves: [Int] = []
+    var before: String?
+    var allowsAutoCapitalization = true
+    var hasText = false
+    var after: String?
 
     func insertText(_ text: String) { insertedTexts.append(text) }
     func deleteBackward() { deleteCount += 1 }
@@ -130,4 +316,8 @@ private final class MockShiftDelegate: KeyboardViewModelDelegate {
     func switchToNextKeyboard() {}
     func triggerHapticFeedback() {}
     func moveCursor(by offset: Int) { cursorMoves.append(offset) }
+    func textBeforeCursor() -> String? { before }
+    func textAfterCursor() -> String? { after }
+    func hostAllowsAutoCapitalization() -> Bool { allowsAutoCapitalization }
+    func hostHasText() -> Bool { hasText }
 }

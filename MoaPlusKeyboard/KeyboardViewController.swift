@@ -115,10 +115,15 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         viewModel.bottomSafeAreaInset = view.safeAreaInsets.bottom
         heightConstraint?.constant = computedKeyboardHeight()
         viewModel.canSwitchInputMode = needsInputModeSwitchKey
+        // 빈 필드로 새로 열렸을 때는 textDidChange 가 아직 한 번도 불리지 않는다.
+        viewModel.refreshAutoCapitalization()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        // `viewWillAppear` 시점에는 프록시가 아직 호스트 필드에 붙기 전일 수 있어
+        // 문맥이 비어 온다. 등장이 끝난 뒤 한 번 더 판정한다 (멱등).
+        viewModel.refreshAutoCapitalization()
 
         // Skip the touch-recovery toggle on the very first appearance. It
         // exists to fix touch delivery after background→foreground cycles,
@@ -396,6 +401,12 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // flag must stay set until the edit fully settles.
         DispatchQueue.main.async { [weak self] in
             self?.isProgrammaticTextChange = false
+            // 영문 문장 첫 글자 대문자: 우리 삽입/호스트 편집/캐럿 탭 모두 여기를
+            // 지난다. **다음 런루프 틱**에서 읽는 게 중요하다 — 콜백 안에서 바로
+            // `documentContextBeforeInput` 을 읽으면 방금 넣은 문자가 아직 반영되지
+            // 않은 호스트가 있어(". " 를 넣었는데 "." 로 읽힘) 자동 대문자가
+            // 될 때도 있고 안 될 때도 있는 간헐 증상이 된다.
+            self?.viewModel.refreshAutoCapitalization()
         }
     }
 
@@ -460,5 +471,38 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
 
     func textAfterCursor() -> String? {
         textDocumentProxy.documentContextAfterInput
+    }
+
+    func hostHasText() -> Bool {
+        textDocumentProxy.hasText
+    }
+
+    /// 대문자화가 명백히 틀린 필드만 걸러낸다. `autocapitalizationType` 은
+    /// 쓰지 않는다 — 실기기에서 평범한 빈 입력창도 `.none` 으로 와서 기능 자체를
+    /// 막았다(2026-09-02 진단 `allows=false`). 비밀번호 같은 시큐어 필드는 캐럿 앞
+    /// 문맥을 아예 주지 않아 `shouldArmAutoCapitalization` 이 이미 판정을 포기한다.
+    func hostAllowsAutoCapitalization() -> Bool {
+        switch textDocumentProxy.keyboardType {
+        case .emailAddress, .URL, .webSearch,
+             .numberPad, .phonePad, .decimalPad, .namePhonePad, .asciiCapableNumberPad:
+            return false
+        default:
+            break
+        }
+        // 로그인 폼의 이메일란은 키보드 타입을 `.default` 로 두고 용도만
+        // `textContentType` 으로 선언하는 경우가 많다 — 실기기 B1 실패의 원인.
+        switch textDocumentProxy.textContentType {
+        case .some(.emailAddress), .some(.username), .some(.password),
+             .some(.newPassword), .some(.oneTimeCode), .some(.URL),
+             .some(.telephoneNumber), .some(.creditCardNumber):
+            return false
+        default:
+            return true
+        }
+    }
+
+    func hostInputTraitsDebugInfo() -> String {
+        let content = textDocumentProxy.textContentType?.rawValue ?? "nil"
+        return "kbType=\(textDocumentProxy.keyboardType?.rawValue ?? -1) autoCap=\(textDocumentProxy.autocapitalizationType?.rawValue ?? -1) content=\(content)"
     }
 }

@@ -328,6 +328,7 @@ class KeyboardViewModel: ObservableObject {
         // buffer so half-typed triggers don't leak across modes.
         abbreviationEngine.resetBuffer()
         shiftState = .off  // reset shift when switching language mode
+        refreshAutoCapitalization()  // 한→영 전환 직후 문장 첫 글자 판정
         persistLetterModeIfEnabled()
     }
 
@@ -371,6 +372,96 @@ class KeyboardViewModel: ObservableObject {
         shiftState = (shiftState == .locked) ? .off : .locked
         lastShiftTapTimestamp = nil
         didHandleShiftLongPressInCurrentGesture = true
+    }
+
+    /// Re-evaluate English sentence-start auto-capitalization.
+    ///
+    /// iOS never forwards the host field's `autocapitalizationType` to a
+    /// custom keyboard, so we arm shift ourselves. Wired to
+    /// `KeyboardViewController.textDidChange` (on the NEXT runloop tick —
+    /// the proxy context read inside the callback itself is still stale in
+    /// some hosts, which made this fire only intermittently) plus
+    /// `viewWillAppear`/`viewDidAppear` for a freshly opened field.
+    /// Setting `shiftState` never mutates text, so there is no re-entrancy loop.
+    func refreshAutoCapitalization() {
+        guard !previewMode else { return }
+        guard KeyboardSettings.shared.englishAutoCapitalizeEnabled else { return }
+        let before = delegate?.textBeforeCursor()
+        let after = delegate?.textAfterCursor()
+        let hasText = delegate?.hostHasText() ?? true
+        let allows = delegate?.hostAllowsAutoCapitalization() ?? true
+        let armed = shouldArmAutoCapitalization(before: before, after: after, hostHasText: hasText)
+        recordAutoCapitalizeDiagnostic(before: before, hasText: hasText, allows: allows, armed: armed)
+
+        guard keyboardMode == .english else { return }
+        guard shiftState != .locked else { return }
+        guard allows else { return }
+        guard let armed else { return }   // 호스트가 아무 것도 말해 주지 않으면 건드리지 않는다
+        let next: ShiftState = armed ? .on : .off
+        if shiftState != next { shiftState = next }
+    }
+
+    /// 우리 자신의 입력 뒤에 자동 대문자를 다시 판정한다.
+    ///
+    /// `KeyboardViewController.textDidChange` 만으로는 부족하다 — 실기기 실측
+    /// 2026-09-02: 빈 필드 진입(A1)과 시프트 자동 해제(A2)는 되는데 ". " 입력 뒤
+    /// 재무장(A3)만 안 됐다. A2 는 `shiftedSymbolIfNeeded` 의 자동 해제만으로도
+    /// 성립하므로, 두 결과를 합치면 **호스트가 우리 삽입에 대해서는
+    /// `textDidChange` 를 발화하지 않는다**는 뜻이 된다.
+    ///
+    /// 다음 런루프 틱으로 미루는 이유는 `textDidChange` 쪽과 같다: 프록시의
+    /// `documentContextBeforeInput` 이 방금 넣은 문자를 아직 반영하지 않았을 수 있다.
+    private func scheduleAutoCapitalizationRefresh() {
+        guard KeyboardSettings.shared.englishAutoCapitalizeEnabled else { return }
+        guard keyboardMode == .english else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshAutoCapitalization()
+        }
+    }
+
+    /// `nil` = 판정 불가(호스트가 문맥을 주지 않음) → 시프트를 건드리지 않는다.
+    ///
+    /// 캐럿 앞 문맥이 `nil` 인 경우가 세 가지로 갈린다.
+    /// - **빈 문서**(`hasText` false): 문장 시작이 맞다. 원 제보의 핵심 시나리오.
+    /// - **문서 맨 앞**(뒤 문맥은 옴): 앞에 아무 것도 없으니 역시 문장 시작이다.
+    ///   실기기 A6 실패 — 문장 시작을 탭해도 안 켜지던 원인이 여기였다.
+    /// - **문맥을 아예 안 주는 호스트**(앞뒤 모두 nil + 글자는 있음, 시큐어 필드):
+    ///   알 수 없으므로 판정을 포기한다.
+    ///
+    /// 앞뒤 nil 을 이렇게 가르는 건 `freezeComposerIfCaretMoved` 가 쓰는 것과 같은
+    /// 구분법이다 (CLAUDE.md "커서 탭" 항목).
+    func shouldArmAutoCapitalization(before: String?, after: String?, hostHasText: Bool) -> Bool? {
+        guard let before else {
+            if !hostHasText { return true }
+            return after != nil ? true : nil
+        }
+        return Self.isSentenceStart(before)
+    }
+
+    /// True when the caret sits at the start of a sentence: an empty (or
+    /// whitespace-only) context, or a terminator (`.` `!` `?`) followed by
+    /// whitespace. The trailing-whitespace half matters — without it "Hi."
+    /// would arm shift immediately and produce "Hi.Q".
+    static func isSentenceStart(_ before: String) -> Bool {
+        var trimmed = Substring(before)
+        while let last = trimmed.last, last.isWhitespace { trimmed = trimmed.dropLast() }
+        if trimmed.isEmpty { return true }
+        guard trimmed.endIndex < before.endIndex else { return false }  // no trailing whitespace
+        guard let terminator = trimmed.last else { return false }
+        return terminator == "." || terminator == "!" || terminator == "?"
+    }
+
+    /// 실기기 판독용 기록. 판정에 쓴 입력값을 그대로 남긴다 — 어느 가드에서
+    /// 걸렸는지가 곧 원인이다.
+    private func recordAutoCapitalizeDiagnostic(before: String?, hasText: Bool, allows: Bool, armed: Bool?) {
+        let ctx: String = {
+            guard let before else { return "nil" }
+            let tail = before.suffix(6)
+            return "\"\(tail)\"(\(before.count))"
+        }()
+        let traits = delegate?.hostInputTraitsDebugInfo() ?? "-"
+        KeyboardSettings.shared.recordAutoCapitalizeDiagnostic(
+            "mode=\(keyboardMode) shift=\(shiftState) before=\(ctx) hasText=\(hasText) allows=\(allows) armed=\(armed.map(String.init(describing:)) ?? "판정불가") traits=\(traits)")
     }
 
     /// Apply shift to a letter symbol. Auto-releases .on to .off after consuming one letter.
@@ -602,6 +693,7 @@ class KeyboardViewModel: ObservableObject {
         if resolved.count == 1, let char = resolved.first {
             abbreviationEngine.processCharacter(char)
         }
+        scheduleAutoCapitalizationRefresh()
     }
 
     func inputNumber(_ number: String) {
@@ -612,6 +704,7 @@ class KeyboardViewModel: ObservableObject {
         } else {
             delegate?.insertText(number)
         }
+        scheduleAutoCapitalizationRefresh()
     }
 
     /// Insert opening bracket + closing bracket, then move cursor back between them.
@@ -706,7 +799,16 @@ class KeyboardViewModel: ObservableObject {
             let selected = longPressPopupCandidates[longPressPopupSelectedIndex]
             inputNumber(selected)
         } else if let text = longPressPopupText {
-            inputNumber(text)
+            // English letter long-press (uppercase) goes through inputSymbol,
+            // not inputNumber: only that path feeds the abbreviation trie and
+            // consumes a pending `.on` shift. Without it, long-pressing the
+            // first letter of a sentence would leave shift armed and turn the
+            // NEXT tap uppercase too ("QUick").
+            if keyboardMode == .english, text.count == 1, text.first?.isLetter == true {
+                inputSymbol(text, bypassAutoBracket: true)
+            } else {
+                inputNumber(text)
+            }
         }
         dismissPopup()
     }
@@ -739,6 +841,7 @@ class KeyboardViewModel: ObservableObject {
             handleComposerAction(action)
         }
         triggerHapticFeedback()
+        scheduleAutoCapitalizationRefresh()
     }
 
     func inputSpace() {
@@ -763,6 +866,7 @@ class KeyboardViewModel: ObservableObject {
                 delegate?.insertText(" ")
             }
         }
+        scheduleAutoCapitalizationRefresh()
     }
 
     /// Double-space → period. When the user presses space and the text already
@@ -789,6 +893,7 @@ class KeyboardViewModel: ObservableObject {
         if !abbreviationEngine.canRestoreLastExpansion {
             delegate?.insertText("\n")
         }
+        scheduleAutoCapitalizationRefresh()
     }
 
     func switchKeyboard() {
@@ -808,6 +913,7 @@ class KeyboardViewModel: ObservableObject {
         // Cursor moves invalidate abbreviation context — reset trie matching state.
         abbreviationEngine.resetBuffer()
         delegate?.moveCursor(by: offset)
+        scheduleAutoCapitalizationRefresh()
     }
 
     /// The user moved the caret by tapping directly in the host text field
@@ -825,6 +931,7 @@ class KeyboardViewModel: ObservableObject {
     func handleExternalCursorMove() {
         commitCurrent()
         abbreviationEngine.resetBuffer()
+        scheduleAutoCapitalizationRefresh()
     }
 
     func toggleSpecialCharLayer() {
@@ -1483,11 +1590,28 @@ protocol KeyboardViewModelDelegate: AnyObject {
     /// after non-nil) apart from "host reports no context at all"
     /// (both nil) in `freezeComposerIfCaretMoved`.
     func textAfterCursor() -> String?
+    /// Whether this host field is one where capitalizing is plainly wrong
+    /// (email, URL, numeric). Judged from the **keyboard type**, not from
+    /// `autocapitalizationType` — 실기기 실측 2026-09-02: 평범한 빈 입력창에서도
+    /// 프록시가 `.none` 을 돌려줘(진단 `allows=false`) 자동 대문자가 영영 안 켜졌다.
+    /// 키보드 타입은 서드파티 키보드가 숫자 패드를 띄우는 근거라 신뢰할 수 있다.
+    /// Defaults to true when the host says nothing.
+    func hostAllowsAutoCapitalization() -> Bool
+    /// 진단 기록용 원시 트레이트 값. 판정에는 쓰지 않는다.
+    func hostInputTraitsDebugInfo() -> String
+
+    /// Whether the host document contains any text at all. Distinguishes an
+    /// empty field (no context because there is nothing) from a secure field
+    /// (text exists, context withheld).
+    func hostHasText() -> Bool
 }
 
 extension KeyboardViewModelDelegate {
     func textBeforeCursor() -> String? { nil }
     func textAfterCursor() -> String? { nil }
+    func hostAllowsAutoCapitalization() -> Bool { true }
+    func hostHasText() -> Bool { true }
+    func hostInputTraitsDebugInfo() -> String { "-" }
 }
 
 // MARK: - AbbreviationEngineDelegate

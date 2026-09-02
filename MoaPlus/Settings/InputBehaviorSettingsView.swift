@@ -21,6 +21,15 @@ struct InputBehaviorSettingsView: View {
             }
 
             Section {
+                Toggle("영문 문장 첫 글자 대문자", isOn: $settings.englishAutoCapitalizeEnabled)
+                Toggle("영문 키 길게 눌러 대문자", isOn: $settings.englishLongPressUppercaseEnabled)
+            } header: {
+                Text("영문")
+            } footer: {
+                Text("문장 첫 글자 대문자를 켜면 문장이 시작될 때(빈 칸이거나 . ! ? 뒤) 시프트가 자동으로 켜집니다. 이메일·비밀번호처럼 대문자를 원하지 않는 입력란에서는 동작하지 않습니다. 길게 눌러 대문자는 시프트를 누르지 않고도 q~m 키를 꾹 눌러 대문자를 입력합니다.")
+            }
+
+            Section {
                 Toggle("스페이스 드래그로 커서 이동", isOn: $settings.cursorMoveBySpaceDragEnabled)
                 if settings.cursorMoveBySpaceDragEnabled {
                     Picker("연속 이동 속도", selection: $settings.cursorRepeatSpeed) {

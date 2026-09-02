@@ -23,6 +23,7 @@ final class KeyboardSettings: ObservableObject {
         static let keyboardAutoBottomInset = "keyboardAutoBottomInset"
         static let keyboardExtraBottomInset = "keyboardExtraBottomInset"
         static let keyboardGeometryDiagnostic = "keyboardGeometryDiagnostic"
+        static let autoCapitalizeDiagnostic = "autoCapitalizeDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
@@ -30,6 +31,8 @@ final class KeyboardSettings: ObservableObject {
         static let clickSoundEnabled = "clickSoundEnabled"
         static let showDetailedHints = "showDetailedHints"
         static let autoBracketEnabled = "autoBracketEnabled"
+        static let englishAutoCapitalize = "englishAutoCapitalize"
+        static let englishLongPressUppercase = "englishLongPressUppercase"
         static let wordDeleteEnabled = "wordDeleteEnabled"
         static let gestureDebugLogEnabled = "gestureDebugLogEnabled"
         static let backspaceSpeed = "backspaceSpeed"
@@ -291,6 +294,18 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(periodOnDoubleSpaceEnabled, forKey: Keys.periodOnDoubleSpace) }
     }
 
+    /// Capitalize the first letter of a sentence in English mode (default OFF).
+    /// iOS never forwards its own auto-capitalization to custom keyboards, so
+    /// we arm `shiftState = .on` ourselves at sentence starts.
+    @Published var englishAutoCapitalizeEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(englishAutoCapitalizeEnabled, forKey: Keys.englishAutoCapitalize) }
+    }
+
+    /// Long-pressing an English letter key inputs its uppercase form (default ON).
+    @Published var englishLongPressUppercaseEnabled: Bool = true {
+        didSet { guard !isLoading else { return }; writePrimitive(englishLongPressUppercaseEnabled, forKey: Keys.englishLongPressUppercase) }
+    }
+
     // MARK: - Layout Customization (v1.4)
 
     @Published var layoutCustomization: LayoutCustomization = LayoutCustomization() {
@@ -494,6 +509,8 @@ final class KeyboardSettings: ObservableObject {
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
         assign(\.cursorRepeatSpeed, defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1)
         assign(\.periodOnDoubleSpaceEnabled, defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true)
+        assign(\.englishAutoCapitalizeEnabled, defaults.object(forKey: Keys.englishAutoCapitalize) as? Bool ?? false)
+        assign(\.englishLongPressUppercaseEnabled, defaults.object(forKey: Keys.englishLongPressUppercase) as? Bool ?? true)
         assign(\.layoutCustomization, load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization())
         assign(\.firstLaunchModalShown, defaults.bool(forKey: Keys.firstLaunchModalShown))
         assign(\.rememberLastKeyboardMode, defaults.bool(forKey: Keys.rememberLastKeyboardMode))
@@ -528,6 +545,18 @@ final class KeyboardSettings: ObservableObject {
 
     var keyboardGeometryDiagnostic: String? {
         defaults.string(forKey: Keys.keyboardGeometryDiagnostic)
+    }
+
+    /// 영문 자동 대문자 판정의 마지막 입력값. 호스트가 캐럿 앞 문맥과 대문자화
+    /// 의사를 실제로 넘겨주는지는 실기기에서만 알 수 있어(시뮬레이터는 서드파티
+    /// 키보드를 못 띄운다) "설정 › 입력 기록"으로 읽어내는 경로가 필요하다.
+    /// 지오메트리 진단과 같은 이유로 `@Published` 밖에 둔다.
+    func recordAutoCapitalizeDiagnostic(_ text: String) {
+        defaults.set(text, forKey: Keys.autoCapitalizeDiagnostic)
+    }
+
+    var autoCapitalizeDiagnostic: String? {
+        defaults.string(forKey: Keys.autoCapitalizeDiagnostic)
     }
 
     /// 익스텐션이 마지막으로 실측한 하단 안전영역(pt). 아직 키보드를 한 번도
@@ -589,6 +618,8 @@ final class KeyboardSettings: ObservableObject {
         cursorMoveBySpaceDragEnabled = true
         cursorRepeatSpeed = 1
         periodOnDoubleSpaceEnabled = true
+        englishAutoCapitalizeEnabled = false
+        englishLongPressUppercaseEnabled = true
         layoutCustomization = LayoutCustomization()
         firstLaunchModalShown = false
         rememberLastKeyboardMode = false

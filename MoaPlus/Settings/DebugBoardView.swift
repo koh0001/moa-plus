@@ -68,6 +68,7 @@ final class DebugBoardStore: ObservableObject {
         높이 배율: \(s.keyboardHeightScale) / 사이드 키 폭: \(s.sideKeyWidthRatio)
         하단 여백: 자동 \(s.keyboardAutoBottomInsetEnabled ? "ON" : "OFF") / 추가 \(Int(s.keyboardExtraBottomInset))pt
         키보드 실측: \(s.keyboardGeometryDiagnostic ?? "(키보드를 한 번도 띄우지 않음)")
+        자동 대문자: \(s.autoCapitalizeDiagnostic ?? "(아직 판정한 적 없음)")
         레이아웃: slotA \(s.layoutCustomization.slotA.rawValue) / slotB \(s.layoutCustomization.slotB.rawValue) / 모음키 \(s.layoutCustomization.vowelKeyBehavior.rawValue)
         """
         let records = entries.isEmpty ? "(저장된 기록 없음)" : exportText
