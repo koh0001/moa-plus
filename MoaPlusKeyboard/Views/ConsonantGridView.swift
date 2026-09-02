@@ -92,10 +92,17 @@ struct KeyGridView: View {
                             if mode == .korean {
                                 return KeyboardMetrics.longPressNumber(at: row, column: column, layout: layoutCustomization)
                             }
-                            if mode == .english,
-                               case .symbol(let s) = content,
-                               s.first?.isNumber == true {
-                                return KeyboardSettings.shared.secondaryAction(forKey: s)?.primaryLongPressOutput
+                            if mode == .english, case .symbol(let s) = content {
+                                if s.first?.isNumber == true {
+                                    return KeyboardSettings.shared.secondaryAction(forKey: s)?.primaryLongPressOutput
+                                }
+                                // 영문 letter 롱프레스 = 대문자. 숫자 행은 위에서
+                                // 이미 처리되므로 여기 오는 건 q~m 뿐이다.
+                                if s.count == 1, s.first?.isLetter == true,
+                                   KeyboardSettings.shared.englishLongPressUppercaseEnabled {
+                                    return s.uppercased()
+                                }
+                                return nil
                             }
                             if mode.isSymbol, case .symbol(let s) = content {
                                 return KeyboardMetrics.symbolModeAlternates[s]?.first

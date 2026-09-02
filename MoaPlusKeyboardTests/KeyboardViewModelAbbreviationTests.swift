@@ -90,6 +90,40 @@ final class KeyboardViewModelAbbreviationTests: XCTestCase {
         XCTAssertEqual(delegate.text, "", "backspace clears the rest of the trigger")
     }
 
+    // MARK: - 영문 트리거 대소문자 (자동 대문자와의 상호작용, 2026-09-02)
+
+    /// 자동 대문자가 문장 첫 글자를 `H` 로 만들어도 소문자로 등록한 `hi` 가
+    /// 터져야 한다. 영문 단축어는 대부분 문장 첫 단어라, 안 그러면 두 기능을
+    /// 함께 켠 사용자에게는 영문 단축어가 통째로 죽는다.
+    func testExpansion_englishTrigger_isCaseInsensitive() {
+        makeViewModel(triggers: [("hi", "hello")])
+        viewModel.keyboardMode = .english
+
+        viewModel.inputSymbol("H")
+        viewModel.inputSymbol("i")
+        viewModel.inputSpace()
+
+        XCTAssertEqual(delegate.text, "hello ",
+                       "대문자로 시작해도 소문자 트리거가 매칭돼야 한다")
+    }
+
+    /// 지울 길이는 정규화 이전의 **실제 입력 문자열** 기준이어야 한다.
+    /// 등록 트리거 길이로 지우면 앞 글자를 먹거나 덜 지운다.
+    func testExpansion_caseInsensitiveMatch_deletesTypedTextOnly() {
+        makeViewModel(triggers: [("hi", "hello")])
+        viewModel.keyboardMode = .english
+
+        viewModel.inputSymbol("o")
+        viewModel.inputSymbol("k")
+        viewModel.inputSpace()
+        viewModel.inputSymbol("H")
+        viewModel.inputSymbol("I")
+        viewModel.inputSpace()
+
+        XCTAssertEqual(delegate.text, "ok hello ",
+                       "앞 어절 'ok ' 은 그대로 남아야 한다")
+    }
+
     // MARK: - 제보 재현 (2026-08-16) — 트리거/본문에 기호가 섞인 경우
     //
     // 두 가지 해석을 분리 검증한다.

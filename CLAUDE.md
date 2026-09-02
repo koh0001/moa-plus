@@ -362,6 +362,8 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 │                                             — 기호·엔터는 설정 무관 항상 유지)
 ├── abbreviationTriggerPolicy: .safe/.free  (신규 트리거 등록 제한 — 메인 앱 검증 전용)
 ├── periodOnDoubleSpaceEnabled: Bool        (더블 스페이스 → 마침표)
+├── englishAutoCapitalizeEnabled: Bool      (영문 문장 첫 글자 대문자, 기본 OFF)
+├── englishLongPressUppercaseEnabled: Bool  (영문 letter 롱프레스 = 대문자, 기본 ON)
 ├── layoutCustomization: LayoutCustomization (프리셋/슬롯/펑크 구성 + vowelKeyBehavior)
 ├── rememberLastKeyboardMode: Bool + lastKeyboardLetterMode: String (한/영 모드 복원)
 ├── clickSoundEnabled: Bool                 (독립 저장)
@@ -415,6 +417,11 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 - 매칭은 ①버퍼 전체 정확 매칭 → 실패 시 ②**최장 접미** 매칭 순. 접미 매칭은 **내용 구분자를
   포함한 트리거로 한정**한다. 이 제한을 풀면 평범한 `ㅎㅌ` 가 "안녕ㅎㅌ" 끝에서도 터져
   기존 사용자가 전부 깨진다 (`testExpansion_plainTrigger_doesNotFireMidWord` 가드)
+- 영문 트리거는 **대소문자를 구분하지 않는다**(트라이 키를 소문자로 접어 넣고 조회도 접어서
+  한다, `AbbreviationEngine.foldCase`). 자동 대문자가 문장 첫 글자를 `H` 로 만들면 소문자로
+  등록한 `hi` 가 영영 안 터지는데, 영문 단축어는 대부분 문장 첫 단어(`hi` `thx` `btw`)라
+  두 기능을 함께 켠 사용자에게는 기능이 통째로 죽는다. iOS 순정 텍스트 대치와 같은 규칙이다.
+  한글은 대소문자가 없어 무변화 (`testExpansion_englishTrigger_isCaseInsensitive` 가드)
 - 지울 길이는 **매칭된 트리거** 기준이다. 버퍼 길이로 지우면 접미 매칭에서 앞 글자를 먹는다
 - 확장 직전 `textBeforeCursor()` 가 트리거로 끝나는지 확인하고, 아니면 **확장을 포기**한다.
   델리게이트가 `Bool` 을 반환해 엔진이 되돌리기 상태를 세우지 않도록 한다 — 포기했는데

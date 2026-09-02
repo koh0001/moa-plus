@@ -130,7 +130,7 @@ final class AbbreviationEngine {
         var sawSymbolTrigger = false
         for expansion in store.enabledExpansions {
             var node = trieRoot
-            for char in expansion.trigger {
+            for char in Self.foldCase(expansion.trigger) {
                 let child = node.children[char] ?? {
                     let newNode = TrieNode()
                     node.children[char] = newNode
@@ -373,10 +373,30 @@ final class AbbreviationEngine {
         return true
     }
 
+    /// 트라이 키 정규화 — 영문 트리거는 대소문자를 구분하지 않는다.
+    ///
+    /// 자동 대문자가 문장 첫 글자를 `H` 로 만들면 소문자로 등록한 `hi` 가 영영
+    /// 안 터진다. 영문 단축어는 대부분 문장 첫 단어(`hi` `thx` `btw`)로 쓰므로
+    /// 그 조합에서 기능이 통째로 죽는 셈이다. iOS 순정 텍스트 대치도
+    /// 대소문자를 구분하지 않는다(`omw` 로 등록해도 `Omw` 에서 터짐).
+    ///
+    /// 지울 길이는 정규화 이전의 **실제 버퍼 문자열**로 계산하므로(`findMatch` 가
+    /// 버퍼 조각을 그대로 돌려준다) 삭제 개수 규칙은 영향을 받지 않는다.
+    /// 한글은 대소문자가 없어 무변화다.
+    static func foldCase(_ text: String) -> String {
+        String(text.map(foldCase))
+    }
+
+    static func foldCase(_ char: Character) -> Character {
+        let lowered = String(char).lowercased()
+        // "İ" 처럼 한 글자가 두 스칼라로 풀리는 경우는 원본을 유지한다.
+        return lowered.count == 1 ? Character(lowered) : char
+    }
+
     /// Look up a string in the trie
     private func lookupTrie(_ text: String) -> [ShortcutExpansion] {
         var node = trieRoot
-        for char in text {
+        for char in Self.foldCase(text) {
             guard let next = node.children[char] else {
                 return []
             }
@@ -388,7 +408,7 @@ final class AbbreviationEngine {
     /// Check if the current buffer has any potential matches (prefix exists in trie)
     func hasPartialMatch() -> Bool {
         var node = trieRoot
-        for char in buffer {
+        for char in Self.foldCase(buffer) {
             guard let next = node.children[char] else {
                 return false
             }

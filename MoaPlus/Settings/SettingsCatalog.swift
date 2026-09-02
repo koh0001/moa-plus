@@ -204,6 +204,12 @@ enum SettingsCatalog {
             keywords: ["괄호", "자동", "마침표", "더블스페이스", "온점"]
         ),
         SettingsEntry(
+            title: "영문 대문자 · 첫 글자 · 길게 눌러 대문자",
+            icon: "textformat",
+            destination: .inputBehavior,
+            keywords: ["대문자", "영문", "영어", "첫글자", "시프트", "shift", "caps", "자동대문자", "길게", "꾹"]
+        ),
+        SettingsEntry(
             title: "테마 · 색상 · 배경 이미지",
             icon: "paintbrush",
             destination: .appearance,

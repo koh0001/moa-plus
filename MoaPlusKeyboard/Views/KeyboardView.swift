@@ -212,7 +212,13 @@ struct KeyboardView: View {
                         let y = candidateBarFootprint
                             + CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
-                        let rawCandidates = popupState.candidates
+                        // 후보가 없는 키(영문 letter 롱프레스 대문자, 대체문자
+                        // 없는 심볼 키)는 팝업 텍스트 자체를 유일한 후보로 그린다.
+                        // 빈 배열로 두면 패딩과 그림자만 남아 키보드 위에 정체를
+                        // 알 수 없는 검은 점이 뜬다.
+                        let rawCandidates = popupState.candidates.isEmpty
+                            ? [popupState.text].compactMap { $0 }
+                            : popupState.candidates
                         let selectedIdx = popupState.selectedIndex
                         let isRightEdge = activeCol >= 5
                         // Auto-bracket hides standalone closing brackets in
