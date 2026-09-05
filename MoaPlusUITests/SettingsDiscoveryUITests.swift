@@ -154,6 +154,30 @@ final class SettingsDiscoveryUITests: XCTestCase {
         shot(app, "5-검색 결과 탭 → 긋기 입력 설정")
     }
 
+    /// 이슈 #29 — 제보에 등장한 표기("뫄")로 복합모음 경로 항목에 도달하고, 화면에
+    /// 새 선택지("세로 왕복만")가 실제로 렌더되는지. 유닛 테스트는 엔진만 덮는다.
+    @MainActor
+    func testSearch_findsCompoundVowelPathByIssueVocabulary() throws {
+        let app = openSettings()
+        let field = app.searchFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("뫄")
+
+        XCTAssertTrue(exists(app, "복합모음 경로"),
+                      "‘뫄’ 검색이 복합모음 경로 항목을 찾지 못했다 — SettingsCatalog keywords 확인")
+        shot(app, "5b-검색 ‘뫄’")
+
+        tap(app, "복합모음 경로")
+        XCTAssertTrue(app.navigationBars["긋기 입력 설정"].waitForExistence(timeout: 5),
+                      "검색 결과를 탭했는데 긋기 설정 화면으로 가지 않았다")
+        XCTAssertTrue(exists(app, "세로 왕복만"),
+                      "긋기 설정에 ‘세로 왕복만’ 선택지가 보이지 않는다 — GestureSettingsView 섹션 확인")
+        XCTAssertTrue(exists(app, "직각 꺾기 + 세로 왕복"),
+                      "기본 선택지 ‘직각 꺾기 + 세로 왕복’ 이 보이지 않는다")
+        shot(app, "5c-긋기 입력 설정 — 복합모음 경로 섹션")
+    }
+
     // MARK: - 증상 라우터
 
     @MainActor
@@ -166,6 +190,20 @@ final class SettingsDiscoveryUITests: XCTestCase {
                       "도움말 화면 제목이 행 레이블과 다르다")
         XCTAssertTrue(exists(app, "오타가 잦아요"), "증상 항목이 보이지 않는다")
         shot(app, "6-증상 라우터 목록")
+    }
+
+    /// 이슈 #29 증상 행 → 긋기 설정. 행 레이블은 리뷰/이슈에서 쓰인 말 그대로다.
+    @MainActor
+    func testSymptomRouter_moToMwaSymptomLeadsToGestureSettings() throws {
+        let app = openSettings()
+        tap(app, "이럴 때 어떻게 하나요")
+        tap(app, "‘모’가 ‘뫄’로, ‘보’가 ‘봐’로 찍혀요")
+
+        XCTAssertTrue(app.navigationBars["긋기 입력 설정"].waitForExistence(timeout: 5),
+                      "‘모→뫄’ 증상을 탭했는데 긋기 설정 화면으로 가지 않았다")
+        XCTAssertTrue(exists(app, "세로 왕복만"),
+                      "도착 화면에 해결책(‘세로 왕복만’)이 보이지 않는다")
+        shot(app, "7b-증상 ‘모→뫄’ → 긋기 입력 설정")
     }
 
     @MainActor

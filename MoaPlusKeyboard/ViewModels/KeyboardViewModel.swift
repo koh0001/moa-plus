@@ -558,6 +558,7 @@ class KeyboardViewModel: ObservableObject {
         keyPressFeedback()
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        vowelResolver.compoundVowelPath = KeyboardSettings.shared.gestureSettings.compoundVowelPath
         // Slot B is not associated with any consonant column override.
         // slot B 는 자음 드래그 패턴(ㅢ 등 대각선 포함)을 쓰므로 카디널 강제 OFF.
         gestureAnalyzer.columnId = 0
@@ -982,6 +983,7 @@ class KeyboardViewModel: ObservableObject {
         gestureStartPoint = point
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
+        vowelResolver.compoundVowelPath = KeyboardSettings.shared.gestureSettings.compoundVowelPath
         // 활성 키의 내용은 한 제스처 동안 바뀌지 않으므로 여기서 한 번만 조회한다.
         // `keyContent` 는 캐시가 없어 호출마다 `activeLayout` → `koreanLayout` 을 타고
         // 4개 행 배열 + leftCol 배열 + KeyContent 28개를 새로 만든다. 이걸
@@ -1301,9 +1303,10 @@ class KeyboardViewModel: ObservableObject {
 
         // Additional strokes: fold into compound vowels.
         // applySecondaryStroke == nil → keep prior vowel (ignore noise).
+        let path = KeyboardSettings.shared.gestureSettings.compoundVowelPath
         for direction in directions.dropFirst() {
             let cardinal = normalizedCardinal(direction)
-            if let combined = applySecondaryStroke(current, primitive: primitive, direction: cardinal) {
+            if let combined = applySecondaryStroke(current, primitive: primitive, direction: cardinal, path: path) {
                 current = combined
             }
         }
@@ -1318,7 +1321,7 @@ class KeyboardViewModel: ObservableObject {
         // 순정 모아키(기본값)에서는 이 경로 자체가 없다. 대각선은 최종 결과
         // (↖↗=ㅣ, ↙↘=ㅡ)이며, 복합모음은 카디널 조합(ㅘ=↑→ 등)으로만 만든다.
         // nil 을 돌려주면 호출부 3곳이 모두 `VowelResolver` 트라이로 폴백하는데,
-        // 그 패턴 테이블(`VowelPattern.all`)이 이미 순정 스펙과 동일하다.
+        // 그 패턴 테이블(`VowelPattern.patternTrie`, 공통 + 직각)이 이미 순정 스펙과 동일하다.
         // 단독 대각선은 어차피 아래 `rest.isEmpty` 가드로 폴백하므로, 이 게이트는
         // 클래식/확장형 레이아웃의 ㅣ/ㅡ 입력에 영향을 주지 않는다.
         guard KeyboardSettings.shared.consonantDiagonalDerivationEnabled else { return nil }
@@ -1367,9 +1370,23 @@ class KeyboardViewModel: ObservableObject {
     /// Fold an additional stroke into the running vowel.
     /// Returns nil if the stroke doesn't produce a known compound — caller
     /// then keeps the previous vowel intact.
-    private func applySecondaryStroke(_ current: Jungseong, primitive: VowelPrimitiveType, direction: GestureDirection) -> Jungseong? {
+    private func applySecondaryStroke(_ current: Jungseong, primitive: VowelPrimitiveType, direction: GestureDirection,
+                                      path: CompoundVowelPath) -> Jungseong? {
         switch primitive {
         case .dash:
+            // 세로 왕복 전용(이슈 #29): ㅡ 키에서도 직각 ↑→=ㅘ / ↓←=ㅝ 를 끈다.
+            // ㅡ 키는 원래 ↑↓→ 가 ㅚ 에서 멈추므로(ㅚ+→ 간선 없음), 이 모드에서만
+            // ㅚ+→=ㅘ / ㅟ+←=ㅝ 체인을 열어 ㅘ·ㅝ 에 도달할 길을 남긴다. 기본
+            // 모드의 표는 그대로 — 기존 사용자의 ㅡ 키 동작이 달라지면 안 된다.
+            if path == .verticalOnly {
+                switch (current, direction) {
+                case (.ㅗ, .right): return nil
+                case (.ㅜ, .left):  return nil
+                case (.ㅚ, .right): return .ㅘ
+                case (.ㅟ, .left):  return .ㅝ
+                default: break
+                }
+            }
             switch (current, direction) {
             // ㅗ → ㅘ (→) / ㅚ (←,↓ 역방향)
             case (.ㅗ, .right): return .ㅘ

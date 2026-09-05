@@ -98,6 +98,13 @@ enum SettingsCatalog {
             keywords: ["순정", "모아키", "복합모음", "대각선", "확장", "ㅘ", "ㅝ", "와", "워", "ㅐ", "ㅔ", "ㅢ", "애", "에", "의", "왕복"]
         ),
         SettingsEntry(
+            title: "복합모음 경로",
+            icon: "arrow.turn.right.up",
+            destination: .gesture,
+            // "모가 뫄로 찍힌다" 갈래 (이슈 #29).
+            keywords: ["복합모음", "경로", "직각", "세로", "왕복", "ㅘ", "ㅝ", "ㅙ", "ㅞ", "와", "워", "뫄", "봐", "모", "오"]
+        ),
+        SettingsEntry(
             title: "멀티스트로크 민감도",
             icon: "scribble.variable",
             destination: .gesture,
@@ -241,6 +248,12 @@ enum SettingsCatalog {
             symptom: "‘으’가 ‘워’로, ‘이’가 ‘와’로 바뀌어요",
             remedy: "복합모음 입력 방식을 ‘순정 모아키’로 두세요 (기본값)",
             icon: "character.textbox",
+            destination: .gesture
+        ),
+        SettingsSymptom(
+            symptom: "‘모’가 ‘뫄’로, ‘보’가 ‘봐’로 찍혀요",
+            remedy: "복합모음 경로를 ‘세로 왕복만’으로 바꿔 보세요",
+            icon: "arrow.turn.right.up",
             destination: .gesture
         ),
         SettingsSymptom(

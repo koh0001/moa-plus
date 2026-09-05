@@ -9,7 +9,9 @@ struct VowelPattern {
         self.directions = directions
     }
 
-    static let allPatterns: [VowelPattern] = [
+    /// 두 경로 모드에 공통인 패턴. 직각 꺾기 4개는 `rightAnglePatterns` 에 있다 —
+    /// "전체" 는 `patternTrie`(공통 + 직각)이다.
+    static let commonPatterns: [VowelPattern] = [
         // Basic vowels (왼쪽 대각선만 정규화: ↖→↑, ↙→↓)
         VowelPattern(.ㅗ, .up),                           // ↑ (↖도 정규화로 처리됨)
         VowelPattern(.ㅜ, .down),                         // ↓ (↙도 정규화로 처리됨)
@@ -24,11 +26,8 @@ struct VowelPattern {
         VowelPattern(.ㅑ, .right, .left, .right),         // →←→
         VowelPattern(.ㅕ, .left, .right, .left),          // ←→←
 
-        // Complex vowels (diphthongs)
-        VowelPattern(.ㅘ, .up, .right),                   // ↑→
-        VowelPattern(.ㅙ, .up, .right, .left),            // ↑→←
-        VowelPattern(.ㅝ, .down, .left),                  // ↓←
-        VowelPattern(.ㅞ, .down, .left, .right),          // ↓←→
+        // Complex vowels (diphthongs) — 직각 꺾기 4개는 `rightAnglePatterns` 로 분리
+        // (세로 왕복 전용 모드에서 빠진다, 이슈 #29). ㅚ/ㅟ 는 왕복이라 항상 포함.
         VowelPattern(.ㅚ, .up, .down),                    // ↑↓
         VowelPattern(.ㅟ, .down, .up),                    // ↓↑
 
@@ -60,14 +59,39 @@ struct VowelPattern {
         VowelPattern(.ㅢ, .downRight, .up),               // ↘↑ (오른쪽아래-위)
     ]
 
-    // Build a trie for efficient pattern matching
-    static let patternTrie: PatternTrie = {
+    /// 직각 꺾기 복합모음 — 순정 실측 스펙(↑→=ㅘ, ↓←=ㅝ, 영상 판독)이라 기본
+    /// 모드에는 항상 포함된다. 세로 왕복 전용(`CompoundVowelPath.verticalOnly`)
+    /// 에서만 제외해, 위로 긋는 끝이 오른쪽 위로 흘러 "모"→"뫄" 가 되는 경로를
+    /// 구조적으로 없앤다. 세로 체인(↑↓→=ㅘ 등)은 `commonPatterns` 에 남아 있어
+    /// 두 모드 모두에서 ㅘ·ㅙ·ㅝ·ㅞ 에 도달할 수 있다.
+    static let rightAnglePatterns: [VowelPattern] = [
+        VowelPattern(.ㅘ, .up, .right),                   // ↑→
+        VowelPattern(.ㅙ, .up, .right, .left),            // ↑→←
+        VowelPattern(.ㅝ, .down, .left),                  // ↓←
+        VowelPattern(.ㅞ, .down, .left, .right),          // ↓←→
+    ]
+
+    /// 기본 모드 트라이 = 공통 패턴 + 직각 꺾기 (v2.2.0 까지의 `patternTrie` 와 동일).
+    static let patternTrie: PatternTrie = buildTrie(commonPatterns + rightAnglePatterns)
+
+    /// 세로 왕복 전용 트라이 = 공통 패턴만. 트라이 밖 획은 `match` 가 건너뛰므로
+    /// ↑→ 는 ㅗ, ↑→← 도 ㅗ 로 떨어진다.
+    static let verticalOnlyPatternTrie: PatternTrie = buildTrie(commonPatterns)
+
+    static func trie(for path: CompoundVowelPath) -> PatternTrie {
+        switch path {
+        case .rightAngleAndVertical: return patternTrie
+        case .verticalOnly:          return verticalOnlyPatternTrie
+        }
+    }
+
+    private static func buildTrie(_ patterns: [VowelPattern]) -> PatternTrie {
         let trie = PatternTrie()
-        for pattern in allPatterns {
+        for pattern in patterns {
             trie.insert(pattern)
         }
         return trie
-    }()
+    }
 }
 
 // Trie for efficient pattern matching

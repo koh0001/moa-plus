@@ -63,7 +63,7 @@ final class DebugBoardStore: ObservableObject {
         let settingsSummary = """
         [설정 요약]
         긋기: 프리셋 \(g.swipeProfile.mode.rawValue) / 길이 \(g.swipeProfile.swipeLength.displayName) / 4방향 \(g.swipeProfile.fourWayMode ? "ON" : "OFF")
-        멀티스트로크 민감도: \(g.multiStrokeTurnSensitivity) / 복합모음: \(s.consonantDiagonalDerivationEnabled ? "확장(대각선 진입)" : "순정 모아키")
+        멀티스트로크 민감도: \(g.multiStrokeTurnSensitivity) / 복합모음: \(s.consonantDiagonalDerivationEnabled ? "확장(대각선 진입)" : "순정 모아키") / 경로: \(g.compoundVowelPath == .verticalOnly ? "세로 왕복만" : "직각+세로 왕복")
         반전 임계 비율: \(g.reversalThresholdRatio) / 방향 전환 임계: \(g.directionChangeThreshold)
         높이 배율: \(s.keyboardHeightScale) / 사이드 키 폭: \(s.sideKeyWidthRatio)
         하단 여백: 자동 \(s.keyboardAutoBottomInsetEnabled ? "ON" : "OFF") / 추가 \(Int(s.keyboardExtraBottomInset))pt
