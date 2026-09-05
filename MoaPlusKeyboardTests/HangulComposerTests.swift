@@ -159,6 +159,81 @@ final class HangulComposerTests: XCTestCase {
         XCTAssertEqual(composer.currentComposingCharacter, "가")
     }
 
+    // MARK: - 글자 단위 백스페이스 (앱스토어 리뷰 제보, opt-in)
+    //
+    // v2.0 의 자소 단위 백스페이스(순정 실측 G5)에 "예전처럼 자음까지 같이 지워
+    // 달라"는 리뷰가 왔다. v2.0 이전(커밋 089dfd0 이전)의 동작은 **받침 없는 조합
+    // 글자만** 통째로 지우고, 받침은 먼저 떨어뜨렸다(한→하→빈). 그 동작을 옵션으로
+    // 되살린다. 기본값은 자소 단위 그대로 — 바꾸면 순정 정합이 깨진다.
+
+    func test_backspaceWholeSyllable_choseongJungseong_clearsSyllable() {
+        _ = composer.inputChoseong(.ㄱ)
+        _ = composer.inputJungseong(.ㅏ)
+        XCTAssertEqual(composer.currentComposingCharacter, "가")
+        let action = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(action, .update)
+        XCTAssertEqual(composer.state, .empty, "글자 단위: 가 → (빈) — v2.0 이전 동작")
+        XCTAssertNil(composer.currentComposingCharacter)
+    }
+
+    func test_backspaceWholeSyllable_compoundJungseong_clearsSyllable() {
+        _ = composer.inputChoseong(.ㄱ)
+        _ = composer.inputJungseong(.ㅏ)
+        _ = composer.inputJungseong(.ㅣ)   // ㅏ+ㅣ=ㅐ
+        XCTAssertEqual(composer.currentComposingCharacter, "개")
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.state, .empty, "복합 모음도 획 되감기 없이 글자째")
+    }
+
+    func test_backspaceWholeSyllable_jongseongIsStillRemovedFirst() {
+        _ = composer.inputChoseong(.ㅎ)
+        _ = composer.inputJungseong(.ㅏ)
+        _ = composer.inputChoseong(.ㄴ)
+        XCTAssertEqual(composer.currentComposingCharacter, "한")
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.currentComposingCharacter, "하", "받침은 v1.x 와 같이 먼저 떨어진다")
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.state, .empty)
+    }
+
+    func test_backspaceWholeSyllable_doubleJongseongSplitsFirst() {
+        _ = composer.inputChoseong(.ㄱ)
+        _ = composer.inputJungseong(.ㅏ)
+        _ = composer.inputChoseong(.ㅂ)
+        _ = composer.inputChoseong(.ㅅ)   // ㅄ
+        XCTAssertEqual(composer.currentComposingCharacter, "값")
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.currentComposingCharacter, "갑")
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.currentComposingCharacter, "가")
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.state, .empty)
+    }
+
+    func test_backspaceWholeSyllable_otherStatesUnchanged() {
+        _ = composer.inputChoseong(.ㅎ)
+        XCTAssertEqual(composer.deleteBackward(wholeSyllable: true), .update)
+        XCTAssertEqual(composer.state, .empty, "초성만: 두 모드 동일")
+
+        _ = composer.inputChoseong(.ㅇ)
+        _ = composer.inputJungseong(.ㆍ)
+        _ = composer.inputJungseong(.ㆍ)
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.state, .dotPending(choseong: .ㅇ, dotCount: 1), "ㆍ 대기: 카운트 1단계 감소 그대로")
+        composer.reset()
+
+        _ = composer.inputJungseong(.ㅡ)
+        _ = composer.deleteBackward(wholeSyllable: true)
+        XCTAssertEqual(composer.state, .empty, "단독 모음: 두 모드 동일")
+    }
+
+    func test_backspaceDefault_staysJamoUnit() {
+        _ = composer.inputChoseong(.ㄱ)
+        _ = composer.inputJungseong(.ㅏ)
+        _ = composer.deleteBackward()
+        XCTAssertEqual(composer.state, .choseong(.ㄱ), "인자 없는 호출은 자소 단위(순정) 그대로")
+    }
+
     func testDeleteDoubleJongseong() {
         _ = composer.inputChoseong(.ㄱ)
         _ = composer.inputJungseong(.ㅏ)

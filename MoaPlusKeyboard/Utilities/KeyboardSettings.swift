@@ -35,6 +35,7 @@ final class KeyboardSettings: ObservableObject {
         static let englishLongPressUppercase = "englishLongPressUppercase"
         static let wordDeleteEnabled = "wordDeleteEnabled"
         static let gestureDebugLogEnabled = "gestureDebugLogEnabled"
+        static let backspaceDeletesWholeSyllable = "backspaceDeletesWholeSyllable"
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
@@ -263,6 +264,13 @@ final class KeyboardSettings: ObservableObject {
     }
 
     /// 실측용 제스처 상세 로그 (입력 기록 보드 → 개발자 리포트 동봉).
+    /// 조합 중인 받침 없는 글자를 백스페이스 한 번에 통째로 지울지(글자 단위, v2.0 이전
+    /// 동작). 기본 OFF = 자소 단위(순정 실측 G5: 가→ㄱ). 앱스토어 리뷰 "예전처럼
+    /// 자음까지 같이 지워 달라" 제보로 opt-in 추가. 받침은 두 모드 모두 먼저 떨어진다.
+    @Published var backspaceDeletesWholeSyllable: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(backspaceDeletesWholeSyllable, forKey: Keys.backspaceDeletesWholeSyllable) }
+    }
+
     /// 기본 ON — 기록은 기기 로컬(App Group, 최근 200건 순환)에만 남고,
     /// 전송은 사용자가 리포트 보내기를 눌러야만 일어난다. GestureDebugLog 참고.
     @Published var gestureDebugLogEnabled: Bool = true {
@@ -504,6 +512,7 @@ final class KeyboardSettings: ObservableObject {
         assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
         assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
         assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? true)
+        assign(\.backspaceDeletesWholeSyllable, defaults.object(forKey: Keys.backspaceDeletesWholeSyllable) as? Bool ?? false)
         assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
         assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
@@ -628,6 +637,7 @@ final class KeyboardSettings: ObservableObject {
     }
 
     /// Reset gesture settings only
+        backspaceDeletesWholeSyllable = false
     func resetGestureSettings() {
         gestureSettings = .default
     }

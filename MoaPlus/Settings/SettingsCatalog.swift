@@ -187,10 +187,11 @@ enum SettingsCatalog {
         SettingsEntry(
             // 실기기 실측 D4: "자소"로 검색해도 제목에 그 말이 없어 결과를
             // 지나치기 쉬웠다 — 제목에 자소 단위 삭제를 드러낸다.
-            title: "백스페이스 · 자소/단어 삭제",
+            title: "백스페이스 · 자소/글자/단어 삭제",
             icon: "delete.left",
             destination: .backspace,
-            keywords: ["백스페이스", "지우기", "삭제", "속도", "단어", "자소", "한자소", "낱자", "받침"]
+            // "글자 단위" 갈래(앱스토어 리뷰: 모음만 지워진다, 자음까지 같이).
+            keywords: ["백스페이스", "지우기", "삭제", "속도", "단어", "자소", "한자소", "낱자", "받침", "글자", "글자단위", "통째", "한번에", "자음", "모음만"]
         ),
         SettingsEntry(
             title: "입력 기록 보드",
@@ -261,6 +262,12 @@ enum SettingsCatalog {
             remedy: "멀티스트로크 민감도를 올려 보세요",
             icon: "hare",
             destination: .gesture
+        ),
+        SettingsSymptom(
+            symptom: "글자를 지우면 자음만 남아요",
+            remedy: "백스페이스 삭제 단위를 ‘글자 단위’로 바꿔 보세요",
+            icon: "delete.left",
+            destination: .backspace
         ),
         SettingsSymptom(
             symptom: "키에 작은 글자가 보여요",

@@ -3,8 +3,29 @@ import SwiftUI
 struct BackspaceSettingsView: View {
     @ObservedObject private var settings = KeyboardSettings.shared
 
+    /// 푸터 문구 공용 — 삭제 단위 설정에 따라 "한 자소씩 / 한 글자씩" 이 바뀐다.
+    private var unitPhrase: String {
+        settings.backspaceDeletesWholeSyllable ? "한 글자씩(받침 → 글자)" : "한 자소씩(받침 → 모음 → 자음)"
+    }
+
     var body: some View {
         List {
+            // 삭제 단위 — 앱스토어 리뷰 "글자 지울 때 모음만 지워진다, 예전처럼 자음까지"
+            // 반영. 기본은 자소 단위(순정 실측)라 기존 사용자는 무변화.
+            Section {
+                Picker("삭제 단위", selection: $settings.backspaceDeletesWholeSyllable) {
+                    Text("자소 단위").tag(false)
+                    Text("글자 단위").tag(true)
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("삭제 단위")
+            } footer: {
+                Text(settings.backspaceDeletesWholeSyllable
+                     ? "받침 없는 글자를 한 번에 지웁니다 (가 → 빈칸). 받침이 있으면 받침부터 떨어집니다 (한 → 하 → 빈칸). 2.0 이전 모아+ 의 동작입니다."
+                     : "기본값. 받침 → 모음 → 자음 순서로 한 자소씩 지웁니다 (가 → ㄱ). 순정 모아키와 같은 동작입니다.")
+            }
+
             Section {
                 Picker("속도", selection: $settings.backspaceSpeed) {
                     Text("느리게").tag(0)
@@ -17,7 +38,7 @@ struct BackspaceSettingsView: View {
             } footer: {
                 // 실기기 실측 D4: "한 자소씩" 안내가 단어 삭제 OFF 푸터에만 있어
                 // 기본 상태(단어 삭제 ON)에서는 보이지 않았다 — 상시 노출로 이동.
-                Text("길게 누를 때 글자가 반복 삭제되는 속도입니다. 삭제는 항상 한 자소씩(받침 → 모음 → 자음) 이뤄집니다 — 순정 모아키와 같은 기본 동작입니다.")
+                Text("길게 누를 때 글자가 반복 삭제되는 속도입니다. 반복 삭제도 위 삭제 단위를 따라 \(unitPhrase) 이뤄집니다.")
             }
 
             Section {
@@ -35,9 +56,9 @@ struct BackspaceSettingsView: View {
                 Text("단어 단위 삭제")
             } footer: {
                 if settings.wordDeleteEnabled {
-                    Text("백스페이스를 \(settings.wordDeleteDelay, specifier: "%.1f")초 이상 누르면 공백 단위로 빠르게 삭제합니다. 그 전까지는 한 자소씩 삭제합니다.")
+                    Text("백스페이스를 \(settings.wordDeleteDelay, specifier: "%.1f")초 이상 누르면 공백 단위로 빠르게 삭제합니다. 그 전까지는 \(unitPhrase) 삭제합니다.")
                 } else {
-                    Text("백스페이스를 길게 눌러도 한 자소씩(받침 → 모음 → 자음) 삭제합니다.")
+                    Text("백스페이스를 길게 눌러도 \(unitPhrase) 삭제합니다.")
                 }
             }
 
