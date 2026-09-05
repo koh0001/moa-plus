@@ -835,7 +835,8 @@ class KeyboardViewModel: ObservableObject {
             triggerHapticFeedback()
             return
         }
-        let action = composer.deleteBackward()
+        let action = composer.deleteBackward(
+            wholeSyllable: KeyboardSettings.shared.backspaceDeletesWholeSyllable)
         if action == .none {
             delegate?.deleteBackward()
         } else {

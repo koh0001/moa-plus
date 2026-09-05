@@ -45,6 +45,14 @@ enum FeedbackContext {
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         let iosVersion = UIDevice.current.systemVersion
         let model = deviceModelIdentifier()
+        // 전체 접근이 꺼진 키보드는 App Group 에 기록을 못 남기므로 "기록 없음" 도 단서다.
+        let fullAccess: String = {
+            switch KeyboardSettings.shared.fullAccessStatus {
+            case .granted: return "ON"
+            case .denied:  return "OFF"
+            case .unknown: return "기록 없음(미사용 또는 꺼짐)"
+            }
+        }()
         return """
 
 
@@ -52,6 +60,7 @@ enum FeedbackContext {
         앱: 모아+ v\(version) (\(build))
         iOS: \(iosVersion)
         기기: \(model)
+        전체 접근: \(fullAccess)
         ─────────────────
         """
     }

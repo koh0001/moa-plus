@@ -57,6 +57,16 @@ final class DebugBoardStore: ObservableObject {
     /// 개발자 전송용 리포트 — 기록 + 오타 분석에 필요한 맥락(긋기 설정 요약,
     /// 앱/기기 정보)을 한 덩어리로 묶는다. 임계값 튜닝은 사용자의 설정 상태를
     /// 모르면 판독이 안 되기 때문에 리포트에 반드시 동봉한다.
+    /// `.unknown` 은 "아직 안 씀" 과 "꺼져 있어 기록이 못 옴" 을 구분하지 못한다 —
+    /// 키보드를 써 봤는데도 이 값이면 전체 접근이 꺼진 것이다 (App Group 미접근).
+    private var fullAccessLine: String {
+        switch KeyboardSettings.shared.fullAccessStatus {
+        case .granted: return "ON"
+        case .denied:  return "OFF (익스텐션 관측)"
+        case .unknown: return "기록 없음 — 키보드를 아직 안 썼거나, 전체 접근이 꺼져 있어 기록이 앱에 못 옴"
+        }
+    }
+
     var developerReport: String {
         let s = KeyboardSettings.shared
         let g = s.gestureSettings
@@ -67,8 +77,10 @@ final class DebugBoardStore: ObservableObject {
         반전 임계 비율: \(g.reversalThresholdRatio) / 방향 전환 임계: \(g.directionChangeThreshold)
         높이 배율: \(s.keyboardHeightScale) / 사이드 키 폭: \(s.sideKeyWidthRatio)
         하단 여백: 자동 \(s.keyboardAutoBottomInsetEnabled ? "ON" : "OFF") / 추가 \(Int(s.keyboardExtraBottomInset))pt
+        백스페이스: \(s.backspaceDeletesWholeSyllable ? "글자 단위" : "자소 단위") / 단어 삭제 \(s.wordDeleteEnabled ? "ON" : "OFF")
         키보드 실측: \(s.keyboardGeometryDiagnostic ?? "(키보드를 한 번도 띄우지 않음)")
         자동 대문자: \(s.autoCapitalizeDiagnostic ?? "(아직 판정한 적 없음)")
+        전체 접근: \(fullAccessLine)
         레이아웃: slotA \(s.layoutCustomization.slotA.rawValue) / slotB \(s.layoutCustomization.slotB.rawValue) / 모음키 \(s.layoutCustomization.vowelKeyBehavior.rawValue)
         """
         let records = entries.isEmpty ? "(저장된 기록 없음)" : exportText

@@ -159,7 +159,15 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   — 키 하나에 진동 두 번이 된다 (`KeyboardViewModelHapticTimingTests` 가드).
   백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함)
 - 클릭 사운드는 `AudioServicesPlaySystemSound(1104)` 사용 (`playInputClick`은 익스텐션에서 불안정)
-- `clickSoundEnabled`는 ThemeSettings 밖에 독립 Bool로 저장 (Codable 디코딩 실패 방지)
+- **전체 접근 허용(Full Access)이 꺼지면 햅틱만이 아니라 App Group 자체가 막힌다.** Apple
+  Extensibility Guide Table 8-1: open access OFF = "No shared container with containing app".
+  즉 꺼진 사용자는 앱에서 바꾼 설정이 키보드에 **전혀** 전달되지 않는다 (리뷰 "테마 미적용",
+  "클래식 설정했는데 모던", "햅틱 설정했는데 안 됨" 의 유력한 공통 원인. 개발 기기는 켜져 있어
+  재현 안 됨). 따라서 **앱은 꺼짐을 감지할 수 없다** — 익스텐션이 `recordFullAccess(false)` 를
+  써도 앱에 도달하지 않는다. v2.2.2 에서 조건부 배너를 만들었다 이 이유로 걷어냈다. 안내는
+  홈 카드 4단계와 소리·진동 푸터에 **상시** 노출한다. `KeyboardSettings.fullAccessStatus` 는
+  개발자 리포트·문의 메일 판독용: 키보드를 써 봤는데 `.unknown`(기록 없음)이면 꺼진 것이다
+  (`KeyboardSettingsFullAccessTests` 가드). 이 값을 UI 조건으로 다시 쓰지 말 것
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수
@@ -373,6 +381,11 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - `.complete` (받침 있음) → 받침만 제거 (한→하). 겹받침은 뒤쪽부터 (값→갑)
 - `.dotPending` → ㆍ 카운트 1단계 감소
 - `.standaloneVowel` → empty (남길 초성이 없으므로)
+- **글자 단위 옵션 (v2.2.2 / 앱스토어 리뷰)**: `backspaceDeletesWholeSyllable` ON 이면
+  `.choseongJungseong` → `.empty` (가→빈). 그 외 분기는 공통 — 받침은 여전히 먼저 떨어진다
+  (한→하→빈). v2.0 이전 커밋 `089dfd0^` 의 동작 그대로. 컴포저 API 는
+  `deleteBackward(wholeSyllable:)`, 뷰모델 `deleteBackward()` 가 설정을 읽어 넘긴다.
+  **기본값을 바꾸지 말 것** — 순정 실측 정합 (`HangulComposerTests` / `KeyboardViewModelBackspaceUnitTests` 가드)
 
 ### 설정 시스템
 ```
@@ -404,6 +417,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
 ├── wordDeleteEnabled: Bool
+├── backspaceDeletesWholeSyllable: Bool  (조합 중 받침 없는 글자를 한 번에, 기본 OFF=자소 단위)
 ├── wordDeleteDelay: Double
 ├── backspaceSpeed: Int                     (0=느림, 1=보통, 2=빠름)
 ├── showGesturePreview: Bool

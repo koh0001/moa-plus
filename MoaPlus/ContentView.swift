@@ -168,6 +168,11 @@ struct KeyboardStatusCard: View {
                 stepRow(num: 1, text: "설정 → 일반 → 키보드 → 새 키보드 추가")
                 stepRow(num: 2, text: "목록에서 '모아+' 선택")
                 stepRow(num: 3, text: "🌐 버튼으로 키보드 전환")
+                // 4단계는 조건 없이 항상 보여 준다. 전체 접근이 꺼진 키보드는 App Group
+                // 자체를 못 써서(Apple: "No shared container with containing app") 앱이
+                // 그 상태를 알아낼 길이 없고, 꺼져 있으면 진동뿐 아니라 이 앱에서 바꾼
+                // 설정이 키보드에 전달되지 않는다 (앱스토어 리뷰: 진동 안 됨 · 테마 미적용).
+                stepRow(num: 4, text: "'전체 접근 허용' 켜기 — 진동과 앱 설정 반영에 필요합니다")
             }
 
             Button(action: openSettings) {

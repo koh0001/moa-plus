@@ -23,10 +23,26 @@ struct NewFeaturesModalView: View {
         let features: [Feature]
     }
 
-    /// v2.2.1 — 복합모음 경로 옵션(이슈 #29). 기본값이 현재 동작이라 바꾸지 않으면
-    /// 달라지는 것이 없으므로 "켜는 경로"와 증상을 적는다. 이전 릴리스 항목들은
-    /// 뒤에 남겨 둔다.
+    /// v2.2.2 — 백스페이스 삭제 단위(앱스토어 리뷰). v2.2.1 — 복합모음 경로 옵션
+    /// (이슈 #29). 둘 다 기본값이 현재 동작이라 바꾸지 않으면 달라지는 것이 없으므로
+    /// "켜는 경로"와 증상을 적는다. 이전 릴리스 항목들은 뒤에 남겨 둔다.
     private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "백스페이스가 글자째 지우게 할 수 있어요", features: [
+            Feature(
+                icon: "delete.left",
+                tint: .teal,
+                title: "삭제 단위 — 글자 단위",
+                detail: "글자를 지울 때 모음만 지워지고 자음이 남는 게 불편하다면, 설정 › 키보드 › 백스페이스 › 삭제 단위를 '글자 단위'로 바꿔 보세요. 받침 없는 글자는 한 번에 지워지고(가 → 빈칸), 받침은 먼저 떨어집니다(한 → 하 → 빈칸). 2.0 이전 모아+ 의 동작입니다.\n\n기본은 지금까지와 같은 '자소 단위'(순정 모아키 동작)라 바꾸지 않으면 달라지는 것이 없습니다."
+            ),
+        ]),
+        FeatureGroup(title: "진동이 안 되거나 설정이 반영되지 않을 때", features: [
+            Feature(
+                icon: "iphone.radiowaves.left.and.right",
+                tint: .orange,
+                title: "'전체 접근 허용'을 확인해 주세요",
+                detail: "iOS 는 '전체 접근 허용'이 꺼진 키보드의 진동을 막고, 이 앱에서 바꾼 설정도 키보드에 전달하지 않습니다. 설정 → 일반 → 키보드 → 키보드 → 모아+ 에서 켜 주세요. 홈 화면 활성화 카드에도 이 단계를 적어 두었습니다. 키 입력은 외부로 전송되지 않습니다."
+            ),
+        ]),
         FeatureGroup(title: "ㅘ·ㅝ 긋기 경로를 고를 수 있어요", features: [
             Feature(
                 icon: "arrow.turn.right.up",

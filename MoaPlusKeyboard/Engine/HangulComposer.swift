@@ -289,12 +289,16 @@ class HangulComposer {
     }
 
     // Delete the last input
-    func deleteBackward() -> ComposerAction {
+    /// - Parameter wholeSyllable: 받침 없는 조합 글자를 통째로 지운다(글자 단위, v2.0 이전
+    ///   동작). 기본 false = 자소 단위(순정 실측 G5). 받침·ㆍ 대기·단독 모음 분기는 공통.
+    func deleteBackward(wholeSyllable: Bool = false) -> ComposerAction {
         switch state {
         case .empty:
             if !composedText.isEmpty {
                 let lastChar = composedText.removeLast()
-                // If it's a composed syllable, decompose and continue editing
+                // If it's a composed syllable, decompose and continue editing.
+                // 글자 단위 옵션과 무관하게 초성을 남긴다 — v2.0 이전 원본도 같았고,
+                // 뷰모델 경로는 커밋마다 flush 되어 여기 도달하지 않는다. "고치지" 말 것.
                 if let (cho, jung, jong) = HangulConstants.decomposeSyllable(lastChar) {
                     if jong == .none {
                         state = .choseong(cho)
@@ -315,7 +319,9 @@ class HangulComposer {
             // 순정 모아키 실측(영상 G5/H·I 판독): 백스페이스는 자소 단위 —
             // 받침 없는 완성 글자에서 중성만 지우고 초성을 남긴다 (가→ㄱ).
             // 중성은 천지인 획 되감기 없이 통째로 지워진다 (개→ㄱ, ㅐ→ㅏ 아님).
-            state = .choseong(cho)
+            // 글자 단위 옵션(앱스토어 리뷰 제보)은 v2.0 이전처럼 글자째 지운다 (가→빈).
+            // 이 분기만 갈리고 받침(.complete)은 두 모드 모두 먼저 떨어진다.
+            state = wholeSyllable ? .empty : .choseong(cho)
             return .update
 
         case .complete(let cho, let jung, let jong):
