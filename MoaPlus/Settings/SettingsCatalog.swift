@@ -227,7 +227,7 @@ enum SettingsCatalog {
             title: "소리 · 진동",
             icon: "waveform",
             destination: .feedback,
-            keywords: ["소리", "사운드", "클릭", "진동", "햅틱", "무음", "끄기"]
+            keywords: ["소리", "사운드", "클릭", "진동", "햅틱", "무음", "끄기", "전체접근", "전체 접근", "권한", "안됨", "안울림"]
         ),
         SettingsEntry(
             title: "단축어",
@@ -280,6 +280,12 @@ enum SettingsCatalog {
             remedy: "키보드 전환(지구본) 키를 켜세요",
             icon: "globe",
             destination: .size
+        ),
+        SettingsSymptom(
+            symptom: "진동이 안 와요",
+            remedy: "iOS 의 ‘전체 접근 허용’이 꺼져 있으면 울리지 않습니다 — 소리 · 진동에서 상태를 확인하세요",
+            icon: "iphone.radiowaves.left.and.right",
+            destination: .feedback
         ),
         SettingsSymptom(
             symptom: "스페이스바를 누르다 홈 화면으로 나가요",

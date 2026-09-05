@@ -70,6 +70,7 @@ final class DebugBoardStore: ObservableObject {
         백스페이스: \(s.backspaceDeletesWholeSyllable ? "글자 단위" : "자소 단위") / 단어 삭제 \(s.wordDeleteEnabled ? "ON" : "OFF")
         키보드 실측: \(s.keyboardGeometryDiagnostic ?? "(키보드를 한 번도 띄우지 않음)")
         자동 대문자: \(s.autoCapitalizeDiagnostic ?? "(아직 판정한 적 없음)")
+        전체 접근: \({ switch s.fullAccessStatus { case .granted: return "ON"; case .denied: return "OFF"; case .unknown: return "(키보드를 한 번도 띄우지 않음)" } }())
         레이아웃: slotA \(s.layoutCustomization.slotA.rawValue) / slotB \(s.layoutCustomization.slotB.rawValue) / 모음키 \(s.layoutCustomization.vowelKeyBehavior.rawValue)
         """
         let records = entries.isEmpty ? "(저장된 기록 없음)" : exportText

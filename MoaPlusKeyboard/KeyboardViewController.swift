@@ -125,6 +125,12 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // 문맥이 비어 온다. 등장이 끝난 뒤 한 번 더 판정한다 (멱등).
         viewModel.refreshAutoCapitalization()
 
+        // 전체 접근 허용 상태를 App Group 에 남긴다. iOS 는 이 권한이 없으면
+        // 익스텐션의 햅틱을 조용히 무시하는데(앱스토어 리뷰 "설정했는데 진동 안 됨"),
+        // 값은 익스텐션만 읽을 수 있어 메인 앱이 안내를 띄우려면 이 기록이 필요하다.
+        // 사용자가 iOS 설정에서 켜고 돌아오면 다음 등장에서 갱신된다.
+        KeyboardSettings.shared.recordFullAccess(hasFullAccess)
+
         // Skip the touch-recovery toggle on the very first appearance. It
         // exists to fix touch delivery after background→foreground cycles,
         // and applying it on cold start causes a visible reattach flash.

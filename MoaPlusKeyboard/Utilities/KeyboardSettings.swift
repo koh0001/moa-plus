@@ -24,6 +24,7 @@ final class KeyboardSettings: ObservableObject {
         static let keyboardExtraBottomInset = "keyboardExtraBottomInset"
         static let keyboardGeometryDiagnostic = "keyboardGeometryDiagnostic"
         static let autoCapitalizeDiagnostic = "autoCapitalizeDiagnostic"
+        static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
@@ -34,8 +35,8 @@ final class KeyboardSettings: ObservableObject {
         static let englishAutoCapitalize = "englishAutoCapitalize"
         static let englishLongPressUppercase = "englishLongPressUppercase"
         static let wordDeleteEnabled = "wordDeleteEnabled"
-        static let gestureDebugLogEnabled = "gestureDebugLogEnabled"
         static let backspaceDeletesWholeSyllable = "backspaceDeletesWholeSyllable"
+        static let gestureDebugLogEnabled = "gestureDebugLogEnabled"
         static let backspaceSpeed = "backspaceSpeed"
         static let wordDeleteDelay = "wordDeleteDelay"
         static let cursorMoveBySpaceDragEnabled = "cursorMoveBySpaceDragEnabled"
@@ -263,7 +264,6 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(wordDeleteEnabled, forKey: Keys.wordDeleteEnabled) }
     }
 
-    /// 실측용 제스처 상세 로그 (입력 기록 보드 → 개발자 리포트 동봉).
     /// 조합 중인 받침 없는 글자를 백스페이스 한 번에 통째로 지울지(글자 단위, v2.0 이전
     /// 동작). 기본 OFF = 자소 단위(순정 실측 G5: 가→ㄱ). 앱스토어 리뷰 "예전처럼
     /// 자음까지 같이 지워 달라" 제보로 opt-in 추가. 받침은 두 모드 모두 먼저 떨어진다.
@@ -271,6 +271,7 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(backspaceDeletesWholeSyllable, forKey: Keys.backspaceDeletesWholeSyllable) }
     }
 
+    /// 실측용 제스처 상세 로그 (입력 기록 보드 → 개발자 리포트 동봉).
     /// 기본 ON — 기록은 기기 로컬(App Group, 최근 200건 순환)에만 남고,
     /// 전송은 사용자가 리포트 보내기를 눌러야만 일어난다. GestureDebugLog 참고.
     @Published var gestureDebugLogEnabled: Bool = true {
@@ -511,8 +512,8 @@ final class KeyboardSettings: ObservableObject {
         assign(\.showDetailedHints, defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false)
         assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
         assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
-        assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? true)
         assign(\.backspaceDeletesWholeSyllable, defaults.object(forKey: Keys.backspaceDeletesWholeSyllable) as? Bool ?? false)
+        assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? true)
         assign(\.backspaceSpeed, defaults.object(forKey: Keys.backspaceSpeed) as? Int ?? 1)
         assign(\.wordDeleteDelay, defaults.object(forKey: Keys.wordDeleteDelay) as? Double ?? 1.5)
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
@@ -550,6 +551,21 @@ final class KeyboardSettings: ObservableObject {
     /// 매 레이아웃마다 발행하면 키보드 트리가 통째로 재구성된다.
     func recordKeyboardGeometryDiagnostic(_ text: String) {
         defaults.set(text, forKey: Keys.keyboardGeometryDiagnostic)
+    }
+
+    // MARK: - 진단 (전체 접근 허용)
+
+    /// 익스텐션이 마지막으로 관측한 `hasFullAccess`. 전체 접근이 꺼져 있으면 iOS 가
+    /// 익스텐션의 햅틱을 조용히 무시하는데(앱스토어 리뷰 "설정했는데 진동 안 됨"),
+    /// 그 값은 익스텐션만 읽을 수 있어 뜰 때마다 여기 남긴다. 메인 앱은 이 기록으로
+    /// "지금 꺼져 있음" 배너를 띄운다. 설정이 아니라 기록이라 `@Published` 밖.
+    func recordFullAccess(_ granted: Bool) {
+        defaults.set(granted, forKey: Keys.fullAccessDiagnostic)
+    }
+
+    var fullAccessStatus: FullAccessStatus {
+        guard defaults.object(forKey: Keys.fullAccessDiagnostic) != nil else { return .unknown }
+        return defaults.bool(forKey: Keys.fullAccessDiagnostic) ? .granted : .denied
     }
 
     var keyboardGeometryDiagnostic: String? {
@@ -621,6 +637,7 @@ final class KeyboardSettings: ObservableObject {
         consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true
+        backspaceDeletesWholeSyllable = false
         gestureDebugLogEnabled = true
         backspaceSpeed = 1
         wordDeleteDelay = 1.5
@@ -637,7 +654,6 @@ final class KeyboardSettings: ObservableObject {
     }
 
     /// Reset gesture settings only
-        backspaceDeletesWholeSyllable = false
     func resetGestureSettings() {
         gestureSettings = .default
     }
@@ -662,4 +678,12 @@ final class KeyboardSettings: ObservableObject {
     func secondaryAction(forKey keyId: String) -> SecondaryKeyAction? {
         return secondaryActionIndex[keyId]
     }
+}
+
+/// 익스텐션이 기록한 전체 접근 허용 상태. `.unknown` = 키보드를 아직 한 번도 띄우지
+/// 않아 판정 불가 (경고를 띄우지 않는다).
+enum FullAccessStatus: Equatable {
+    case unknown
+    case granted
+    case denied
 }

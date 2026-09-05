@@ -206,6 +206,37 @@ final class SettingsDiscoveryUITests: XCTestCase {
         shot(app, "7b-증상 ‘모→뫄’ → 긋기 입력 설정")
     }
 
+    /// 앱스토어 리뷰(모음만 지워짐) 증상 행 → 백스페이스 설정. 새 "글자 단위"
+    /// 세그먼트가 실제로 렌더되는지까지 본다.
+    @MainActor
+    func testSymptomRouter_consonantLeftSymptomLeadsToBackspaceSettings() throws {
+        let app = openSettings()
+        tap(app, "이럴 때 어떻게 하나요")
+        tap(app, "글자를 지우면 자음만 남아요")
+
+        XCTAssertTrue(app.navigationBars["백스페이스"].waitForExistence(timeout: 5),
+                      "‘자음만 남아요’ 증상을 탭했는데 백스페이스 설정 화면으로 가지 않았다")
+        XCTAssertTrue(exists(app, "글자 단위"),
+                      "백스페이스 설정에 ‘글자 단위’ 선택지가 보이지 않는다 — BackspaceSettingsView 섹션 확인")
+        XCTAssertTrue(exists(app, "자소 단위"), "기본 선택지 ‘자소 단위’ 가 보이지 않는다")
+        shot(app, "7c-증상 ‘자음만 남아요’ → 백스페이스")
+    }
+
+    /// 앱스토어 리뷰(햅틱 설정했는데 안 됨) 증상 행 → 소리 · 진동. 배너 자체는
+    /// 익스텐션이 남긴 기록이 있어야 보여 시뮬레이터에서는 못 잡는다 — 여기서는
+    /// 라우팅과 기존 안내 문구가 화면에 있는지만 본다.
+    @MainActor
+    func testSymptomRouter_noHapticSymptomLeadsToFeedbackSettings() throws {
+        let app = openSettings()
+        tap(app, "이럴 때 어떻게 하나요")
+        tap(app, "진동이 안 와요")
+
+        XCTAssertTrue(app.navigationBars["소리 · 진동"].waitForExistence(timeout: 5),
+                      "‘진동이 안 와요’ 증상을 탭했는데 소리 · 진동 화면으로 가지 않았다")
+        XCTAssertTrue(exists(app, "햅틱 반응"), "소리 · 진동 화면에 햅틱 토글이 보이지 않는다")
+        shot(app, "7d-증상 ‘진동이 안 와요’ → 소리 · 진동")
+    }
+
     @MainActor
     func testSymptomRouter_typoSymptomLeadsToGestureSettings() throws {
         let app = openSettings()

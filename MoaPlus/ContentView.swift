@@ -6,6 +6,9 @@ struct ContentView: View {
 
     @State private var showFirstLaunchModal = false
     @State private var showWhatsNewModal = false
+    @Environment(\.scenePhase) private var scenePhase
+    /// 익스텐션이 남긴 전체 접근 기록 — 꺼져 있으면 활성화 카드에 4단계를 더한다.
+    @State private var fullAccessStatus: FullAccessStatus = KeyboardSettings.shared.fullAccessStatus
 
     var body: some View {
         NavigationStack {
@@ -41,7 +44,8 @@ struct ContentView: View {
                     Spacer()
 
                     // Status card
-                    KeyboardStatusCard(accentColor: accentBlue)
+                    KeyboardStatusCard(accentColor: accentBlue,
+                                       fullAccessDenied: fullAccessStatus == .denied)
                         .padding(.horizontal, 24)
 
                     Spacer()
@@ -130,6 +134,10 @@ struct ContentView: View {
         .sheet(isPresented: $showWhatsNewModal) {
             NewFeaturesModalView()
         }
+        .onChange(of: scenePhase) { _, phase in
+            // iOS 설정에서 전체 접근을 켜고 돌아온 직후 카드가 갱신되도록 다시 읽는다.
+            if phase == .active { fullAccessStatus = KeyboardSettings.shared.fullAccessStatus }
+        }
     }
 
     /// UI 테스트가 넘기는 실행 인자. 프로덕션 실행 경로에는 영향이 없다 —
@@ -151,6 +159,9 @@ struct ContentView: View {
 
 struct KeyboardStatusCard: View {
     var accentColor: Color = .accentColor
+    /// 익스텐션이 "전체 접근 꺼짐"을 기록한 경우 — 진동·소리가 안 되는 원인이라
+    /// 활성화 단계에 4번째 줄로 드러낸다 (앱스토어 리뷰: 설정했는데 진동 안 됨).
+    var fullAccessDenied: Bool = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -168,6 +179,9 @@ struct KeyboardStatusCard: View {
                 stepRow(num: 1, text: "설정 → 일반 → 키보드 → 새 키보드 추가")
                 stepRow(num: 2, text: "목록에서 '모아+' 선택")
                 stepRow(num: 3, text: "🌐 버튼으로 키보드 전환")
+                if fullAccessDenied {
+                    stepRow(num: 4, text: "'전체 접근 허용' 켜기 — 지금 꺼져 있어 진동·소리가 나지 않습니다", highlighted: true)
+                }
             }
 
             Button(action: openSettings) {
@@ -197,17 +211,18 @@ struct KeyboardStatusCard: View {
         )
     }
 
-    private func stepRow(num: Int, text: String) -> some View {
+    private func stepRow(num: Int, text: String, highlighted: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text("\(num)")
                 .font(.caption2)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .frame(width: 18, height: 18)
-                .background(Circle().fill(accentColor.opacity(0.7)))
+                .background(Circle().fill(highlighted ? Color.orange.opacity(0.9) : accentColor.opacity(0.7)))
             Text(text)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.8))
+                .fontWeight(highlighted ? .semibold : .regular)
+                .foregroundColor(highlighted ? .orange : .white.opacity(0.8))
         }
     }
 
