@@ -5,7 +5,7 @@ import XCTest
 /// 뷰모델이 설정을 읽어 컴포저에 넘기는 배선과 설정 저장/기본값을 가드한다.
 final class KeyboardViewModelBackspaceUnitTests: XCTestCase {
 
-    private static let suite = "group.com.moaki.keyboard"
+    private static let suite = KeyboardSettings.appGroupId
     private static let key = "backspaceDeletesWholeSyllable"
 
     private func withWholeSyllable(_ on: Bool, _ body: (KeyboardViewModel) -> Void) {

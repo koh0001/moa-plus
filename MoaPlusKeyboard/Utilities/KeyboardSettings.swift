@@ -556,10 +556,17 @@ final class KeyboardSettings: ObservableObject {
     // MARK: - 진단 (전체 접근 허용)
 
     /// 익스텐션이 마지막으로 관측한 `hasFullAccess`. 전체 접근이 꺼져 있으면 iOS 가
-    /// 익스텐션의 햅틱을 조용히 무시하는데(앱스토어 리뷰 "설정했는데 진동 안 됨"),
-    /// 그 값은 익스텐션만 읽을 수 있어 뜰 때마다 여기 남긴다. 메인 앱은 이 기록으로
-    /// "지금 꺼져 있음" 배너를 띄운다. 설정이 아니라 기록이라 `@Published` 밖.
+    /// 익스텐션의 햅틱을 조용히 무시한다(앱스토어 리뷰 "설정했는데 진동 안 됨").
+    ///
+    /// ⚠️ **이 기록으로 "꺼짐"을 감지할 수는 없다.** 전체 접근이 꺼진 키보드는 App Group
+    /// 자체를 못 쓰므로(Apple Extensibility Guide Table 8-1: "No shared container with
+    /// containing app") `false` 기록은 앱에 도달하지 않는다. 앱이 볼 수 있는 값은
+    /// `.granted` 아니면 `.unknown` 뿐이고, `.unknown` 은 "아직 안 씀" 과 "꺼져 있음" 을
+    /// 구분하지 못한다 — 개발자 리포트 판독용으로만 쓰고 UI 배너의 근거로 삼지 말 것.
+    /// 설정이 아니라 기록이라 `@Published` 밖.
     func recordFullAccess(_ granted: Bool) {
+        // 키보드가 뜰 때마다 불리므로 값이 달라졌을 때만 공유 컨테이너에 쓴다.
+        guard fullAccessStatus != (granted ? .granted : .denied) else { return }
         defaults.set(granted, forKey: Keys.fullAccessDiagnostic)
     }
 
@@ -680,8 +687,9 @@ final class KeyboardSettings: ObservableObject {
     }
 }
 
-/// 익스텐션이 기록한 전체 접근 허용 상태. `.unknown` = 키보드를 아직 한 번도 띄우지
-/// 않아 판정 불가 (경고를 띄우지 않는다).
+/// 익스텐션이 기록한 전체 접근 허용 상태. `.unknown` = 기록 없음 — 키보드를 아직 안
+/// 띄웠거나, 전체 접근이 꺼져 있어 기록이 공유 컨테이너에 못 미친 경우 (구분 불가).
+/// `.denied` 는 익스텐션 내부 관측값이며 실제로는 앱에 거의 도달하지 않는다.
 enum FullAccessStatus: Equatable {
     case unknown
     case granted

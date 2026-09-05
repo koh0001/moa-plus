@@ -159,14 +159,15 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   — 키 하나에 진동 두 번이 된다 (`KeyboardViewModelHapticTimingTests` 가드).
   백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함)
 - 클릭 사운드는 `AudioServicesPlaySystemSound(1104)` 사용 (`playInputClick`은 익스텐션에서 불안정)
-- **햅틱은 '전체 접근 허용' 없이는 iOS 가 조용히 무시한다** (앱스토어 리뷰 2026-09-03 / 2026-05 2건,
-  개발 기기는 켜져 있어 재현 안 됨). `hasFullAccess` 는 익스텐션만 읽을 수 있어
-  `KeyboardViewController.viewDidAppear` 가 `KeyboardSettings.recordFullAccess(_:)` 로 App Group 에 남기고,
-  메인 앱은 `fullAccessStatus`(.unknown/.granted/.denied) 로 홈 카드 4단계·소리·진동 배너를 띄운다.
-  `.unknown`(키보드 미기동)에는 경고하지 않을 것 — 설치 직후 사용자를 겁주게 된다
-  (`KeyboardSettingsFullAccessTests` 가드). 진단 기록이라 `@Published` 밖이며, 화면은 `onAppear`/
-  `scenePhase` 에서 다시 읽는다
-- `clickSoundEnabled`는 ThemeSettings 밖에 독립 Bool로 저장 (Codable 디코딩 실패 방지)
+- **전체 접근 허용(Full Access)이 꺼지면 햅틱만이 아니라 App Group 자체가 막힌다.** Apple
+  Extensibility Guide Table 8-1: open access OFF = "No shared container with containing app".
+  즉 꺼진 사용자는 앱에서 바꾼 설정이 키보드에 **전혀** 전달되지 않는다 (리뷰 "테마 미적용",
+  "클래식 설정했는데 모던", "햅틱 설정했는데 안 됨" 의 유력한 공통 원인. 개발 기기는 켜져 있어
+  재현 안 됨). 따라서 **앱은 꺼짐을 감지할 수 없다** — 익스텐션이 `recordFullAccess(false)` 를
+  써도 앱에 도달하지 않는다. v2.2.2 에서 조건부 배너를 만들었다 이 이유로 걷어냈다. 안내는
+  홈 카드 4단계와 소리·진동 푸터에 **상시** 노출한다. `KeyboardSettings.fullAccessStatus` 는
+  개발자 리포트·문의 메일 판독용: 키보드를 써 봤는데 `.unknown`(기록 없음)이면 꺼진 것이다
+  (`KeyboardSettingsFullAccessTests` 가드). 이 값을 UI 조건으로 다시 쓰지 말 것
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수

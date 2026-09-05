@@ -2,38 +2,9 @@ import SwiftUI
 
 struct FeedbackSettingsView: View {
     @ObservedObject private var settings = KeyboardSettings.shared
-    @Environment(\.scenePhase) private var scenePhase
-    /// 익스텐션이 남긴 전체 접근 기록. `@Published` 가 아니라 화면이 뜰 때와
-    /// 앱이 전면으로 돌아올 때(iOS 설정에서 켜고 온 직후) 다시 읽는다.
-    @State private var fullAccessStatus: FullAccessStatus = KeyboardSettings.shared.fullAccessStatus
 
     var body: some View {
         List {
-            // 전체 접근이 꺼진 것을 익스텐션이 확인한 경우에만 경고한다.
-            // .unknown(키보드 미기동)에 띄우면 설치 직후 사용자를 겁준다.
-            if fullAccessStatus == .denied {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("전체 접근이 꺼져 있어 진동과 클릭음이 울리지 않습니다", systemImage: "exclamationmark.triangle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.orange)
-                        Text("iOS 가 키보드 앱의 진동을 '전체 접근 허용' 없이는 막습니다. 설정 → 일반 → 키보드 → 키보드 → 모아+ → '전체 접근 허용'을 켜 주세요. 키 입력은 외부로 전송되지 않습니다.")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                        Button {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
-                        } label: {
-                            Label("iOS 키보드 설정 열기", systemImage: "arrow.up.right.square")
-                                .font(.footnote.weight(.medium))
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .accessibilityIdentifier("fullAccessDeniedBanner")
-                }
-            }
-
             Section {
                 Toggle("키 클릭 사운드", isOn: $settings.clickSoundEnabled)
             } header: {
@@ -60,7 +31,10 @@ struct FeedbackSettingsView: View {
                 // why vibration may be silent.
                 if settings.themeSettings.hapticEnabled {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("진동이 느껴지지 않으면 '전체 접근 허용' 권한이 필요합니다.")
+                        // 앱은 전체 접근이 꺼졌는지 알 수 없다 — 꺼진 키보드는 App Group 을
+                        // 못 쓰므로 익스텐션의 기록이 여기까지 오지 않는다. 그래서 상태
+                        // 배너 대신 원인과 결과를 항상 적는다.
+                        Text("진동이 느껴지지 않으면 대부분 '전체 접근 허용'이 꺼져 있는 경우입니다. iOS 는 이 권한이 없는 키보드의 진동을 막고, 이 앱에서 바꾼 설정도 키보드에 전달하지 않습니다.")
                         Button {
                             if let url = URL(string: UIApplication.openSettingsURLString) {
                                 UIApplication.shared.open(url)
@@ -69,7 +43,7 @@ struct FeedbackSettingsView: View {
                             Label("iOS 키보드 설정 열기", systemImage: "arrow.up.right.square")
                                 .font(.footnote)
                         }
-                        Text("설정 → 일반 → 키보드 → 키보드 → 모아+ → '전체 접근 허용' 토글을 켜주세요. 키 입력은 외부로 전송되지 않으며, 햅틱 진동·사운드·앱 설정 동기화를 위해서만 사용됩니다.")
+                        Text("설정 → 일반 → 키보드 → 키보드 → 모아+ → '전체 접근 허용' 토글을 켜주세요. 켠 뒤 키보드를 다시 띄우면 바로 적용됩니다. 키 입력은 외부로 전송되지 않으며, 햅틱 진동·사운드·앱 설정 동기화를 위해서만 사용됩니다.")
                             .foregroundColor(.secondary)
                     }
                 }
@@ -92,9 +66,5 @@ struct FeedbackSettingsView: View {
         // 제목이 "반응"이면 "반응속도가 느리다"는 사용자를 사운드·햅틱 화면으로
         // 끌어들여 빈손으로 돌려보낸다. 설정 루트의 행 레이블과 맞춘다.
         .navigationTitle("소리 · 진동")
-        .onAppear { fullAccessStatus = KeyboardSettings.shared.fullAccessStatus }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { fullAccessStatus = KeyboardSettings.shared.fullAccessStatus }
-        }
     }
 }

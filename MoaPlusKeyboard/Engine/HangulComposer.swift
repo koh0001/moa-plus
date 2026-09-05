@@ -296,7 +296,9 @@ class HangulComposer {
         case .empty:
             if !composedText.isEmpty {
                 let lastChar = composedText.removeLast()
-                // If it's a composed syllable, decompose and continue editing
+                // If it's a composed syllable, decompose and continue editing.
+                // 글자 단위 옵션과 무관하게 초성을 남긴다 — v2.0 이전 원본도 같았고,
+                // 뷰모델 경로는 커밋마다 flush 되어 여기 도달하지 않는다. "고치지" 말 것.
                 if let (cho, jung, jong) = HangulConstants.decomposeSyllable(lastChar) {
                     if jong == .none {
                         state = .choseong(cho)

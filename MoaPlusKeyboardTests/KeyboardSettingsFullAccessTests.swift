@@ -10,7 +10,7 @@ import XCTest
 /// (키보드 실측·자동 대문자 진단과 같은 패턴).
 final class KeyboardSettingsFullAccessTests: XCTestCase {
 
-    private static let suite = "group.com.moaki.keyboard"
+    private static let suite = KeyboardSettings.appGroupId
     private static let key = "fullAccessDiagnostic"
 
     override func setUp() {

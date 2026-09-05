@@ -222,9 +222,8 @@ final class SettingsDiscoveryUITests: XCTestCase {
         shot(app, "7c-증상 ‘자음만 남아요’ → 백스페이스")
     }
 
-    /// 앱스토어 리뷰(햅틱 설정했는데 안 됨) 증상 행 → 소리 · 진동. 배너 자체는
-    /// 익스텐션이 남긴 기록이 있어야 보여 시뮬레이터에서는 못 잡는다 — 여기서는
-    /// 라우팅과 기존 안내 문구가 화면에 있는지만 본다.
+    /// 앱스토어 리뷰(햅틱 설정했는데 안 됨) 증상 행 → 소리 · 진동. 안내는 조건 없는
+    /// 푸터 문구라(앱은 전체 접근 꺼짐을 감지할 수 없다) 라우팅과 햅틱 토글만 본다.
     @MainActor
     func testSymptomRouter_noHapticSymptomLeadsToFeedbackSettings() throws {
         let app = openSettings()
