@@ -377,7 +377,7 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 ### 설정 시스템
 ```
 KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
-├── gestureSettings: GestureSettings        (프로필 + 열별 보정)
+├── gestureSettings: GestureSettings        (프로필 + 열별 보정 + compoundVowelPath: 직각+세로왕복(기본)/세로왕복만)
 ├── themeSettings: ThemeSettings            (테마/투명도/햅틱)
 │   └── resolvedKeyBackground/KeyText/FunctionKeyBackground (커스텀 vs 프리셋)
 ├── secondaryKeyActions: [SecondaryKeyAction]  (한글 자음 19키 + 영문 숫자 10키)
@@ -423,6 +423,20 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 - **adb 정밀 측정 (2026-08-14, 갤럭시 S22+ 터치 주입)**: 되돌림 등록 하한 = **42px = 키 너비 150px의 28%** (41px 미등록/42px 등록, 진입 150/300px 무관 = 절대 임계 → `reversalThresholdRatio` 0.70), ㅓ/ㅣ 경계 = 22°/23° 사이(22.5° 정합), 첫 획 4방향 재해석 = 45° 옥탄트 정합(55~65° 정밀 입력은 수직 — S3 영상의 60°=수평은 수기 오차), ↘↖ 반전 = ㅢ 우선(50~65° 전부), ㅐ↔ㅒ·ㅔ↔ㅖ ㆍ토글 확증
 - `resolveConsonantDiagonalVowel`(대각선 진입 후 천지인 파생)은 v1.7에 추가한 확장. **반전 획(↙↗=ㅢ)만 순정에도 존재**(트라이가 이미 처리) — 나머지 대각선+카디널 파생은 순정 미확인 + v1.7 오타 원인(리뷰 3건)이라 `consonantDiagonalDerivationEnabled` **기본 OFF 유지**
 - 단독 대각선(↗=ㅣ ↘=ㅡ)은 트라이가 처리하므로 이 설정과 무관 — 클래식/확장형의 유일한 ㅣ/ㅡ 경로라 절대 깨면 안 됨
+- **복합모음 경로 옵션 (v2.2.1 build 23 / 이슈 #29)**: `GestureSettings.compoundVowelPath`.
+  `.rightAngleAndVertical`(기본) = 위 스펙 그대로, `.verticalOnly` = 직각 4패턴(↑→ ↑→← ↓← ↓←→)만
+  뺀 트라이. 제보 로그 `↑86(89°) ↗33(74°) ⇒ ㅘ` 가 원인 — 분석기가 ↗ 꼬리를 별도 획으로 등록하면
+  `normalizeTrailingStroke` 가 수직 뒤 같은 수직성분 대각선을 →로 접어 `↑→=ㅘ` 가 성립하고, 방향 전환
+  거리 보정(+15pt)으로는 33pt 꼬리를 못 막는다. 구현: 직각 패턴은 `VowelPattern.rightAnglePatterns`
+  로 분리, 트라이 두 벌(`patternTrie`/`verticalOnlyPatternTrie`)을 `trie(for:)` 로 고른다. 리졸버는
+  제스처 시작마다 `KeyboardViewModel` **2곳**(`gestureStarted` 자음 키 / `slotBVowelGestureStarted`)이
+  주입한다 — 긋기 실시간 테스트의 모음 표시도 이 뷰모델의 미리보기(`ingestKeyboardPreview`)에서
+  오므로 별도 주입이 필요 없다(`GestureTestModel.resolver` 는 판정에 쓰이지 않는 잔재).
+  주입 줄을 지워도 리졸버 단위 테스트는 통과하므로 E2E 가드
+  `test_e2e_reporterTrace_*` 로 잡는다. ㅡ 전용 키는 `applySecondaryStroke(path:)` 에서
+  같은 규칙 + 이 모드에서만 ㅚ+→=ㅘ / ㅟ+←=ㅝ 체인(원래 ㅡ 키는 ↑↓→ 가 ㅚ 에서 멈춤).
+  **기본값을 바꾸지 말 것**, 새 패턴을 추가할 때는 직각 여부에 따라 배열을 골라 넣을 것
+  (`CompoundVowelPathTests` 가드)
 
 ### 긋기 노이즈 처리 (GestureAnalyzer)
 - `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다
