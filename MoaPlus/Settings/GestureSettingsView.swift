@@ -21,6 +21,18 @@ struct GestureSettingsView: View {
         )
     }
 
+    /// ㅘ·ㅝ 복합모음 경로(GestureSettings 직속) 바인딩 — 이슈 #29.
+    private var compoundVowelPathBinding: Binding<CompoundVowelPath> {
+        Binding(
+            get: { settings.gestureSettings.compoundVowelPath },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.compoundVowelPath = newValue
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
     /// 멀티스트로크 모음 turn 민감도(GestureSettings 직속, 0~2) 바인딩.
     private var sensitivityBinding: Binding<Int> {
         Binding(
@@ -63,6 +75,23 @@ struct GestureSettingsView: View {
                 Text(settings.consonantDiagonalDerivationEnabled
                      ? "자음을 대각선(↗↖ = ㅣ / ↙↘ = ㅡ)으로 그은 뒤 이어서 그으면 천지인 방식으로 복합모음이 만들어집니다. 순정에 없는 확장 기능이라, 긋기 끝의 작은 흔들림이 '으'를 '워'로 바꾸는 오타가 생길 수 있습니다."
                      : "순정 모아키와 동일하게 동작합니다. 대각선은 ㅣ/ㅡ 그 자체이고, 복합모음은 방향 조합으로 만듭니다 (ㅘ = 위→오른쪽, ㅝ = 아래→왼쪽). 대각선 왕복도 순정처럼 지원합니다 (↗↙ = ㅐ, ↖↘ = ㅔ, ↙↗ = ㅢ).")
+            }
+
+            // 복합모음 경로 — ㅘ·ㅝ 직각 꺾기 허용 여부 (이슈 #29). 자음 키·모음 키·
+            // ㅡ 키 공통. 기본값은 현재 동작(직각 + 세로 왕복)이라 기존 사용자는 무변화.
+            Section {
+                Picker("복합모음 경로", selection: compoundVowelPathBinding) {
+                    Text("직각 꺾기 + 세로 왕복").tag(CompoundVowelPath.rightAngleAndVertical)
+                    Text("세로 왕복만").tag(CompoundVowelPath.verticalOnly)
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("복합모음 경로 (ㅘ · ㅝ)")
+            } footer: {
+                Text(settings.gestureSettings.compoundVowelPath == .verticalOnly
+                     ? "위 → 아래 → 오른쪽처럼 세로로 왕복한 뒤 꺾을 때만 ㅘ 가 됩니다(ㅝ 는 아래 → 위 → 왼쪽). 위로 긋고 바로 오른쪽으로 꺾는 직각 경로는 ㅗ 로 남습니다. 위로 긋는 끝이 오른쪽 위로 흘러 '모'가 '뫄'로 찍힐 때 켜 보세요."
+                     : "기본값. ㅘ 는 위 → 오른쪽(직각)과 위 → 아래 → 오른쪽(세로 왕복) 어느 쪽으로도 만들어지고, ㅝ 도 같습니다. 순정 모아키와 같은 동작입니다.")
             }
 
             // Swipe Angle preset

@@ -70,6 +70,7 @@ final class GestureTestModel: ObservableObject {
         analyzer.columnId = selectedColumn
         analyzer.keyWidth = deviceCenterKeyWidth
         resolver.swipeProfile = s.swipeProfile
+        resolver.compoundVowelPath = s.compoundVowelPath
     }
 
     // MARK: Computed values from settings

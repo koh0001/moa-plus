@@ -1,6 +1,17 @@
 import Foundation
 import CoreGraphics
 
+/// 복합모음 ㅘ·ㅝ 를 만드는 긋기 경로 (이슈 #29).
+/// - `.rightAngleAndVertical` (기본, 현재 동작): 직각 꺾기(↑→=ㅘ, ↓←=ㅝ)와 세로 왕복
+///   (↑↓→=ㅘ, ↓↑←=ㅝ) 둘 다 인정. 순정 모아키 실측 스펙 그대로.
+/// - `.verticalOnly`: 직각 경로를 끄고 세로 왕복만 인정. 위로 긋는 끝이 오른쪽 위로
+///   흘러 "모"가 "뫄"가 되는 사용자를 위한 opt-in. 기본값을 바꾸지 말 것 —
+///   업데이트만으로 기존 사용자의 ㅘ 입력이 달라진다 (`CompoundVowelPathTests` 가드).
+enum CompoundVowelPath: String, Codable, CaseIterable {
+    case rightAngleAndVertical
+    case verticalOnly
+}
+
 /// Unified gesture settings combining swipe profile and column overrides
 struct GestureSettings: Codable, Equatable {
     var swipeProfile: SwipeProfile = .bothHands
@@ -31,6 +42,9 @@ struct GestureSettings: Codable, Equatable {
     /// 복합 모음(ㅗ→ㅚ→ㅛ 등)으로 과승격될 위험이 커진다. 떨림 오인식은 진폭 비율
     /// 가드(직전 스트로크 대비 일정 비율 이상일 때만 등록)로 완화한다.
     var multiStrokeTurnSensitivity: Int = 0
+
+    /// ㅘ·ㅝ 복합모음 경로. 기본은 직각 꺾기 + 세로 왕복(현재 동작). `CompoundVowelPath` 참고.
+    var compoundVowelPath: CompoundVowelPath = .rightAngleAndVertical
 
     /// Get effective swipe threshold for a specific column. `keyWidth`
     /// must be the live center-key width measured by the view layer so
@@ -97,6 +111,7 @@ extension GestureSettings {
     private enum CodingKeys: String, CodingKey {
         case swipeProfile, columnOverrides, directionChangeThreshold
         case reversalThresholdRatio, multiStrokeTurnSensitivity
+        case compoundVowelPath
     }
 
     init(from decoder: Decoder) throws {
@@ -111,5 +126,6 @@ extension GestureSettings {
         let storedReversal = try c.decodeIfPresent(CGFloat.self, forKey: .reversalThresholdRatio)
         reversalThresholdRatio = (storedReversal == nil || storedReversal == 0.5) ? 0.70 : storedReversal!
         multiStrokeTurnSensitivity = try c.decodeIfPresent(Int.self, forKey: .multiStrokeTurnSensitivity) ?? 0
+        compoundVowelPath = try c.decodeIfPresent(CompoundVowelPath.self, forKey: .compoundVowelPath) ?? .rightAngleAndVertical
     }
 }

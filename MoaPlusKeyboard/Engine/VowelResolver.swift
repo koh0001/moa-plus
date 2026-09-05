@@ -1,10 +1,15 @@
 import Foundation
 
 class VowelResolver {
-    private let patternTrie = VowelPattern.patternTrie
+    /// 활성 모드의 트라이. 두 트라이 모두 정적으로 한 번만 만들어지므로 매 호출
+    /// 분기는 딕셔너리 조회 비용도 없다.
+    private var patternTrie: PatternTrie { VowelPattern.trie(for: compoundVowelPath) }
 
     /// Custom diagonal mappings from SwipeProfile (updated per gesture)
     var swipeProfile: SwipeProfile = .bothHands
+
+    /// ㅘ·ㅝ 복합모음 경로 (이슈 #29). 제스처 시작마다 설정에서 주입된다.
+    var compoundVowelPath: CompoundVowelPath = .rightAngleAndVertical
 
     struct Resolution {
         let vowel: Jungseong?
