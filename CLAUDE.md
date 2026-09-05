@@ -159,6 +159,13 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   — 키 하나에 진동 두 번이 된다 (`KeyboardViewModelHapticTimingTests` 가드).
   백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함)
 - 클릭 사운드는 `AudioServicesPlaySystemSound(1104)` 사용 (`playInputClick`은 익스텐션에서 불안정)
+- **햅틱은 '전체 접근 허용' 없이는 iOS 가 조용히 무시한다** (앱스토어 리뷰 2026-09-03 / 2026-05 2건,
+  개발 기기는 켜져 있어 재현 안 됨). `hasFullAccess` 는 익스텐션만 읽을 수 있어
+  `KeyboardViewController.viewDidAppear` 가 `KeyboardSettings.recordFullAccess(_:)` 로 App Group 에 남기고,
+  메인 앱은 `fullAccessStatus`(.unknown/.granted/.denied) 로 홈 카드 4단계·소리·진동 배너를 띄운다.
+  `.unknown`(키보드 미기동)에는 경고하지 않을 것 — 설치 직후 사용자를 겁주게 된다
+  (`KeyboardSettingsFullAccessTests` 가드). 진단 기록이라 `@Published` 밖이며, 화면은 `onAppear`/
+  `scenePhase` 에서 다시 읽는다
 - `clickSoundEnabled`는 ThemeSettings 밖에 독립 Bool로 저장 (Codable 디코딩 실패 방지)
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
@@ -373,6 +380,11 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - `.complete` (받침 있음) → 받침만 제거 (한→하). 겹받침은 뒤쪽부터 (값→갑)
 - `.dotPending` → ㆍ 카운트 1단계 감소
 - `.standaloneVowel` → empty (남길 초성이 없으므로)
+- **글자 단위 옵션 (v2.2.2 / 앱스토어 리뷰)**: `backspaceDeletesWholeSyllable` ON 이면
+  `.choseongJungseong` → `.empty` (가→빈). 그 외 분기는 공통 — 받침은 여전히 먼저 떨어진다
+  (한→하→빈). v2.0 이전 커밋 `089dfd0^` 의 동작 그대로. 컴포저 API 는
+  `deleteBackward(wholeSyllable:)`, 뷰모델 `deleteBackward()` 가 설정을 읽어 넘긴다.
+  **기본값을 바꾸지 말 것** — 순정 실측 정합 (`HangulComposerTests` / `KeyboardViewModelBackspaceUnitTests` 가드)
 
 ### 설정 시스템
 ```
@@ -404,6 +416,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
 ├── wordDeleteEnabled: Bool
+├── backspaceDeletesWholeSyllable: Bool  (조합 중 받침 없는 글자를 한 번에, 기본 OFF=자소 단위)
 ├── wordDeleteDelay: Double
 ├── backspaceSpeed: Int                     (0=느림, 1=보통, 2=빠름)
 ├── showGesturePreview: Bool
