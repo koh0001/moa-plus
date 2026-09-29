@@ -479,7 +479,9 @@ struct SectorAngleHybridView: View {
 
     private typealias HandleSide = SectorAngleHybridView_HandleSide
 
-    private static let widthRange: ClosedRange<Double> = 10...40
+    /// 0…45°. 6방향 프리셋이 0°(끈 대각선)·45°(넓힌 카디널 쪽)를 쓰므로 그 값을
+    /// 슬라이더가 잘라 보이지 않게 이 범위를 덮어야 한다.
+    private static let widthRange: ClosedRange<Double> = 0...45
     private static let defaultHalfWidth: Double = 22.5
     private let selectionHaptic = UISelectionFeedbackGenerator()
 
@@ -638,6 +640,7 @@ struct SectorAngleHybridView: View {
             Button("이 방향 초기화") {
                 var gs = settings.gestureSettings
                 gs.swipeProfile.sectors[selectedIndex].halfWidth = Self.defaultHalfWidth
+                gs.swipeProfile.mode = .custom
                 settings.gestureSettings = gs
             }
             .disabled(isFourWay)
@@ -645,6 +648,7 @@ struct SectorAngleHybridView: View {
             Button("전체 초기화") {
                 var gs = settings.gestureSettings
                 gs.swipeProfile.sectors = DirectionSector.defaultSectors
+                gs.swipeProfile.mode = .both
                 gs.swipeProfile.axisRotation = 0
                 settings.gestureSettings = gs
             }
@@ -702,6 +706,8 @@ struct SectorAngleHybridView: View {
                 } else {
                     gs.swipeProfile.sectors[selectedIndex].rightHalfWidth = newValue
                 }
+                // 손으로 폭을 바꾸면 더 이상 프리셋 배치가 아니다.
+                gs.swipeProfile.mode = .custom
                 settings.gestureSettings = gs
             }
         )

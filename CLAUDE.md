@@ -121,6 +121,11 @@ xcodebuild test \
 # 유닛 테스트만 (빠름)
 xcodebuild test ... -only-testing:MoaPlusKeyboardTests
 
+# 로컬에서는 병렬 테스트를 끌 것 — 기본값이면 시뮬레이터 클론을 여러 대 띄워
+# (실측 2026-09-29: 5대, 메모리 ~14GB, 스왑 포화) 다른 작업까지 멈춘다.
+# 끝나면 xcrun simctl shutdown all 로 시뮬레이터를 내릴 것
+xcodebuild test ... -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1
+
 # UI 테스트만 — 유닛 테스트와 **다른 시뮬레이터**에서 돌릴 것
 xcodebuild test ... -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -only-testing:MoaPlusUITests
@@ -461,6 +466,12 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ↖ ↗ = ㅣ,  ↙ ↘ = ㅡ  (설정에서 변경 가능)
 ```
 모음 제스처 전체 표: [README.md](README.md) 참조
+
+**6방향 프리셋** (`SwipeMode.sixWayRight` ↗ㅣ↙ㅡ / `.sixWayLeft` ↖ㅣ↘ㅡ, 사용자 메일 제안):
+분류기 수정 없이 **섹터 데이터만으로** 60°×6 타일링 — 중심은 45° 격자 유지, 카디널 좌우 폭
+45°/15° 비대칭, 끈 대각선 폭 0. 카디널 `halfWidth` 는 22.5 로 둘 것(STEP1 이 넓힌 쪽 판별에 씀).
+프리셋 피커는 `SwipeProfile.applyingPreset` 로 **섹터까지** 쓴다(v2.2.2 까지 오른손/왼손은 라벨만
+바뀌고 미적용이었다). 각도 편집기에서 손대면 `.custom`. 가드 `SixWaySectorTests`
 
 ### 약어(단축어) 트리거 매칭 규칙
 - 구분자는 두 종류다. **경계 구분자**(`" "` `"\n"`)는 버퍼를 리셋하고, **내용 겸 확정

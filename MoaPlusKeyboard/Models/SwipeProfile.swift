@@ -7,6 +7,12 @@ enum SwipeMode: String, Codable, CaseIterable {
     case left     // Left-hand optimized
     case both     // Bimanual (symmetric 45° sectors)
     case custom   // User-defined angles
+    /// 6방향 60° 균등 (사용자 메일 제안). ↗ㅣ ↙ㅡ 만 남기고 ↖ ↘ 를 끈다.
+    /// ⚠️ 새 rawValue 는 이전 빌드에서 디코딩되지 않는다 — 다운그레이드 시
+    /// `SwipeProfile` 디코딩이 실패해 긋기 설정이 기본값으로 돌아간다.
+    case sixWayRight
+    /// 6방향 60° 균등, 좌우 거울상. ↖ㅣ ↘ㅡ 만 남기고 ↗ ↙ 를 끈다.
+    case sixWayLeft
 }
 
 /// Swipe length threshold
@@ -205,6 +211,36 @@ struct SwipeProfile: Codable, Equatable {
     }()
 }
 
+// MARK: - Preset sectors
+
+extension SwipeProfile {
+    /// 프리셋이 정하는 섹터 배치. `.custom` 은 사용자가 편집한 값을 그대로 두므로 nil.
+    ///
+    /// 프리셋 피커는 v2.2.2 까지 `mode` 라벨만 바꾸고 섹터는 건드리지 않았다
+    /// (오른손/왼손 프리셋이 정의만 있고 적용되지 않던 문제). 피커는 이제 이 값을
+    /// 섹터에 써 넣는다. 매핑·길이·4방향·회전·빈 각도 설정은 프리셋과 무관하게 유지한다.
+    static func presetSectors(for mode: SwipeMode) -> [DirectionSector]? {
+        switch mode {
+        case .right:       return rightHand.sectors
+        case .left:        return leftHand.sectors
+        case .both:        return DirectionSector.defaultSectors
+        case .sixWayRight: return DirectionSector.sixWayRightSectors
+        case .sixWayLeft:  return DirectionSector.sixWayLeftSectors
+        case .custom:      return nil
+        }
+    }
+
+    /// `mode` 를 바꾸고, 프리셋이면 섹터도 그 배치로 바꾼 사본.
+    func applyingPreset(_ mode: SwipeMode) -> SwipeProfile {
+        var copy = self
+        copy.mode = mode
+        if let sectors = Self.presetSectors(for: mode) {
+            copy.sectors = sectors
+        }
+        return copy
+    }
+}
+
 // MARK: - Forward-compatible decoding
 //
 // Defined in an extension so the memberwise initialiser (used by the static
@@ -248,6 +284,43 @@ extension DirectionSector {
         DirectionSector(centerAngle: 225),    // ↙ → ↓ 정규화
         DirectionSector(centerAngle: 270),    // ↓ ㅜ
         DirectionSector(centerAngle: 315),    // ↘ ㅡ
+    ]
+
+    /// 6방향 60° 균등 배치 (오른손형: ↗ㅣ ↙ㅡ). 사용자 메일 제안 — 대각선이 네 개일 때
+    /// 방향 간 간격이 좁아 생기는 오타를 줄인다.
+    ///
+    /// 네 카디널 + 두 대각선을 60° 씩 나누면 경계가 45° 격자에서 15° 벗어난다:
+    /// → 315~15° · ↗ 15~75° · ↑ 75~135° · ← 135~195° · ↙ 195~255° · ↓ 255~315°.
+    /// 섹터 중심은 45° 격자에 그대로 두고 **좌우 폭만 비대칭**으로 준다
+    /// (45°/15°). 분류기(`GestureDirection.from`)는 한 줄도 바꾸지 않는다:
+    /// - 카디널의 `halfWidth` 는 기본 22.5 로 둔다. STEP1(넓힌 카디널 우선)이
+    ///   `side > halfWidth` 로 넓힌 쪽을 알아보기 때문이다. `halfWidth` 에 대입하면
+    ///   didSet 이 양쪽 폭을 리셋하므로 초기화 인자로만 준다.
+    /// - 끈 대각선(↖ ↘)은 폭 0. 열별 ㅣ/ㅡ 보정이 폭을 조금 되살려도 인접 카디널의
+    ///   STEP1 이 먼저 가져가므로 22.5° 이하 보정에서는 여전히 인식되지 않는다.
+    /// 가드: `SixWaySectorTests` (1° 간격 전수 스윕).
+    static let sixWayRightSectors: [DirectionSector] = [
+        DirectionSector(centerAngle: 0,   halfWidth: 22.5, leftHalfWidth: 15, rightHalfWidth: 45), // → 315~15
+        DirectionSector(centerAngle: 45,  halfWidth: 30),                                          // ↗ 15~75
+        DirectionSector(centerAngle: 90,  halfWidth: 22.5, leftHalfWidth: 45, rightHalfWidth: 15), // ↑ 75~135
+        DirectionSector(centerAngle: 135, halfWidth: 0),                                           // ↖ 꺼짐
+        DirectionSector(centerAngle: 180, halfWidth: 22.5, leftHalfWidth: 15, rightHalfWidth: 45), // ← 135~195
+        DirectionSector(centerAngle: 225, halfWidth: 30),                                          // ↙ 195~255
+        DirectionSector(centerAngle: 270, halfWidth: 22.5, leftHalfWidth: 45, rightHalfWidth: 15), // ↓ 255~315
+        DirectionSector(centerAngle: 315, halfWidth: 0),                                           // ↘ 꺼짐
+    ]
+
+    /// 6방향 60° 균등 배치 (왼손형: ↖ㅣ ↘ㅡ). `sixWayRightSectors` 의 좌우 거울상:
+    /// → 345~45° · ↑ 45~105° · ↖ 105~165° · ← 165~225° · ↓ 225~285° · ↘ 285~345°.
+    static let sixWayLeftSectors: [DirectionSector] = [
+        DirectionSector(centerAngle: 0,   halfWidth: 22.5, leftHalfWidth: 45, rightHalfWidth: 15), // → 345~45
+        DirectionSector(centerAngle: 45,  halfWidth: 0),                                           // ↗ 꺼짐
+        DirectionSector(centerAngle: 90,  halfWidth: 22.5, leftHalfWidth: 15, rightHalfWidth: 45), // ↑ 45~105
+        DirectionSector(centerAngle: 135, halfWidth: 30),                                          // ↖ 105~165
+        DirectionSector(centerAngle: 180, halfWidth: 22.5, leftHalfWidth: 45, rightHalfWidth: 15), // ← 165~225
+        DirectionSector(centerAngle: 225, halfWidth: 0),                                           // ↙ 꺼짐
+        DirectionSector(centerAngle: 270, halfWidth: 22.5, leftHalfWidth: 15, rightHalfWidth: 45), // ↓ 225~285
+        DirectionSector(centerAngle: 315, halfWidth: 30),                                          // ↘ 285~345
     ]
 
     /// Direction labels for display
