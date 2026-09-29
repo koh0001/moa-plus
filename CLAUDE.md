@@ -469,7 +469,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 
 **6방향 프리셋** (`SwipeMode.sixWayRight` ↗ㅣ↙ㅡ / `.sixWayLeft` ↖ㅣ↘ㅡ, 사용자 메일 제안):
 분류기 수정 없이 **섹터 데이터만으로** 60°×6 타일링 — 중심은 45° 격자 유지, 카디널 좌우 폭
-45°/15° 비대칭, 끈 대각선 폭 0. 카디널 `halfWidth` 는 22.5 로 둘 것(STEP1 이 넓힌 쪽 판별에 씀).
+45°/15° 비대칭, 끈 대각선 폭 0. 살아 있는 대각선 쌍의 매핑은 ㅣ/ㅡ 로 강제(끈 쪽은 유지). 카디널 `halfWidth` 는 22.5 로 둘 것(STEP1 이 넓힌 쪽 판별에 씀).
 프리셋 피커는 `SwipeProfile.applyingPreset` 로 **섹터까지** 쓴다(v2.2.2 까지 오른손/왼손은 라벨만
 바뀌고 미적용이었다). 각도 편집기에서 손대면 `.custom`. 가드 `SixWaySectorTests`
 

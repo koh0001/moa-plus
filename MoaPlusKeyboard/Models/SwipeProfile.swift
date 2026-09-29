@@ -231,11 +231,26 @@ extension SwipeProfile {
     }
 
     /// `mode` 를 바꾸고, 프리셋이면 섹터도 그 배치로 바꾼 사본.
+    ///
+    /// 6방향 프리셋은 이름이 "↗ㅣ ↙ㅡ" / "↖ㅣ ↘ㅡ" 를 약속하므로 **살아 있는 대각선
+    /// 한 쌍의 매핑**도 ㅣ/ㅡ 로 맞춘다. 대각선을 ㅗ/ㅜ 로 바꿔 둔 사용자(메일 제보
+    /// 스크린샷: ↖ㅗ ↘ㅜ)가 왼손형을 고르면 60° 섹터가 통째로 ㅗ 가 되고 ㅣ 가
+    /// 사라지기 때문이다. 폭 0 으로 끈 쪽의 매핑은 건드리지 않는다.
     func applyingPreset(_ mode: SwipeMode) -> SwipeProfile {
         var copy = self
         copy.mode = mode
         if let sectors = Self.presetSectors(for: mode) {
             copy.sectors = sectors
+        }
+        switch mode {
+        case .sixWayRight:
+            copy.upRightMapping = .vowelI
+            copy.downLeftMapping = .vowelEu
+        case .sixWayLeft:
+            copy.upLeftMapping = .vowelI
+            copy.downRightMapping = .vowelEu
+        case .right, .left, .both, .custom:
+            break
         }
         return copy
     }

@@ -69,7 +69,7 @@ final class SixWaySectorTests: XCTestCase {
     func test_applyingPreset_writesSectorsAndKeepsOtherFields() {
         var p = SwipeProfile.bothHands
         p.swipeLength = .long
-        p.upRightMapping = .vowelA
+        p.upLeftMapping = .vowelO   // 끈 쪽 대각선 — 그대로 남아야 한다
         p.axisRotation = 5
         p.gapFillNearest = false
 
@@ -77,7 +77,7 @@ final class SixWaySectorTests: XCTestCase {
         XCTAssertEqual(six.mode, .sixWayRight)
         XCTAssertEqual(six.sectors, DirectionSector.sixWayRightSectors)
         XCTAssertEqual(six.swipeLength, .long)
-        XCTAssertEqual(six.upRightMapping, .vowelA)
+        XCTAssertEqual(six.upLeftMapping, .vowelO)
         XCTAssertEqual(six.axisRotation, 5)
         XCTAssertFalse(six.gapFillNearest)
     }
@@ -96,6 +96,26 @@ final class SixWaySectorTests: XCTestCase {
         XCTAssertEqual(six.applyingPreset(.custom).mode, .custom)
     }
 
+    /// 대각선을 ㅗ/ㅜ 로 바꿔 둔 사용자(메일 제보 스크린샷)도 6방향을 고르면 이름대로
+    /// 살아 있는 대각선이 ㅣ/ㅡ 가 되어야 한다.
+    func test_applyingPreset_sixWayForcesLiveDiagonalPairToIEu() {
+        var p = SwipeProfile.bothHands
+        p.upLeftMapping = .normalizeUp
+        p.upRightMapping = .vowelA
+        p.downLeftMapping = .vowelU
+        p.downRightMapping = .normalizeDown
+
+        let right = p.applyingPreset(.sixWayRight)
+        XCTAssertEqual(right.upRightMapping, .vowelI)
+        XCTAssertEqual(right.downLeftMapping, .vowelEu)
+        XCTAssertEqual(right.upLeftMapping, .normalizeUp, "끈 쪽은 유지")
+
+        let left = p.applyingPreset(.sixWayLeft)
+        XCTAssertEqual(left.upLeftMapping, .vowelI)
+        XCTAssertEqual(left.downRightMapping, .vowelEu)
+        XCTAssertEqual(left.upRightMapping, .vowelA, "끈 쪽은 유지")
+    }
+
     func test_sixWayMode_roundTripsThroughJSON() throws {
         let p = SwipeProfile.bothHands.applyingPreset(.sixWayRight)
         let decoded = try JSONDecoder().decode(SwipeProfile.self, from: JSONEncoder().encode(p))
@@ -105,9 +125,10 @@ final class SixWaySectorTests: XCTestCase {
     // MARK: - E2E (분석기 + 리졸버)
 
     /// 꼭짓점 사이를 4pt 간격으로 채워 분석기에 넣고 모음을 돌려준다.
-    private func vowel(_ mode: SwipeMode, strokes: [(dx: CGFloat, dy: CGFloat)]) -> Jungseong? {
+    private func vowel(_ mode: SwipeMode, strokes: [(dx: CGFloat, dy: CGFloat)],
+                       from base: SwipeProfile = .bothHands) -> Jungseong? {
         var settings = GestureSettings.default
-        settings.swipeProfile = SwipeProfile.bothHands.applyingPreset(mode)
+        settings.swipeProfile = base.applyingPreset(mode)
         let analyzer = GestureAnalyzer(settings: settings, columnId: 2)
         var p = CGPoint(x: 200, y: 200)
         analyzer.addPoint(p)
@@ -156,6 +177,16 @@ final class SixWaySectorTests: XCTestCase {
             XCTAssertEqual(vowel(mode, strokes: [stroke(180, 40), stroke(0, 40)]), .ㅔ, "←→ \(mode)")
             XCTAssertEqual(vowel(mode, strokes: [stroke(90, 40), stroke(270, 40)]), .ㅚ, "↑↓ \(mode)")
         }
+    }
+
+    /// 제보자 설정(↖ㅗ ↘ㅜ)에서 왼손형을 골라도 ㅣ·ㅡ·ㅢ 가 살아 있어야 한다.
+    func test_e2e_sixWayLeft_fromReporterMappings() {
+        var base = SwipeProfile.bothHands
+        base.upLeftMapping = .normalizeUp
+        base.downRightMapping = .normalizeDown
+        XCTAssertEqual(vowel(.sixWayLeft, strokes: [stroke(135)], from: base), .ㅣ)
+        XCTAssertEqual(vowel(.sixWayLeft, strokes: [stroke(315)], from: base), .ㅡ)
+        XCTAssertEqual(vowel(.sixWayLeft, strokes: [stroke(315, 40), stroke(135, 40)], from: base), .ㅢ)
     }
 
     /// ㅢ 는 남은 대각선 쌍의 왕복으로 들어간다 — 오른손형 ↙↗, 왼손형 ↘↖.
