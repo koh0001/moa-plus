@@ -64,6 +64,20 @@ enum GestureDebugLog {
         defaults.set(lines, forKey: storageKey)
     }
 
+    /// 오타 후보 표시. 긋기 직후 첫 입력이 백스페이스면 그 긋기 줄 끝에 붙인다
+    /// (메일 제보 "오타가 나면 그대로 저장해 달라, 사례로 대조할 수 있게"). 판정이 맞았는데
+    /// 마음을 바꿔 지운 경우도 표시되므로 "확정" 이 아니라 "후보" 다.
+    static let deletedMark = " ✗지움"
+
+    static func markLastLineDeleted() {
+        guard let defaults else { return }
+        var lines = cachedLines ?? defaults.stringArray(forKey: storageKey) ?? []
+        guard let last = lines.last, !last.hasSuffix(deletedMark) else { return }
+        lines[lines.count - 1] = last + deletedMark
+        cachedLines = lines
+        defaults.set(lines, forKey: storageKey)
+    }
+
     /// 메인 앱에서 읽을 때는 익스텐션 프로세스가 그 사이 더 쓴 내용을 봐야
     /// 하므로 캐시가 아니라 디스크를 읽는다 (읽기는 입력 경로가 아니라 느긋해도 됨).
     static func recentLines(_ count: Int = 80) -> [String] {
