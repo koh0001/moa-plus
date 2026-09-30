@@ -374,6 +374,8 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
         addChild(hostingController)
         view.addSubview(hostingController.view)
+        // 하단 절반 키의 누름 시작을 SwiftUI 인식 대기 없이 받는다 (`EarlyTouch.swift`).
+        hostingController.view.addGestureRecognizer(EarlyTouchRecognizer())
         hostingController.didMove(toParent: self)
 
         NSLayoutConstraint.activate([

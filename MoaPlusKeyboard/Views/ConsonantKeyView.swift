@@ -26,6 +26,9 @@ struct KeyView: View {
     /// caps-lock toggle so users can hold shift to lock instead of
     /// having to time a precise double-tap.
     var onShiftLongPress: (() -> Void)? = nil
+    /// 시스템이 터치를 가져가 SwiftUI 제스처가 끝내 오지 않았을 때 뷰모델의 진행 중
+    /// 제스처(활성 키·팝업)를 입력 확정 없이 걷는다. `EarlyTouch.swift` 참조.
+    var onGestureCancel: (() -> Void)? = nil
 
     @State private var isHighlighted = false
     @State private var showNumberPopup = false
@@ -74,14 +77,11 @@ struct KeyView: View {
             // using these coords (opposite-side rendering).
             DragGesture(minimumDistance: 0, coordinateSpace: .named("keyboardPreview"))
                 .onChanged { value in
+                    TouchLatencyProbe.recordRecognition(label: probeLabel)
+                    // 하단 절반에서는 `earlyPress` 가 ~20ms 에 이미 시작했다 — 여기서는
+                    // 건너뛴다(두 번 시작하면 백스페이스 두 번·진동 두 번).
                     if !isHighlighted {
-                        isHighlighted = true
-                        if isBackspaceKey {
-                            onBackspacePressStart?()
-                        } else {
-                            onGestureStart(value.startLocation)
-                            startLongPressTimer()
-                        }
+                        beginPress(at: value.startLocation)
                     }
 
                     guard !isBackspaceKey else { return }
@@ -122,6 +122,23 @@ struct KeyView: View {
                         onGestureEnd()
                     }
                 }
+        )
+        // SwiftUI 제스처는 키보드 아래쪽 절반에서 가만히 누르면 ~0.75초 늦게 시작한다
+        // (iOS 27 실측). 누름 시작만 UIKit 층에서 먼저 받는다 — `EarlyTouch.swift`.
+        .earlyPress(
+            onPress: { point in
+                guard !isHighlighted else { return }
+                TouchLatencyProbe.event("조기 시작")
+                beginPress(at: point)
+            },
+            onMove: { t in
+                // SwiftUI 가 아직 안 붙은 동안 긋기가 시작되면 롱프레스를 여기서 끊는다.
+                if !isBackspaceKey, sqrt(t.width * t.width + t.height * t.height) > KeyboardMetrics.gestureThreshold {
+                    cancelLongPressTimer()
+                }
+            },
+            isStillPressed: { isHighlighted },
+            onUnhandledRelease: { cancelUnhandledPress() }
         )
         .onDisappear {
             if isHighlighted && isBackspaceKey {
@@ -321,6 +338,35 @@ struct KeyView: View {
         return false
     }
 
+    private var probeLabel: String {
+        String(String(describing: content).prefix(24))
+    }
+
+    /// 누름 시작 — SwiftUI 첫 `onChanged` 와 `earlyPress` 중 먼저 온 쪽이 한 번만 부른다.
+    private func beginPress(at point: CGPoint) {
+        isHighlighted = true
+        if isBackspaceKey {
+            TouchLatencyProbe.event("백스페이스 시작")
+            onBackspacePressStart?()
+        } else {
+            onGestureStart(point)
+            startLongPressTimer()
+        }
+    }
+
+    /// 뗐는데 SwiftUI 가 끝내 처리하지 않은 누름(시스템 제스처가 가져감)의 뒷정리.
+    /// 입력은 확정하지 않는다 — `onGestureEnd` 를 부르면 의도하지 않은 글자가 들어간다.
+    private func cancelUnhandledPress() {
+        isHighlighted = false
+        cancelLongPressTimer()
+        hideNumberPopup()
+        if isBackspaceKey {
+            onBackspacePressEnd?()
+        } else {
+            onGestureCancel?()
+        }
+    }
+
     private func startLongPressTimer() {
         let isShiftKey: Bool = {
             if case .functional(.shift) = content { return true }
@@ -334,6 +380,7 @@ struct KeyView: View {
                 onShiftLongPress?()
                 return
             }
+            TouchLatencyProbe.event("롱프레스 팝업")
             showNumberPopup = true
             if let number = longPressNumber {
                 onLongPress?(number)

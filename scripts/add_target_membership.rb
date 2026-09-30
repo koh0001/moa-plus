@@ -36,6 +36,7 @@ FILES_TO_ADD = [
   'Utilities/KeyboardMetrics.swift',
   'Utilities/GestureSettings.swift',
   'Utilities/GestureDebugLog.swift',
+  'Utilities/EarlyTouch.swift',
 ]
 
 project = Xcodeproj::Project.open(PROJECT_PATH)

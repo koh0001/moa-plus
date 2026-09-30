@@ -610,6 +610,12 @@ struct PunctuationSwipeKey: View {
                     didDrag = false
                 }
         )
+        // 누르는 순간 햅틱·눌림 표시를 SwiftUI 인식 대기(하단 ~0.75초) 없이 — `EarlyTouch.swift`.
+        .earlyPress(
+            onPress: { _ in if !isPressed { isPressed = true; keyPressFeedback() } },
+            isStillPressed: { isPressed },
+            onUnhandledRelease: { isPressed = false; didDrag = false }
+        )
     }
 }
 
@@ -662,6 +668,15 @@ struct SlotBVowelKey: View {
                     isPressed = false
                     onGestureEnd()
                 }
+        )
+        .earlyPress(
+            onPress: { point in
+                guard !isPressed else { return }
+                isPressed = true
+                onGestureStart(point)
+            },
+            isStillPressed: { isPressed },
+            onUnhandledRelease: { isPressed = false }
         )
     }
 }
@@ -806,6 +821,7 @@ struct SpaceKeyView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
+                        TouchLatencyProbe.recordRecognition(label: "space")
                         if !isPressed { isPressed = true; keyPressFeedback() }
                         // When the cursor-by-drag toggle is off, never enter
                         // drag mode — small finger movements (≥ dragThreshold)
@@ -863,6 +879,18 @@ struct SpaceKeyView: View {
                         lastReportedOffset = 0
                     }
             )
+            .earlyPress(
+                onPress: { _ in if !isPressed { isPressed = true; keyPressFeedback() } },
+                isStillPressed: { isPressed },
+                onUnhandledRelease: {
+                    // 스페이스를 넣지 않고 연속 이동만 멈춘다.
+                    isPressed = false
+                    repeater.stop()
+                    activeRepeatDirection = 0
+                    didDrag = false
+                    lastReportedOffset = 0
+                }
+            )
     }
 }
 
@@ -904,6 +932,11 @@ struct FunctionKeyView: View {
                         isPressed = false
                         action()
                     }
+            )
+            .earlyPress(
+                onPress: { _ in if !isPressed { isPressed = true; keyPressFeedback() } },
+                isStillPressed: { isPressed },
+                onUnhandledRelease: { isPressed = false }
             )
     }
 }

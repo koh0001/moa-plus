@@ -26,6 +26,7 @@ struct KeyGridView: View {
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureEnd: (() -> Void)? = nil
+    var onGestureCancel: (() -> Void)? = nil
     let onPunctuationSlot: (String) -> Void
 
     /// Returns the rendered width for a single cell, accounting for .backspaceWide.
@@ -203,7 +204,8 @@ struct KeyGridView: View {
                             onPopupRelease: {
                                 onPopupRelease?()
                             },
-                            onShiftLongPress: onShiftLongPress
+                            onShiftLongPress: onShiftLongPress,
+                            onGestureCancel: onGestureCancel
                         )
                         }   // close else branch (slot B intercept)
                     }
