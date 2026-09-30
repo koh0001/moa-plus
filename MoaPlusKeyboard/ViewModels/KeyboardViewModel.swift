@@ -555,6 +555,7 @@ class KeyboardViewModel: ObservableObject {
     // 나머지 모음은 천지인 합성으로 쌓는다.
 
     func slotBVowelGestureStarted(at point: CGPoint) {
+        typoMarkPending = false
         keyPressFeedback()
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
         vowelResolver.swipeProfile = KeyboardSettings.shared.gestureSettings.swipeProfile
@@ -683,6 +684,7 @@ class KeyboardViewModel: ObservableObject {
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
 
     func inputSymbol(_ symbol: String, bypassAutoBracket: Bool = false) {
+        typoMarkPending = false
         if previewMode { return }
         let resolved = shiftedSymbolIfNeeded(symbol)
         commitCurrent()
@@ -698,6 +700,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputNumber(_ number: String) {
+        typoMarkPending = false
         if previewMode { return }
         commitCurrent()
         if insertWithAutoBracket(number) {
@@ -828,6 +831,10 @@ class KeyboardViewModel: ObservableObject {
 
     func deleteBackward() {
         if previewMode { return }
+        if typoMarkPending {
+            typoMarkPending = false
+            GestureDebugLog.markLastLineDeleted()
+        }
         // A caret tap can leave the composer pointed at the old glyph; freeze it
         // first so backspace acts at the current caret, not on stale state.
         freezeComposerIfCaretMoved()
@@ -847,6 +854,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputSpace() {
+        typoMarkPending = false
         if previewMode { return }
         // Commit composing text first (feeds abbreviation engine via commitCurrent)
         commitCurrent()
@@ -889,6 +897,7 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func inputReturn() {
+        typoMarkPending = false
         if previewMode { return }
         commitCurrent()
         abbreviationEngine.processCharacter("\n")
@@ -908,6 +917,7 @@ class KeyboardViewModel: ObservableObject {
     /// Treats the currently composing character as committed (frozen at old cursor position),
     /// resets composer + abbreviation buffer, then asks delegate to adjust proxy cursor.
     func moveCursor(by offset: Int) {
+        typoMarkPending = false
         guard offset != 0 else { return }
         // Freeze any in-progress composition at its current screen position.
         // commitCurrent() clears internal state without touching the proxy.
@@ -976,7 +986,13 @@ class KeyboardViewModel: ObservableObject {
 
     // MARK: - Gesture Handling
 
+    /// 방금 긋기를 제스처 로그에 기록했고 아직 다른 입력이 없다 — 다음 입력이
+    /// 백스페이스면 그 줄을 오타 후보(`GestureDebugLog.deletedMark`)로 표시한다.
+    /// 다른 입력(키·스페이스·기호·엔터·커서 이동)이 오면 지운다.
+    private(set) var typoMarkPending = false
+
     func gestureStarted(row: Int, column: Int, at point: CGPoint) {
+        typoMarkPending = false
         keyPressFeedback()
         didHandleLongPressNumberInCurrentGesture = false
         didHandleShiftLongPressInCurrentGesture = false
@@ -1194,6 +1210,7 @@ class KeyboardViewModel: ObservableObject {
                                    finalized: debugFinalStrokes,
                                    keyWidth: gestureAnalyzer.keyWidth,
                                    result: result)
+            typoMarkPending = true
         }
 
         let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
