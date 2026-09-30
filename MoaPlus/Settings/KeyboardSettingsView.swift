@@ -73,6 +73,7 @@ struct KeyboardSettingsView: View {
             case .right: return "오른손"
             case .left: return "왼손"
             case .both: return "양손"
+            case .sixWayRight, .sixWayLeft: return "6방향"
             case .custom: return "커스텀"
             }
         }()

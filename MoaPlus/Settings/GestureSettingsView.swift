@@ -21,6 +21,19 @@ struct GestureSettingsView: View {
         )
     }
 
+    /// 프리셋 선택은 라벨만이 아니라 섹터 배치까지 바꾼다(`SwipeProfile.applyingPreset`).
+    /// "직접 설정" 은 현재 섹터를 그대로 둔다.
+    private var presetBinding: Binding<SwipeMode> {
+        Binding(
+            get: { settings.gestureSettings.swipeProfile.mode },
+            set: { newValue in
+                var gs = settings.gestureSettings
+                gs.swipeProfile = gs.swipeProfile.applyingPreset(newValue)
+                settings.gestureSettings = gs
+            }
+        )
+    }
+
     /// ㅘ·ㅝ 복합모음 경로(GestureSettings 직속) 바인딩 — 이슈 #29.
     private var compoundVowelPathBinding: Binding<CompoundVowelPath> {
         Binding(
@@ -96,10 +109,12 @@ struct GestureSettingsView: View {
 
             // Swipe Angle preset
             Section {
-                Picker("프리셋", selection: profileBinding(\.mode)) {
+                Picker("프리셋", selection: presetBinding) {
                     Text("오른손용").tag(SwipeMode.right)
                     Text("왼손용").tag(SwipeMode.left)
                     Text("양손용").tag(SwipeMode.both)
+                    Text("6방향 (↗ㅣ ↙ㅡ)").tag(SwipeMode.sixWayRight)
+                    Text("6방향 (↖ㅣ ↘ㅡ)").tag(SwipeMode.sixWayLeft)
                     Text("직접 설정").tag(SwipeMode.custom)
                 }
                 .pickerStyle(.inline)
@@ -222,6 +237,8 @@ struct GestureSettingsView: View {
         case .right: return "오른손 위주 사용 습관에 맞는 프리셋"
         case .left: return "왼손 위주 사용 습관에 맞는 프리셋"
         case .both: return "좌우 균형형 45도 프리셋"
+        case .sixWayRight: return "6방향 60° 균등 배치. ↗는 ㅣ, ↙는 ㅡ로 입력하고 ↖·↘는 쓰지 않아 방향마다 인식 범위가 넓어집니다. 복합모음 조합은 그대로입니다."
+        case .sixWayLeft: return "6방향 60° 균등 배치. ↖는 ㅣ, ↘는 ㅡ로 입력하고 ↗·↙는 쓰지 않아 방향마다 인식 범위가 넓어집니다. 복합모음 조합은 그대로입니다."
         case .custom: return "세부 각도를 직접 조정합니다"
         }
     }
