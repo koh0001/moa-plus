@@ -191,6 +191,10 @@ extension View {
 /// 누름 시작부터의 경과를 `GestureDebugLog` 에 남긴다. 실기기 판정용:
 /// 하단 행도 "조기 시작"·"롱프레스 팝업"·"백스페이스" 가 위쪽 행과 같은 시각이어야 한다.
 enum TouchLatencyProbe {
+    /// 기본 꺼짐 — 켜면 누를 때마다 App Group 에 2~3줄을 쓴다. 지연 재조사 때만 true 로
+    /// 빌드해 실기기에 올리고 개발자 리포트를 받는다(2026-09-30 판정에 쓴 계측).
+    static var isEnabled = false
+
     /// `UITouch.timestamp` 와 같은 시계(시스템 업타임, 초).
     private static var touchTimestamp: TimeInterval?
     private static var arrivalMs: Double = 0
@@ -199,6 +203,7 @@ enum TouchLatencyProbe {
     private static var recognitionLogged = true
 
     static func touchBegan(_ touch: UITouch, in view: UIView?) {
+        guard isEnabled else { return }
         touchTimestamp = touch.timestamp
         arrivalMs = (ProcessInfo.processInfo.systemUptime - touch.timestamp) * 1000
         y = touch.location(in: view).y
