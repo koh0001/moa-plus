@@ -168,6 +168,15 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   홈 카드 4단계와 소리·진동 푸터에 **상시** 노출한다. `KeyboardSettings.fullAccessStatus` 는
   개발자 리포트·문의 메일 판독용: 키보드를 써 봤는데 `.unknown`(기록 없음)이면 꺼진 것이다
   (`KeyboardSettingsFullAccessTests` 가드). 이 값을 UI 조건으로 다시 쓰지 말 것
+- **키보드 아래쪽 절반은 SwiftUI 제스처 인식이 ~0.75초 늦는다** (iOS 27 메일 제보, 실측 iPhone 16 Pro /
+  iOS 27.0.1 / 2026-09-30). 터치 **도착**은 어디서나 ~20ms 인데 `DragGesture` 첫 `onChanged` 가
+  y ≳ 130/260pt 에서 **751ms 고정**(위쪽 ~81ms) — 시스템 제스처 판정 대기. 탭·긋기는 멀쩡하고
+  가만히 누르는 동작(롱프레스 팝업·백스페이스 꾹·누름 햅틱)만 밀린다. 해법 `EarlyTouch.swift`:
+  호스팅 뷰의 `EarlyTouchRecognizer`(인식 안 함, 관찰만)가 키 프레임 레지스트리로 키를 찾아
+  **누름 시작만** 먼저 한다(`.earlyPress`). 불변식: 시작은 한 번만(SwiftUI 쪽은 이미 눌린 상태면
+  건너뜀 — 어기면 백스페이스·진동 두 번), 뗀 뒤 0.3초에도 SwiftUI 가 안 왔으면 입력 확정 없이
+  정리(세대 번호로 연타 보호). **창 게이트의 `delaysTouchesBegan` 해제는 효과 없음**(실측으로 기각).
+  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`)
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수

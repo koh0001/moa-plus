@@ -50,6 +50,20 @@ enum GestureDebugLog {
         defaults.set(lines, forKey: storageKey)
     }
 
+    /// 형식이 정해진 계측 한 줄(예: `TouchLatencyProbe`)을 시각을 붙여 기록한다.
+    static func appendLine(_ text: String) {
+        guard let defaults else { return }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        var lines = cachedLines ?? defaults.stringArray(forKey: storageKey) ?? []
+        lines.append("\(formatter.string(from: Date())) \(text)")
+        if lines.count > maxLines {
+            lines.removeFirst(lines.count - maxLines)
+        }
+        cachedLines = lines
+        defaults.set(lines, forKey: storageKey)
+    }
+
     /// 메인 앱에서 읽을 때는 익스텐션 프로세스가 그 사이 더 쓴 내용을 봐야
     /// 하므로 캐시가 아니라 디스크를 읽는다 (읽기는 입력 경로가 아니라 느긋해도 됨).
     static func recentLines(_ count: Int = 80) -> [String] {

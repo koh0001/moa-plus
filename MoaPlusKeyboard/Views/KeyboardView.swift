@@ -55,6 +55,7 @@ struct KeyboardView: View {
             onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
             onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },
             onSlotBVowelGestureEnd: { viewModel.slotBVowelGestureEnded() },
+            onGestureCancel: { viewModel.resetGestureState() },
             onPunctuationSlot: { viewModel.inputSymbol($0, bypassAutoBracket: true) }
         )
     }
