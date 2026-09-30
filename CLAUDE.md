@@ -466,6 +466,16 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
   **기본값을 바꾸지 말 것**, 새 패턴을 추가할 때는 직각 여부에 따라 배열을 골라 넣을 것
   (`CompoundVowelPathTests` 가드)
 
+### 휘어진 한 획 재해석 (v2.2.4 / 메일 제보 "오타→오티")
+- 분석기의 획 분리는 실제 꺾인 각도가 아니라 **방향 구역 간 각도(45° 단위)** 로 판정한다. 그래서
+  29°→8° 로 21° 만 휜 획도 ↗→ 두 획이 된다. 리졸버(`VowelResolver.resolve`)는 첫 획 재해석
+  (`firstStrokeCardinal`)이 **바로 다음 획과 같은 방향**이면 휘어진 한 획으로 보고, 간선 수 동률에서
+  버린 획이 적은 재해석을 고른다 (↗→ = ㅏ, ↖← = ㅓ). 이 조건 없이 "버린 획 적은 쪽" 만 쓰면
+  ↙↑→ = ㅢ 특성화가 ㅔ 로 깨진다(실측). 가드 `CurvedFirstStrokeTests`
+- 오타 후보 표시: 긋기 로그 직후 첫 입력이 백스페이스면 `GestureDebugLog.markLastLineDeleted()`
+  가 줄 끝에 `✗지움`. 대기 플래그 `KeyboardViewModel.typoMarkPending` 은 다른 입력 메서드마다
+  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`)
+
 ### 긋기 노이즈 처리 (GestureAnalyzer)
 - `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다
 - 후행 노이즈 트림은 **절대 크기(`edgeNoiseCap`) + 직전 획 대비 비율(`trailingNoiseRatio` 0.4)** 를 함께 보고, 꼬리가 여러 조각일 수 있어 반복 제거. 절대 크기만 쓰면 ㅒ/ㅖ/ㅙ/ㅞ의 짧은 마지막 획이 잘려 얘→야, 왜→와 회귀 발생 (`GestureOverDetectionCharacterizationTests` 가드)
