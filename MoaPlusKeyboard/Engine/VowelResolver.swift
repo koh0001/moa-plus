@@ -38,8 +38,20 @@ class VowelResolver {
 
         if let alt = cardinalReinterpretation(directions, firstStrokeCardinal: firstStrokeCardinal) {
             let altMatch = patternTrie.match(alt)
+            // 휘어진 한 획: 재해석한 첫 획이 **바로 다음 획과 같은 방향**이면 두 획은 한 번에
+            // 휘어 그은 같은 획이다(구역 경계를 넘으며 `↗→`/`↖←` 로 나뉨). 이때 간선 수가
+            // 같으면 버린 획이 적은 재해석을 고른다 — 원래 해석은 ↗(ㅣ) 뒤의 → 를 버리고,
+            // 재해석은 `[→ →]` = → 로 전부 설명한다. 메일 제보 "오타→오티", "어→이"
+            // (`CurvedFirstStrokeTests`). 첫 획과 다음 획이 다른 방향(↙↑→, ↙↗)이면
+            // 실제로 꺾은 궤적이라 기존 동률 규칙(원래 해석 유지)을 그대로 쓴다.
+            let curvedContinuation = directions.count >= 2 && firstStrokeCardinal == directions[1]
+            let skipped = normalized.count - match.matchedCount
+            let altSkipped = alt.count - altMatch.matchedCount
             if altMatch.vowel != nil,
-               match.vowel == nil || altMatch.matchedCount > match.matchedCount {
+               match.vowel == nil
+                || altMatch.matchedCount > match.matchedCount
+                || (curvedContinuation && altMatch.matchedCount == match.matchedCount
+                    && altSkipped < skipped) {
                 return Resolution(vowel: altMatch.vowel, hasMoreMatches: altMatch.hasLongerMatch)
             }
         }
