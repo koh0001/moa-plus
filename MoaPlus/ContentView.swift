@@ -36,6 +36,14 @@ struct ContentView: View {
                         Text("손끝으로 완성하는 한글")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.85))
+
+                        // 문의 메일·개발자 리포트의 "앱: 모아+ v2.2.3 (25)" 와 같은 형식 —
+                        // 사용자가 업데이트가 적용됐는지 홈에서 바로 확인할 수 있게.
+                        Text("v\(Self.appVersion) (\(Self.buildNumber))")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(.white.opacity(0.6))
+                            .accessibilityLabel("버전 \(Self.appVersion), 빌드 \(Self.buildNumber)")
                     }
 
                     Spacer()
@@ -144,6 +152,10 @@ struct ContentView: View {
     /// 닫힌 뒤 재표시되지 않는다.
     private static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.7.2"
+    }
+
+    private static var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     }
 }
 
