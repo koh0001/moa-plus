@@ -27,6 +27,8 @@ final class KeyboardSettings: ObservableObject {
         static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
+        static let keyboardPlacement = "keyboardPlacement"
+        static let oneHandedWidthRatio = "oneHandedWidthRatio"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
         static let longPressDelay = "longPressDelay"
         static let clickSoundEnabled = "clickSoundEnabled"
@@ -225,16 +227,23 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(keyboardExtraBottomInset, forKey: Keys.keyboardExtraBottomInset) }
     }
 
-    /// Show the system keyboard-switch (globe) key in the function row.
-    /// Only rendered when iOS also reports `needsInputModeSwitchKey`, so it
-    /// can never ship as a dead button when there is nothing to switch to.
-    ///
-    /// 기본 **OFF**. iOS 26 아이폰은 서드파티 키보드 아래에 지구본 바를 시스템이
-    /// 직접 그려주므로(`needsInputModeSwitchKey == false`) 대부분의 사용자에게는
-    /// 어차피 보이지 않고, ON 이면 기능 행에 키가 하나 늘어 스페이스바만 좁아진다.
-    /// 지구본이 필요한 환경(구버전 iOS·아이패드)에서 설정으로 켜는 방식.
+    /// **v2.2.6 부터 렌더에 쓰지 않는다.** 지구본 표시는 `KeyboardViewModel.canSwitchInputMode`
+    /// (= iOS `needsInputModeSwitchKey`)만으로 정한다 — 기본 OFF 였던 탓에 지구본이 필요한
+    /// 아이패드·홈 버튼 아이폰 사용자가 키보드를 바꿀 수단이 없었다. 저장 키는 기존
+    /// 설치와의 호환을 위해 남겨 둔다.
     @Published var showGlobeKey: Bool = false {
         didSet { guard !isLoading else { return }; writePrimitive(showGlobeKey, forKey: Keys.showGlobeKey) }
+    }
+
+    /// 한손 모드 위치 (기본 `.full` = 꺼짐). 키보드의 띠 버튼으로도 바뀐다 — 전체 접근이
+    /// 꺼져 있으면 App Group 에 못 써서 다음에 키보드를 띄울 때(`loadAll`) 원래 값으로 돌아온다.
+    @Published var keyboardPlacement: KeyboardPlacement = .full {
+        didSet { guard !isLoading else { return }; writePrimitive(keyboardPlacement.rawValue, forKey: Keys.keyboardPlacement) }
+    }
+
+    /// 한손 모드에서 키보드가 차지하는 폭 비율 (`KeyboardPlacement.widthRatioRange`).
+    @Published var oneHandedWidthRatio: Double = KeyboardPlacement.defaultWidthRatio {
+        didSet { guard !isLoading else { return }; writePrimitive(oneHandedWidthRatio, forKey: Keys.oneHandedWidthRatio) }
     }
 
     /// 자음 키에서 **대각선으로 진입**한 뒤 이어 그어 천지인 규칙으로 복합모음을
@@ -506,6 +515,10 @@ final class KeyboardSettings: ObservableObject {
         assign(\.keyboardAutoBottomInsetEnabled, defaults.object(forKey: Keys.keyboardAutoBottomInset) as? Bool ?? true)
         assign(\.keyboardExtraBottomInset, defaults.object(forKey: Keys.keyboardExtraBottomInset) as? Double ?? KeyboardMetrics.defaultExtraBottomInset)
         assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
+        assign(\.keyboardPlacement,
+               (defaults.object(forKey: Keys.keyboardPlacement) as? String)
+                   .flatMap(KeyboardPlacement.init(rawValue:)) ?? .full)
+        assign(\.oneHandedWidthRatio, defaults.object(forKey: Keys.oneHandedWidthRatio) as? Double ?? KeyboardPlacement.defaultWidthRatio)
         assign(\.consonantDiagonalDerivationEnabled, defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false)
         assign(\.longPressDelay, defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5)
         assign(\.clickSoundEnabled, defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false)
@@ -641,6 +654,8 @@ final class KeyboardSettings: ObservableObject {
         keyboardAutoBottomInsetEnabled = true
         keyboardExtraBottomInset = KeyboardMetrics.defaultExtraBottomInset
         showGlobeKey = false
+        keyboardPlacement = .full
+        oneHandedWidthRatio = KeyboardPlacement.defaultWidthRatio
         consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true

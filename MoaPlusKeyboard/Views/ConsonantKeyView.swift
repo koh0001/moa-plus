@@ -31,6 +31,7 @@ struct KeyView: View {
     var onGestureCancel: (() -> Void)? = nil
 
     @State private var isHighlighted = false
+    @State private var pressLinger = false
     @State private var showNumberPopup = false
     @State private var longPressTimer: Timer?
 
@@ -39,7 +40,7 @@ struct KeyView: View {
             // Key background
             RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
                 .fill(themedBackgroundColor)
-                .shadow(color: .black.opacity(0.2), radius: isPressed ? 0 : 1, y: isPressed ? 0 : 1)
+                .shadow(color: .black.opacity(0.2), radius: showsPressed ? 0 : 1, y: showsPressed ? 0 : 1)
 
             // Key label
             keyLabel
@@ -70,6 +71,15 @@ struct KeyView: View {
             }
         }
         .frame(width: keySize.width, height: keySize.height)
+        .onChange(of: isPressed) { _, pressed in
+            if pressed {
+                pressLinger = true
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.pressLingerDuration) {
+                    pressLinger = false
+                }
+            }
+        }
         .gesture(
             // Use the keyboard-frame coordinate space so start point and
             // current location are reported in the keyboard's frame, not
@@ -300,32 +310,42 @@ struct KeyView: View {
         column == 0 || column == 6
     }
 
+    /// 눌림 표시 여부. 짧은 탭은 누름→뗌이 한두 프레임 안에 끝나 표시가 그려지기도 전에
+    /// 사라지므로 `pressLinger` 로 뗀 뒤 잠깐 더 남긴다 (앱스토어 리뷰 2026-09-28
+    /// "자음만 클릭했을 때도 누른 표시가 났으면").
+    private var showsPressed: Bool { isPressed || isHighlighted || pressLinger }
+
+    /// 눌림 표시를 뗀 뒤 남기는 시간. 연타 속도(~100ms 간격)를 넘지 않게 짧게 둔다.
+    static let pressLingerDuration: TimeInterval = 0.08
+
     private var themedBackgroundColor: Color {
         // 미리 계산된 색 캐시를 읽는다 — ThemeSettings 를 통째로 복사하면 키마다
         // 구조체 복사(String? 필드 때문에 ARC 발생) + Color 재생성이 일어난다.
+        //
+        // 눌림 색은 순정 키보드처럼 **반대쪽 키 색**으로 바꾼다(일반 키 → 기능키 색,
+        // 기능키 → 일반 키 색). 예전처럼 투명도만 낮추면 뒤 배경(`systemGray6`)이 키 색과
+        // 거의 같아 눌러도 티가 나지 않았다.
         let ts = KeyboardSettings.shared
+        let key = ts.resolvedKeyBackground
+        let function = ts.resolvedFunctionKeyBackground
+        let usesFunctionColor: Bool
         switch content {
         case .consonant:
-            return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
+            usesFunctionColor = false
         case .vowelPrimitive:
-            return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.6) : ts.resolvedKeyBackground.opacity(0.85)
+            return showsPressed ? function : key.opacity(0.85)
         case .symbol(let s), .quickPunctuation(let s):
             // English mode: letter keys use normal key color; digit keys use function key color
-            if mode == .english {
-                if s.first?.isNumber == true {
-                    return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
-                }
-                return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
-            }
             // Korean / symbol mode: center keys use key color, side keys use function key color
-            if isSideKey {
-                return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
-            }
-            return isPressed || isHighlighted ? ts.resolvedKeyBackground.opacity(0.7) : ts.resolvedKeyBackground
+            usesFunctionColor = mode == .english ? s.first?.isNumber == true : isSideKey
         case .functional, .systemSwitch, .backspace, .backspaceWide,
              .slotBVowelKey, .slotBPunctuation:
-            return isPressed || isHighlighted ? ts.resolvedFunctionKeyBackground.opacity(0.7) : ts.resolvedFunctionKeyBackground
+            usesFunctionColor = true
         }
+        if usesFunctionColor {
+            return showsPressed ? key : function
+        }
+        return showsPressed ? function : key
     }
 
     private var themedTextColor: Color {

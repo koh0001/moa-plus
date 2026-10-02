@@ -23,12 +23,41 @@ struct NewFeaturesModalView: View {
         let features: [Feature]
     }
 
-    /// v2.2.5 — 다크 모드 버튼 색 + 테마 모드 설정 실제 적용(이슈 #30). 시스템 모드 사용자는
+    /// v2.2.5 — 한손 모드, iOS 18 지원(지구본 자동 표시), 세로 라인별 보정 끄기, 눌림 표시
+    /// (앱스토어 리뷰 5건) + 다크 모드 버튼 색·테마 모드 적용(이슈 #30). 시스템 모드 사용자는
     /// 업데이트만으로 다크 모드 키 색이 바뀌므로 되돌리는 경로를 적는다. v2.2.4 — 휘어 그은 획
     /// 오타 수정, 오타 후보 자동 표시(메일 제보). v2.2.3 — iOS 27 하단 키 반응 지연 수정, 6방향
     /// 프리셋(메일 제보 2건). v2.2.2 — 백스페이스 삭제 단위(앱스토어 리뷰). v2.2.1 — 복합모음 경로
     /// 옵션(이슈 #29). 이전 릴리스 항목들은 뒤에 남겨 둔다.
     private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "한 손으로도 편하게", features: [
+            Feature(
+                icon: "keyboard.onehanded.right",
+                tint: .blue,
+                title: "한손 모드",
+                detail: "설정 › 키보드 › 크기 · 전환 키 › 한손 모드에서 키보드를 왼쪽이나 오른쪽에 좁게 붙일 수 있습니다. 폭도 조절할 수 있습니다.\n\n키보드 빈쪽의 화살표로 반대쪽으로 옮기고, 네모 화살표로 전체 폭으로 돌아갑니다. 아이폰 세로 화면에서만 적용됩니다."
+            ),
+            Feature(
+                icon: "dial.low",
+                tint: .orange,
+                title: "세로 라인별 보정 끄기",
+                detail: "양끝 열의 긋기 각도 보정을 끌 수 있습니다. 설정 › 키보드 › 긋기 › 세로 라인별 제스처 보정에서 끄면 모든 열을 똑같이 판정합니다. 기본은 지금처럼 켜져 있습니다."
+            ),
+            Feature(
+                icon: "hand.tap.fill",
+                tint: .green,
+                title: "눌림 표시가 잘 보여요",
+                detail: "자음을 짧게 탭해도 키를 누른 표시가 분명하게 보입니다."
+            ),
+        ]),
+        FeatureGroup(title: "iOS 18 지원", features: [
+            Feature(
+                icon: "globe",
+                tint: .teal,
+                title: "iOS 18 · iPadOS 18",
+                detail: "iOS 18 과 iPadOS 18 에서도 쓸 수 있습니다. 아이패드와 홈 버튼이 있는 아이폰, iOS 18 아이폰에서는 기능 행 왼쪽에 지구본 키가 자동으로 나타나 다른 키보드로 전환할 수 있습니다."
+            ),
+        ]),
         FeatureGroup(title: "다크 모드에서 키도 어두워져요", features: [
             Feature(
                 icon: "moon.fill",

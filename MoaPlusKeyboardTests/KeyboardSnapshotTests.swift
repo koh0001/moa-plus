@@ -10,8 +10,9 @@ final class KeyboardSnapshotTests: XCTestCase {
     @MainActor
     private func snapshot(width: CGFloat, height: CGFloat,
                          override: (isPad: Bool, isLandscape: Bool),
-                         name: String) throws {
+                         name: String, showGlobe: Bool = false) throws {
         let vm = KeyboardViewModel()
+        vm.canSwitchInputMode = showGlobe
         let view = KeyboardView(viewModel: vm,
                                 gestureState: vm.gestureState,
                                 popupState: vm.popupState,
@@ -52,13 +53,8 @@ final class KeyboardSnapshotTests: XCTestCase {
     @MainActor
     private func phoneSnapshot(showGlobe: Bool, heightScale: Double, name: String) throws {
         let settings = KeyboardSettings.shared
-        let prevGlobe = settings.showGlobeKey
         let prevScale = settings.keyboardHeightScale
-        defer {
-            settings.showGlobeKey = prevGlobe
-            settings.keyboardHeightScale = prevScale
-        }
-        settings.showGlobeKey = showGlobe
+        defer { settings.keyboardHeightScale = prevScale }
         settings.keyboardHeightScale = heightScale
 
         let height = KeyboardMetrics.keyboardHeight(
@@ -66,7 +62,7 @@ final class KeyboardSnapshotTests: XCTestCase {
             scale: heightScale)
         try snapshot(width: 402, height: height,
                      override: (isPad: false, isLandscape: false),
-                     name: name)
+                     name: name, showGlobe: showGlobe)
     }
 
     /// 지구본 ON — 기능 행 맨 왼쪽에 지구본이 있고 ⏎ 가 잘리지 않아야 한다.
@@ -79,6 +75,32 @@ final class KeyboardSnapshotTests: XCTestCase {
     @MainActor
     func test_snapshot_iPhoneGlobeOff() throws {
         try phoneSnapshot(showGlobe: false, heightScale: 1.0, name: "iphone_globe_off.png")
+    }
+
+    /// 한손 모드 — 375pt(SE·mini, iOS 18 지원으로 범위에 들어옴) + 지구본 표시 + 최소 폭 비율이
+    /// 가장 좁은 조합이다. ⏎ 가 잘리지 않고 빈쪽에 띠가 있어야 한다.
+    @MainActor
+    private func oneHandedSnapshot(_ placement: KeyboardPlacement, name: String) throws {
+        let settings = KeyboardSettings.shared
+        let prev = (settings.keyboardPlacement, settings.oneHandedWidthRatio)
+        defer { settings.keyboardPlacement = prev.0; settings.oneHandedWidthRatio = prev.1 }
+        settings.keyboardPlacement = placement
+        settings.oneHandedWidthRatio = KeyboardPlacement.widthRatioRange.lowerBound
+        let height = KeyboardMetrics.keyboardHeight(
+            isPad: false, isLandscape: false, screenShort: 375, screenLong: 667, scale: 1.0)
+        try snapshot(width: 375, height: height,
+                     override: (isPad: false, isLandscape: false),
+                     name: name, showGlobe: true)
+    }
+
+    @MainActor
+    func test_snapshot_oneHandedLeft() throws {
+        try oneHandedSnapshot(.left, name: "iphone_onehanded_left.png")
+    }
+
+    @MainActor
+    func test_snapshot_oneHandedRight() throws {
+        try oneHandedSnapshot(.right, name: "iphone_onehanded_right.png")
     }
 
     /// 높이 배율 하한/상한에서의 실제 렌더. 키가 찌그러지거나 겹치지 않아야 한다.

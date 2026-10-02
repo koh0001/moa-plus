@@ -133,6 +133,12 @@ enum SettingsCatalog {
                        "스페이스", "띄어쓰기", "나가짐", "홈화면", "튕김", "제스처"]
         ),
         SettingsEntry(
+            title: "한손 모드 (키보드 위치)",
+            icon: "keyboard.onehanded.right",
+            destination: .size,
+            keywords: ["한손", "한 손", "한손모드", "왼쪽", "오른쪽", "축소", "작게", "좁게", "큰폰", "프로맥스"]
+        ),
+        SettingsEntry(
             title: "키보드 전환 (지구본) 키",
             icon: "globe",
             destination: .size,
@@ -278,7 +284,7 @@ enum SettingsCatalog {
         ),
         SettingsSymptom(
             symptom: "다른 키보드로 못 바꾸겠어요",
-            remedy: "키보드 전환(지구본) 키를 켜세요",
+            remedy: "최신 아이폰은 키보드 아래 지구본 바, 아이패드·홈 버튼 아이폰은 기능 행 왼쪽 지구본 키로 바꿉니다",
             icon: "globe",
             destination: .size
         ),

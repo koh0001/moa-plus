@@ -46,8 +46,12 @@ class KeyboardViewModel: ObservableObject {
     /// appearance — the user can enable a second keyboard in Settings while
     /// our extension process stays alive, and a value captured once at
     /// `viewDidLoad` would leave the globe key hidden until the process dies.
-    /// Defaults to `true` for the host app's settings preview.
-    @Published var canSwitchInputMode: Bool = true
+    ///
+    /// 이 값이 곧 지구본 키 표시 여부다(설정 토글 없음). iOS 가 지구본을 요구하는
+    /// 기기(아이패드·홈 버튼 아이폰·구버전 iOS)에서 끄면 키보드를 바꿀 수단이 사라지고,
+    /// 요구하지 않는 기기(iOS 26 아이폰 — 시스템이 지구본 바를 그림)에서 켜면 중복이다.
+    /// 기본 `false`: 호스트 앱 미리보기는 `KeyboardPreviewView` 가 기기로 추정해 넣는다.
+    @Published var canSwitchInputMode: Bool = false
 
     /// 익스텐션 입력 뷰가 실제로 보고한 하단 안전영역(pt).
     ///

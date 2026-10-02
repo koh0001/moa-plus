@@ -43,10 +43,11 @@ final class GlobeKeySwitchTests: XCTestCase {
         XCTAssertEqual(delegate.composingUpdates.last?.current, "ㄴ")
     }
 
-    /// 뷰모델 기본값은 호스트 앱 미리보기용 true. 익스텐션에서는
-    /// `KeyboardViewController` 가 `needsInputModeSwitchKey` 로 덮어쓴다.
-    func test_canSwitchInputMode_defaultsTrueForHostPreview() {
-        XCTAssertTrue(KeyboardViewModel().canSwitchInputMode)
+    /// 이 값이 곧 지구본 표시 여부라 기본은 false(표시 안 함). 익스텐션에서는
+    /// `KeyboardViewController` 가 `needsInputModeSwitchKey` 로, 호스트 앱 미리보기는
+    /// `KeyboardPreviewView` 가 기기 추정으로 덮어쓴다.
+    func test_canSwitchInputMode_defaultsFalse() {
+        XCTAssertFalse(KeyboardViewModel().canSwitchInputMode)
     }
 }
 

@@ -32,6 +32,7 @@ FILES_TO_ADD = [
   'Models/SwipeProfile.swift',
   'Models/ColumnGestureOverride.swift',
   'Models/KeyboardMode.swift',
+  'Models/KeyboardPlacement.swift',
   'Utilities/HangulConstants.swift',
   'Utilities/KeyboardMetrics.swift',
   'Utilities/GestureSettings.swift',
