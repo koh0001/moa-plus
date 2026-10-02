@@ -163,6 +163,13 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   **입력 메서드(`inputConsonant`/`inputSpace`/`toggleLetterMode` 등)에 햅틱을 되살리지 말 것**
   — 키 하나에 진동 두 번이 된다 (`KeyboardViewModelHapticTimingTests` 가드).
   백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함)
+- **라이트/다크 (이슈 #30)**: 밝은 버튼 프리셋(기본 그레이·블루 포인트·베이지)은 `presetDark*` 짝을 가진
+  **동적 색**(`UIColor { traits in }`)이라 trait 만 바뀌면 스스로 바뀐다 — 색 캐시 재계산 불필요.
+  동적 색은 프리셋별 `static` 팔레트로 **한 번만** 만든다(매번 새로 만들면 `Color` 비교가 달라져
+  `KeyboardSettingsCacheTests` 가 깨진다). 어두운 프리셋·커스텀은 모드 무관. 설정의 테마 모드는
+  `KeyboardViewController.applyAppearanceMode()` 가 **컨트롤러**의 `overrideUserInterfaceStyle` 에
+  건다(자식 호스팅 VC 는 trait 를 부모 VC 에서 받으므로 뷰에 걸면 안 닿을 수 있음). v2.2.4 까지 이 설정은
+  저장만 되고 키보드에 적용되지 않았다 (`ThemeDarkModeTests`)
 - 클릭 사운드는 `AudioServicesPlaySystemSound(1104)` 사용 (`playInputClick`은 익스텐션에서 불안정)
 - **전체 접근 허용(Full Access)이 꺼지면 햅틱만이 아니라 App Group 자체가 막힌다.** Apple
   Extensibility Guide Table 8-1: open access OFF = "No shared container with containing app".

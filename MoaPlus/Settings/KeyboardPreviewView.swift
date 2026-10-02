@@ -96,6 +96,10 @@ struct KeyboardPreviewView: View {
         // except the slot B vowel gesture. Otherwise (legacy callers like
         // Appearance settings) all touches are blocked outright.
         .allowsHitTesting(isInteractive)
+        // 실제 키보드처럼 테마 모드(라이트/다크 강제)를 따른다. 시스템이면 앱 화면을 따른다.
+        .transformEnvironment(\.colorScheme) { scheme in
+            if let forced = settings.themeSettings.appearanceMode.colorScheme { scheme = forced }
+        }
         .onAppear { applyConfiguration() }
         .onChange(of: isInteractive) { _, _ in applyConfiguration() }
     }
