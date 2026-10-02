@@ -62,7 +62,6 @@ struct KeyboardSettingsView: View {
             deviceInset: DeviceSafeArea.bottomInset,
             extra: settings.keyboardExtraBottomInset)
         if inset > 0 { parts.append("여백 \(Int(inset))pt") }
-        if settings.showGlobeKey { parts.append("지구본") }
         return parts.joined(separator: " · ")
     }
 

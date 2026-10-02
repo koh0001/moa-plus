@@ -87,7 +87,7 @@ struct KeyboardView: View {
             symbolPage: viewModel.symbolPage,
             onSymbolPagePressed: { viewModel.toggleSymbolPage() },
             onLanguageSwitchPressed: { viewModel.switchKeyboard() },
-            showGlobeKey: settings.showGlobeKey && viewModel.canSwitchInputMode,
+            showGlobeKey: viewModel.canSwitchInputMode,
             layoutCustomization: settings.layoutCustomization,
             onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
             onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },

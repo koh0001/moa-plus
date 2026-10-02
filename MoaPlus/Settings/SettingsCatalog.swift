@@ -278,7 +278,7 @@ enum SettingsCatalog {
         ),
         SettingsSymptom(
             symptom: "다른 키보드로 못 바꾸겠어요",
-            remedy: "키보드 전환(지구본) 키를 켜세요",
+            remedy: "최신 아이폰은 키보드 아래 지구본 바, 아이패드·홈 버튼 아이폰은 기능 행 왼쪽 지구본 키로 바꿉니다",
             icon: "globe",
             destination: .size
         ),

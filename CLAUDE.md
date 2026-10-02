@@ -105,6 +105,9 @@ moa-plus/
 
 ## 빌드 및 테스트
 
+최소 지원: **iOS 18.0** (v2.2.6 에서 26.0 → 18.0, 앱스토어 리뷰 요청). 18 이상이 필요한 API 는 쓰지 않는다 —
+새 API 를 쓸 땐 `#available` 가드 또는 18 호환 대안을 쓸 것. iOS 18 실기기 키보드 동작은 미검증
+
 ```bash
 # Xcode에서 열기
 open MoaPlus.xcodeproj
@@ -284,8 +287,13 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 
 ### Function Row
 `[🌐] [123/한글] [한/영] [space (drag→커서)] [긋기 펑크] [⏎]`
-- 지구본(🌐): **iOS 26 아이폰에서는 시스템이 키보드 아래에 지구본 바를 직접 그려 `needsInputModeSwitchKey == false` → 우리 지구본 미표시**(중복 방지, 시뮬레이터 실측). 구버전 iOS/아이패드 등 `true` 인 환경에서만 나타남
-- `showGlobeKey && viewModel.canSwitchInputMode` 일 때만 렌더 → `KeyboardViewModel.switchKeyboard()` → `advanceToNextInputMode()`. `needsInputModeSwitchKey`는 익스텐션만 읽을 수 있어 `KeyboardViewController`가 `viewDidLoad` + **`viewWillAppear` 매회** `viewModel.canSwitchInputMode`에 밀어넣는다(세션 중 키보드 추가 반영, 호스트 앱 미리보기 기본 true). 1회만 캡처하면 익스텐션 프로세스가 살아있는 동안 갱신 안 됨
+- 지구본(🌐): **설정 토글 없이 `viewModel.canSwitchInputMode`(= iOS `needsInputModeSwitchKey`)만으로 표시**
+  (v2.2.6, 리뷰 대응으로 최소 iOS 18 하향과 함께). iOS 26 아이폰은 시스템이 키보드 아래에 지구본 바를 그려
+  `false` → 미표시(중복 방지). 아이패드·홈 버튼 아이폰·구버전 iOS 는 `true` → 항상 표시 — 예전 기본 OFF 토글은
+  이 사용자들에게 키보드 전환 수단을 빼앗았다. `showGlobeKey` 저장 키는 호환용으로만 남음(렌더 미사용).
+  `canSwitchInputMode` 기본 `false`, 익스텐션은 `KeyboardViewController` 가 `viewDidLoad` + **`viewWillAppear` 매회**
+  밀어넣고(세션 중 변화 반영), 호스트 앱 미리보기는 `DeviceSafeArea.likelyNeedsGlobeKey`(아이패드 또는 앱 창
+  하단 안전영역 0) 추정. 탭 → `KeyboardViewModel.switchKeyboard()` → `advanceToNextInputMode()`
 - 기능행 4개 바디(default/longSpace/symbol/bimanual) 모두 자식 폭 합 == `effectiveTotalWidth` 여야 ⏎ 가 안 잘림. 자식 추가 시 간격 수도 함께 증가 — 지구본은 `globeReservedWidth`(폭+간격)를 **스페이스바에서만** 차감. 불변식은 `FunctionRowWidthTests` 가드
 - 긋기 펑크: tap=`.`, ←=`?`, →=`!`, ↑=`,`, ↓=`.`
 - Space 드래그: 8pt 임계값, 12pt/step → `moveCursor(by:)` (commitCurrent + abbreviation reset 후 proxy 커서 이동)
@@ -439,7 +447,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── keyboardHeightScale: Double             (0.85~1.35, 기본 1.0 — 기기 기본 높이에 곱함)
 ├── keyboardAutoBottomInsetEnabled: Bool    (홈 인디케이터 구역 자동 회피, 기본 ON)
 ├── keyboardExtraBottomInset: Double        (자동 여백 위에 더할 추가 여백 0~34pt, 기본 0)
-├── showGlobeKey: Bool                      (기능행 지구본 키, 기본 OFF)
+├── showGlobeKey: Bool                      (v2.2.6 부터 렌더 미사용 — 지구본은 needsInputModeSwitchKey 로 자동)
 ├── consonantDiagonalDerivationEnabled: Bool (자음 대각선 진입 파생, 기본 OFF=순정 모아키)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)
 ├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)

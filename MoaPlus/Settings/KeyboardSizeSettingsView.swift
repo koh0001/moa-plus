@@ -121,11 +121,11 @@ struct KeyboardSizeSettingsView: View {
             }
 
             Section {
-                Toggle("키보드 전환 키 표시", isOn: $settings.showGlobeKey)
+                Text("아이패드와 홈 버튼이 있는 아이폰에서는 기능 행 맨 왼쪽에 지구본 키가 자동으로 나타나 다른 키보드로 전환할 수 있습니다. 스페이스바는 그만큼 좁아집니다.\n\n최신 iOS 아이폰은 시스템이 키보드 아래에 지구본 바를 직접 표시하므로 지구본 키가 따로 나타나지 않습니다.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
             } header: {
                 Text("키보드 전환")
-            } footer: {
-                Text("켜면 기능 행 맨 왼쪽에 지구본 키가 생겨 애플 기본 키보드 등 다른 키보드로 바로 전환합니다. 스페이스바는 그만큼 좁아집니다.\n\n최신 iOS(26 이상) 아이폰은 시스템이 키보드 아래에 지구본 바를 직접 표시하므로, 켜도 지구본이 중복으로 나타나지는 않습니다. 설치된 키보드가 모아+ 하나뿐일 때도 전환할 대상이 없어 표시되지 않습니다.")
             }
         }
         .navigationTitle("크기 · 전환 키")

@@ -10,8 +10,9 @@ final class KeyboardSnapshotTests: XCTestCase {
     @MainActor
     private func snapshot(width: CGFloat, height: CGFloat,
                          override: (isPad: Bool, isLandscape: Bool),
-                         name: String) throws {
+                         name: String, showGlobe: Bool = false) throws {
         let vm = KeyboardViewModel()
+        vm.canSwitchInputMode = showGlobe
         let view = KeyboardView(viewModel: vm,
                                 gestureState: vm.gestureState,
                                 popupState: vm.popupState,
@@ -52,13 +53,8 @@ final class KeyboardSnapshotTests: XCTestCase {
     @MainActor
     private func phoneSnapshot(showGlobe: Bool, heightScale: Double, name: String) throws {
         let settings = KeyboardSettings.shared
-        let prevGlobe = settings.showGlobeKey
         let prevScale = settings.keyboardHeightScale
-        defer {
-            settings.showGlobeKey = prevGlobe
-            settings.keyboardHeightScale = prevScale
-        }
-        settings.showGlobeKey = showGlobe
+        defer { settings.keyboardHeightScale = prevScale }
         settings.keyboardHeightScale = heightScale
 
         let height = KeyboardMetrics.keyboardHeight(
@@ -66,7 +62,7 @@ final class KeyboardSnapshotTests: XCTestCase {
             scale: heightScale)
         try snapshot(width: 402, height: height,
                      override: (isPad: false, isLandscape: false),
-                     name: name)
+                     name: name, showGlobe: showGlobe)
     }
 
     /// 지구본 ON — 기능 행 맨 왼쪽에 지구본이 있고 ⏎ 가 잘리지 않아야 한다.

@@ -32,6 +32,13 @@ enum DeviceSafeArea {
             screenLong: max(bounds.width, bounds.height))
     }
 
+    /// 이 기기에서 키보드가 지구본 키를 직접 그려야 할 가능성(미리보기 전용 추정).
+    /// 아이패드와 홈 버튼 아이폰(앱 창 하단 안전영역 0)은 iOS 가 지구본 바를 그려 주지 않는다.
+    /// 실제 키보드는 `needsInputModeSwitchKey` 를 읽으므로 이 추정을 쓰지 않는다.
+    static var likelyNeedsGlobeKey: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad || (keyWindowBottomInset ?? 0) == 0
+    }
+
     /// 익스텐션이 실측값을 남긴 적이 있는지. 설정 화면이 "아직 모름"과
     /// "0 으로 확인됨"을 구분해 안내하는 데 쓴다.
     static var hasKeyboardMeasurement: Bool {

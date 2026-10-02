@@ -225,14 +225,10 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(keyboardExtraBottomInset, forKey: Keys.keyboardExtraBottomInset) }
     }
 
-    /// Show the system keyboard-switch (globe) key in the function row.
-    /// Only rendered when iOS also reports `needsInputModeSwitchKey`, so it
-    /// can never ship as a dead button when there is nothing to switch to.
-    ///
-    /// 기본 **OFF**. iOS 26 아이폰은 서드파티 키보드 아래에 지구본 바를 시스템이
-    /// 직접 그려주므로(`needsInputModeSwitchKey == false`) 대부분의 사용자에게는
-    /// 어차피 보이지 않고, ON 이면 기능 행에 키가 하나 늘어 스페이스바만 좁아진다.
-    /// 지구본이 필요한 환경(구버전 iOS·아이패드)에서 설정으로 켜는 방식.
+    /// **v2.2.6 부터 렌더에 쓰지 않는다.** 지구본 표시는 `KeyboardViewModel.canSwitchInputMode`
+    /// (= iOS `needsInputModeSwitchKey`)만으로 정한다 — 기본 OFF 였던 탓에 지구본이 필요한
+    /// 아이패드·홈 버튼 아이폰 사용자가 키보드를 바꿀 수단이 없었다. 저장 키는 기존
+    /// 설치와의 호환을 위해 남겨 둔다.
     @Published var showGlobeKey: Bool = false {
         didSet { guard !isLoading else { return }; writePrimitive(showGlobeKey, forKey: Keys.showGlobeKey) }
     }

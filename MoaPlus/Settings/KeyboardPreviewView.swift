@@ -114,5 +114,8 @@ struct KeyboardPreviewView: View {
         // 익스텐션이 없는 메인 앱에서는 아무도 실측 안전영역을 밀어넣지 않는다.
         // 앱 창의 값을 대신 넣어 미리보기가 실제 키보드와 같은 여백을 그리게 한다.
         viewModel.bottomSafeAreaInset = DeviceSafeArea.bottomInset
+        // 실제 키보드의 지구본 표시는 익스텐션만 읽을 수 있는 `needsInputModeSwitchKey` 가
+        // 정한다. 미리보기는 기기로 추정한다.
+        viewModel.canSwitchInputMode = DeviceSafeArea.likelyNeedsGlobeKey
     }
 }
