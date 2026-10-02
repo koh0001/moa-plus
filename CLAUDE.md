@@ -170,6 +170,13 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   `KeyboardViewController.applyAppearanceMode()` 가 **컨트롤러**의 `overrideUserInterfaceStyle` 에
   건다(자식 호스팅 VC 는 trait 를 부모 VC 에서 받으므로 뷰에 걸면 안 닿을 수 있음). v2.2.4 까지 이 설정은
   저장만 되고 키보드에 적용되지 않았다 (`ThemeDarkModeTests`)
+- **키 눌림 표시 (리뷰 2026-09-28)**: 눌린 키는 투명도가 아니라 **반대쪽 키 색**(일반 키 → 기능키 색,
+  기능키 → 일반 키 색)으로 바뀐다. 투명도만 낮추면 뒤 배경 `systemGray6` 이 키 색과 거의 같아 티가 안 난다.
+  짧은 탭은 `KeyView.pressLinger` 로 뗀 뒤 0.08초 더 남긴다 — 연타 간격(~100ms)보다 길게 늘리지 말 것
+- **세로 라인별 보정 끄기 (리뷰 2026-09-16)**: `GestureSettings.columnCorrectionEnabled` = false 면 모든 열이
+  중립값(회전 0°). 열별 `ColumnGestureOverride.isEnabled = false` 는 "기본 보정으로 복귀" 라 끄는 수단이
+  아니다. 분석기는 열 보정을 `GestureSettings` 조회 함수로만 읽으므로 새 조회를 추가할 때도
+  `columnOverride(forColumn:)` 를 거칠 것 (`ColumnCorrectionToggleTests`)
 - 클릭 사운드는 `AudioServicesPlaySystemSound(1104)` 사용 (`playInputClick`은 익스텐션에서 불안정)
 - **전체 접근 허용(Full Access)이 꺼지면 햅틱만이 아니라 App Group 자체가 막힌다.** Apple
   Extensibility Guide Table 8-1: open access OFF = "No shared container with containing app".
@@ -411,7 +418,7 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 ### 설정 시스템
 ```
 KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
-├── gestureSettings: GestureSettings        (프로필 + 열별 보정 + compoundVowelPath: 직각+세로왕복(기본)/세로왕복만)
+├── gestureSettings: GestureSettings        (프로필 + 열별 보정 + columnCorrectionEnabled(기본 ON) + compoundVowelPath: 직각+세로왕복(기본)/세로왕복만)
 ├── themeSettings: ThemeSettings            (테마/투명도/햅틱)
 │   └── resolvedKeyBackground/KeyText/FunctionKeyBackground (커스텀 vs 프리셋)
 ├── secondaryKeyActions: [SecondaryKeyAction]  (한글 자음 19키 + 영문 숫자 10키)

@@ -46,13 +46,19 @@ struct GestureSettings: Codable, Equatable {
     /// ㅘ·ㅝ 복합모음 경로. 기본은 직각 꺾기 + 세로 왕복(현재 동작). `CompoundVowelPath` 참고.
     var compoundVowelPath: CompoundVowelPath = .rightAngleAndVertical
 
+    /// 세로 라인별 보정(끝열 회전·섹터 확장·거리 배율) 전체 스위치. 기본 ON(현재 동작).
+    /// 끄면 모든 열이 가운데 열과 같은 판정을 쓴다 — 순정(갤럭시) 모아키에는 열별 보정이
+    /// 없어 끝열 오타를 겪는 사용자 요청(앱스토어 리뷰 2026-09-16 "회전 보정을 끄는 방법").
+    /// `ColumnGestureOverride.isEnabled = false` 는 "기본 보정으로 복귀" 라 끄는 수단이 아니다.
+    var columnCorrectionEnabled: Bool = true
+
     /// Get effective swipe threshold for a specific column. `keyWidth`
     /// must be the live center-key width measured by the view layer so
     /// the same swipeLength preset behaves consistently across iPhone
     /// SE through Pro Max (and iPad).
     func effectiveSwipeThreshold(forColumn columnId: Int, keyWidth: CGFloat) -> CGFloat {
         let baseThreshold = swipeProfile.swipeLength.threshold(keyWidth: keyWidth)
-        let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
+        let override = columnOverride(forColumn: columnId)
         return baseThreshold * CGFloat(override.outwardDistanceMultiplier)
     }
 
@@ -75,27 +81,33 @@ struct GestureSettings: Codable, Equatable {
     /// a non-zero `directionChangeThresholdDelta` to be stricter or
     /// looser about second-stroke registration.
     func effectiveDirectionChangeThreshold(forColumn columnId: Int) -> CGFloat {
-        let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
+        let override = columnOverride(forColumn: columnId)
         let adjusted = directionChangeThreshold + CGFloat(override.directionChangeThresholdDelta)
         return max(0, adjusted)
     }
 
     /// Get effective rotation offset for a specific column
     func effectiveRotationOffset(forColumn columnId: Int) -> Double {
-        let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
+        let override = columnOverride(forColumn: columnId)
         return override.rotationOffsetDeg
     }
 
     /// Get ㅣ sector width delta for a specific column
     func verticalIWidthDelta(forColumn columnId: Int) -> Double {
-        let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
+        let override = columnOverride(forColumn: columnId)
         return override.verticalIWidthDelta
     }
 
     /// Get ㅡ sector width delta for a specific column
     func horizontalEuWidthDelta(forColumn columnId: Int) -> Double {
-        let override = ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
+        let override = columnOverride(forColumn: columnId)
         return override.horizontalEuWidthDelta
+    }
+
+    /// 열별 보정 조회. 보정을 끈 경우 모든 열에 중립값(회전 0°, 확장 0, 배율 1)을 돌려준다.
+    private func columnOverride(forColumn columnId: Int) -> ColumnGestureOverride {
+        guard columnCorrectionEnabled else { return ColumnGestureOverride(columnId: columnId) }
+        return ColumnGestureOverride.override(forColumn: columnId, from: columnOverrides)
     }
 
     static let `default` = GestureSettings()
@@ -111,7 +123,7 @@ extension GestureSettings {
     private enum CodingKeys: String, CodingKey {
         case swipeProfile, columnOverrides, directionChangeThreshold
         case reversalThresholdRatio, multiStrokeTurnSensitivity
-        case compoundVowelPath
+        case compoundVowelPath, columnCorrectionEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -127,5 +139,6 @@ extension GestureSettings {
         reversalThresholdRatio = (storedReversal == nil || storedReversal == 0.5) ? 0.70 : storedReversal!
         multiStrokeTurnSensitivity = try c.decodeIfPresent(Int.self, forKey: .multiStrokeTurnSensitivity) ?? 0
         compoundVowelPath = try c.decodeIfPresent(CompoundVowelPath.self, forKey: .compoundVowelPath) ?? .rightAngleAndVertical
+        columnCorrectionEnabled = try c.decodeIfPresent(Bool.self, forKey: .columnCorrectionEnabled) ?? true
     }
 }

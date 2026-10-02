@@ -192,6 +192,7 @@ struct GestureSettingsView: View {
 
             // Column correction (advanced)
             Section {
+                Toggle("세로 라인별 보정 사용", isOn: $settings.gestureSettings.columnCorrectionEnabled)
                 ForEach(0..<5, id: \.self) { index in
                     let columnId = index + 1
                     NavigationLink(destination: ColumnCorrectionDetailView(columnId: columnId)) {
@@ -204,11 +205,12 @@ struct GestureSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .disabled(!settings.gestureSettings.columnCorrectionEnabled)
                 }
             } header: {
                 Text("세로 라인별 제스처 보정")
             } footer: {
-                Text("고급 설정: 끝열에서 바깥쪽 긋기가 잘 안 되는 경우 보정값을 조정할 수 있습니다.")
+                Text("기본으로 가운데 열을 뺀 나머지 열은 긋기 각도를 바깥쪽 기준으로 2~3° 회전해 판정합니다. 순정(갤럭시) 모아키처럼 모든 열을 똑같이 판정하려면 끄세요. 켠 상태에서는 열마다 보정값을 조정할 수 있습니다.")
             }
             // Gesture preview toggle
             Section {
