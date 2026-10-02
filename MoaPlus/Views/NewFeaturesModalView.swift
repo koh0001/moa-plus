@@ -41,7 +41,7 @@ struct NewFeaturesModalView: View {
                 icon: "dial.low",
                 tint: .orange,
                 title: "세로 라인별 보정 끄기",
-                detail: "양끝 열의 긋기 각도 보정을 끌 수 있습니다. 설정 › 키보드 › 긋기 › 세로 라인별 제스처 보정에서 끄면 모든 열을 똑같이 판정합니다. 기본은 지금처럼 켜져 있습니다."
+                detail: "양끝 열의 긋기 각도 보정을 끌 수 있습니다. 설정 › 키보드 › 제스처 (긋기) › 세로 라인별 제스처 보정에서 끄면 모든 열을 똑같이 판정합니다. 기본은 지금처럼 켜져 있습니다."
             ),
             Feature(
                 icon: "hand.tap.fill",
