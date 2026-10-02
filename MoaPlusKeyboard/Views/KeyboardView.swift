@@ -133,38 +133,53 @@ struct KeyboardView: View {
     }
 
     /// 한손 모드의 빈쪽 띠: 반대쪽으로 옮기기 + 전체 폭으로 돌아가기 (순정 키보드와 같은 구성).
+    ///
+    /// 아이콘은 **기능키 모양 버튼 위에** 그린다. 키보드 배경 위에 키 글자색만 쓰면 글자색이 흰
+    /// 테마(다크 차콜·네이비)나 배경 이미지에서 밝은 배경에 묻힌다(실기기 확인). 기능키 배경 +
+    /// 키 글자색은 테마가 짝지어 둔 조합이라 어떤 테마에서도 대비가 보장된다.
     private func oneHandedStrip(side: KeyboardPlacement) -> some View {
         let bottomInset = KeyboardMetrics.resolvedBottomInset(
             autoEnabled: settings.keyboardAutoBottomInsetEnabled,
             deviceInset: viewModel.bottomSafeAreaInset,
             extra: settings.keyboardExtraBottomInset)
-        let color = settings.resolvedKeyText.opacity(0.6)
-        return VStack(spacing: 28) {
-            Button {
-                viewModel.keyPressFeedback()
+        return VStack(spacing: 20) {
+            oneHandedButton(
+                systemName: side == .left ? "chevron.right" : "chevron.left",
+                size: 20,
+                label: side == .left ? "키보드를 오른쪽으로" : "키보드를 왼쪽으로"
+            ) {
                 settings.keyboardPlacement = side == .left ? .right : .left
-            } label: {
-                Image(systemName: side == .left ? "chevron.right" : "chevron.left")
-                    .font(.system(size: 22, weight: .medium))
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .contentShape(Rectangle())
             }
-            .accessibilityLabel(side == .left ? "키보드를 오른쪽으로" : "키보드를 왼쪽으로")
-            Button {
-                viewModel.keyPressFeedback()
+            oneHandedButton(systemName: "arrow.up.left.and.arrow.down.right",
+                            size: 17, label: "키보드 전체 폭") {
                 settings.keyboardPlacement = .full
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 18, weight: .medium))
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .contentShape(Rectangle())
             }
-            .accessibilityLabel("키보드 전체 폭")
         }
-        .foregroundColor(color)
-        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, bottomInset)
+    }
+
+    private func oneHandedButton(systemName: String, size: CGFloat, label: String,
+                                 action: @escaping () -> Void) -> some View {
+        Button {
+            viewModel.keyPressFeedback()
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundColor(settings.resolvedKeyText)
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: KeyboardMetrics.keyCornerRadius)
+                        .fill(settings.resolvedFunctionKeyBackground)
+                        .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
+                )
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private func keyboardContent(drawsBackground: Bool) -> some View {
