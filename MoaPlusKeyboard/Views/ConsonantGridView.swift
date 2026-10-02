@@ -19,14 +19,15 @@ struct KeyGridView: View {
     let onLongPressNumber: (String) -> Void
     var onShiftLongPress: (() -> Void)? = nil
     let onGestureStart: (Int, Int, CGPoint) -> Void
-    let onGestureMove: (CGPoint) -> Void
+    /// (row, column, point) — 키 위치를 함께 넘겨야 뷰모델이 롤오버로 먼저 확정한 키의 늦은 이동을 버린다.
+    let onGestureMove: (Int, Int, CGPoint) -> Void
     let onGestureEnd: (Int, Int) -> Void
     var onPopupDrag: ((CGFloat) -> Void)?
     var onPopupRelease: (() -> Void)?
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureEnd: (() -> Void)? = nil
-    var onGestureCancel: (() -> Void)? = nil
+    var onGestureCancel: ((Int, Int) -> Void)? = nil
     let onPunctuationSlot: (String) -> Void
 
     /// Returns the rendered width for a single cell, accounting for .backspaceWide.
@@ -193,7 +194,7 @@ struct KeyGridView: View {
                                 onGestureStart(row, column, point)
                             },
                             onGestureMove: { point in
-                                onGestureMove(point)
+                                onGestureMove(row, column, point)
                             },
                             onGestureEnd: {
                                 onGestureEnd(row, column)
@@ -205,7 +206,7 @@ struct KeyGridView: View {
                                 onPopupRelease?()
                             },
                             onShiftLongPress: onShiftLongPress,
-                            onGestureCancel: onGestureCancel
+                            onGestureCancel: { onGestureCancel?(row, column) }
                         )
                         }   // close else branch (slot B intercept)
                     }

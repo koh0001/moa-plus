@@ -48,14 +48,14 @@ struct KeyboardView: View {
             onLongPressNumber: { viewModel.inputLongPressNumber($0) },
             onShiftLongPress: { viewModel.lockShift() },
             onGestureStart: { row, column, point in viewModel.gestureStarted(row: row, column: column, at: point) },
-            onGestureMove: { viewModel.gestureMoved(to: $0) },
+            onGestureMove: { row, column, point in viewModel.gestureMoved(row: row, column: column, to: point) },
             onGestureEnd: { row, column in viewModel.gestureEnded(row: row, column: column) },
             onPopupDrag: { viewModel.updatePopupSelection(translationX: $0) },
             onPopupRelease: { viewModel.confirmPopupSelection() },
             onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
             onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },
             onSlotBVowelGestureEnd: { viewModel.slotBVowelGestureEnded() },
-            onGestureCancel: { viewModel.resetGestureState() },
+            onGestureCancel: { row, column in viewModel.cancelGesture(row: row, column: column) },
             onPunctuationSlot: { viewModel.inputSymbol($0, bypassAutoBracket: true) }
         )
     }

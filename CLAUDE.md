@@ -300,6 +300,15 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
 - 심볼 모드 전용 행: `[한글/ABC] [한/영] [#+= / 123] [space] [⏎]` — 페이지 토글이 **스페이스 왼쪽**(구 슬롯 B 위치), 긋기 펑크 대신 렌더
 
+### 두 엄지 롤오버 (v2.2.5 build 29 / 이슈 #31·#32)
+뷰모델의 긋기 상태(`activeKey`·`gestureAnalyzer`)는 **하나뿐**이다. 앞 키를 떼기 전에 다른 그리드 키가 눌리면
+`gestureStarted` 가 `supersedeActiveGesture` 로 앞 키를 **그때까지의 자기 획**으로 먼저 확정하고 `supersededKeys`
+에 넣는다. 그 키의 늦은 `gestureMoved(row:column:to:)`·`gestureEnded`·`cancelGesture` 는 버린다. 그래서 그리드는
+이동·취소에도 **(row, column) 을 넘겨야** 한다 — 위치 없는 `gestureMoved(to:)` 를 그리드에서 다시 쓰면 제보
+"는 → 너ㅡㄴ"(앞 키 손가락 흔들림이 새 키 위치에서 시작한 ←225pt 긋기로 읽힘)가 되살아난다.
+롱프레스 팝업이 떠 있던 앞 키는 확정하지 않고 리셋. 슬롯 B(`activeKey.row == -1`)는 별도 파이프라인이라 제외.
+가드 `KeyboardViewModelRolloverTests` (수정을 끄면 "너ㅡㄴ"/"네" 재현)
+
 ### 한손 모드 (v2.2.5 / 앱스토어 리뷰)
 `KeyboardSettings.keyboardPlacement`(`.full` 기본/`.left`/`.right`) + `oneHandedWidthRatio`(0.70~0.90, 기본 0.82).
 - `KeyboardView.body` 가 바깥 `GeometryReader` 에서 **전체 폭 기준**으로 아이폰 세로인지 판정하고, 본체

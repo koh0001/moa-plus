@@ -995,7 +995,37 @@ class KeyboardViewModel: ObservableObject {
     /// 다른 입력(키·스페이스·기호·엔터·커서 이동)이 오면 지운다.
     private(set) var typoMarkPending = false
 
+    /// 롤오버로 먼저 확정한 키들. 그 키 손가락이 뒤늦게 보내는 move/end/cancel 은 무시한다.
+    /// 배열인 이유: 세 손가락 이상이 겹칠 수도 있다(드물다).
+    private var supersededKeys: [(row: Int, column: Int)] = []
+
+    private func isSuperseded(row: Int, column: Int) -> Bool {
+        supersededKeys.contains { $0.row == row && $0.column == column }
+    }
+
+    /// 두 엄지 롤오버 (이슈 #31/#32): 앞 키를 떼기 전에 다른 그리드 키가 눌리면, 앞 키를
+    /// **그때까지 자기 손가락이 그은 만큼**으로 먼저 확정하고 그 손가락의 이후 신호는 버린다.
+    ///
+    /// 이 처리가 없으면 긋기 상태가 하나뿐이라 새 키가 상태를 덮어쓰고, 아직 눌린 앞 키
+    /// 손가락의 미세한 흔들림이 새 키 위치에서 시작한 긋기로 들어가 키 몇 개 거리의 긴
+    /// 긋기가 된다 — 제보 로그 `[ㄴ] raw ←225(178°) ⇒ ㅓ`, "는" → "너ㅡㄴ".
+    /// 슬롯 B 모음 키(`activeKey.row == -1`)는 자체 파이프라인이라 건드리지 않는다.
+    private func supersedeActiveGesture(byRow row: Int, column: Int) {
+        guard let prev = activeKey, prev.row >= 0,
+              !(prev.row == row && prev.column == column) else { return }
+        if popupState.text != nil {
+            // 롱프레스 팝업을 띄운 채 다른 키를 누른 경우 — 팝업 후보를 고른 게 아니므로 확정하지 않는다.
+            resetGestureState()
+        } else {
+            gestureEnded(row: prev.row, column: prev.column)
+        }
+        supersededKeys.append(prev)
+    }
+
     func gestureStarted(row: Int, column: Int, at point: CGPoint) {
+        // 같은 키를 다시 누르면 지난 롤오버 기록은 의미가 없다(그 손가락은 이미 뗐다).
+        supersededKeys.removeAll { $0.row == row && $0.column == column }
+        supersedeActiveGesture(byRow: row, column: column)
         typoMarkPending = false
         keyPressFeedback()
         didHandleLongPressNumberInCurrentGesture = false
@@ -1059,6 +1089,22 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
+    /// 키별 이동. 롤오버로 먼저 확정한 키의 손가락 이동은 버린다.
+    func gestureMoved(row: Int, column: Int, to point: CGPoint) {
+        guard !isSuperseded(row: row, column: column) else { return }
+        gestureMoved(to: point)
+    }
+
+    /// 입력 확정 없이 진행 중인 긋기를 걷는다 (EarlyTouch 미처리 뗌). 롤오버로 먼저 확정한
+    /// 키의 늦은 취소는 새 키의 긋기를 지우면 안 되므로 버린다.
+    func cancelGesture(row: Int, column: Int) {
+        if let i = supersededKeys.firstIndex(where: { $0.row == row && $0.column == column }) {
+            supersededKeys.remove(at: i)
+            return
+        }
+        resetGestureState()
+    }
+
     func gestureMoved(to point: CGPoint) {
         gestureAnalyzer.addPoint(point)
         let directions = gestureAnalyzer.getDirections()
@@ -1101,6 +1147,11 @@ class KeyboardViewModel: ObservableObject {
     }
 
     func gestureEnded(row: Int, column: Int) {
+        // 롤오버로 이미 확정한 키의 실제 뗌 — 두 번 입력하지 않는다.
+        if let i = supersededKeys.firstIndex(where: { $0.row == row && $0.column == column }) {
+            supersededKeys.remove(at: i)
+            return
+        }
         if didHandleLongPressNumberInCurrentGesture {
             didHandleLongPressNumberInCurrentGesture = false
             resetGestureState()

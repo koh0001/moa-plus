@@ -23,13 +23,21 @@ struct NewFeaturesModalView: View {
         let features: [Feature]
     }
 
-    /// v2.2.5 — 한손 모드, iOS 18 지원(지구본 자동 표시), 세로 라인별 보정 끄기, 눌림 표시
+    /// v2.2.5 — 두 엄지 롤오버 오타(이슈 #31·#32), 한손 모드, iOS 18 지원(지구본 자동 표시), 세로 라인별 보정 끄기, 눌림 표시
     /// (앱스토어 리뷰 5건) + 다크 모드 버튼 색·테마 모드 적용(이슈 #30). 시스템 모드 사용자는
     /// 업데이트만으로 다크 모드 키 색이 바뀌므로 되돌리는 경로를 적는다. v2.2.4 — 휘어 그은 획
     /// 오타 수정, 오타 후보 자동 표시(메일 제보). v2.2.3 — iOS 27 하단 키 반응 지연 수정, 6방향
     /// 프리셋(메일 제보 2건). v2.2.2 — 백스페이스 삭제 단위(앱스토어 리뷰). v2.2.1 — 복합모음 경로
     /// 옵션(이슈 #29). 이전 릴리스 항목들은 뒤에 남겨 둔다.
     private let groups: [FeatureGroup] = [
+        FeatureGroup(title: "두 엄지로 빠르게 쳐도 정확하게", features: [
+            Feature(
+                icon: "hands.and.sparkles.fill",
+                tint: .pink,
+                title: "'는'이 '너ㅡㄴ'으로 찍히던 오타",
+                detail: "두 엄지로 빠르게 칠 때 앞 키를 떼기 전에 다음 키를 누르면, 앞 키가 긴 긋기로 잘못 읽혀 '는'이 '너ㅡㄴ', '니'가 '네'로 찍히던 문제를 고쳤습니다."
+            ),
+        ]),
         FeatureGroup(title: "한 손으로도 편하게", features: [
             Feature(
                 icon: "keyboard.onehanded.right",
