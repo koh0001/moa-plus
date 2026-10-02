@@ -86,6 +86,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // initial frame uses defaults and visibly re-renders once
         // viewWillAppear's loadAll() lands.
         KeyboardSettings.shared.loadAll()
+        applyAppearanceMode()
         setupKeyboardView()
         observeHeightScale()
         observeBottomInset()
@@ -108,6 +109,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // layout pass once avoids a visible double-layout flicker on first
         // appearance.
         KeyboardSettings.shared.loadAll()
+        applyAppearanceMode()
         // `viewDidLoad` 시점에는 아직 레이아웃 전이라 `safeAreaInsets.bottom` 이 0 이고,
         // 첫 제약 상수가 여백만큼 짧게 잡힌다. `viewSafeAreaInsetsDidChange` 가
         // 곧바로 키우므로 결과는 같지만 한 번의 정착 과정을 거친다 — 위 999 우선순위
@@ -326,6 +328,20 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
                 + self.candidateBarExtraHeight
                 + self.bottomInset()
         })
+    }
+
+    /// 설정 › 외형의 테마 모드(시스템/라이트/다크)를 키보드에 적용한다.
+    ///
+    /// v2.2.4 까지는 이 설정을 저장만 하고 아무 데서도 읽지 않았다(이슈 #30).
+    /// 배경(`systemGray6`)과 프리셋 키 색은 모두 trait 를 따르는 동적 색이므로
+    /// 컨트롤러의 스타일 하나만 덮어쓰면 자식 호스팅 컨트롤러와 SwiftUI 트리
+    /// 전체가 따라온다(뷰가 아니라 컨트롤러에 거는 이유 — 자식 VC 는 trait 를
+    /// 부모 VC 에서 받는다). 설정은
+    /// 메인 앱에서만 바뀌고 키보드가 다시 뜰 때 `loadAll()` 로 들어오므로
+    /// 관찰자 없이 `viewWillAppear` 에서 적용하면 충분하다.
+    private func applyAppearanceMode() {
+        overrideUserInterfaceStyle =
+            KeyboardSettings.shared.themeSettings.appearanceMode.userInterfaceStyle
     }
 
     /// `loadAll()` reassigns every @Published on each cross-process change, so
