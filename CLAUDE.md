@@ -300,6 +300,20 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)
 - 심볼 모드 전용 행: `[한글/ABC] [한/영] [#+= / 123] [space] [⏎]` — 페이지 토글이 **스페이스 왼쪽**(구 슬롯 B 위치), 긋기 펑크 대신 렌더
 
+### 한손 모드 (v2.2.5 / 앱스토어 리뷰)
+`KeyboardSettings.keyboardPlacement`(`.full` 기본/`.left`/`.right`) + `oneHandedWidthRatio`(0.70~0.90, 기본 0.82).
+- `KeyboardView.body` 가 바깥 `GeometryReader` 에서 **전체 폭 기준**으로 아이폰 세로인지 판정하고, 본체
+  (`keyboardContent`)를 좁힌 폭으로 그대로 그린 뒤 빈쪽에 띠(반대쪽 이동 / 전체 폭)를 붙인다. 그리드·기능행·
+  팝업·오버레이는 주어진 폭을 따르므로 별도 분기가 없다
+- `.coordinateSpace(name: "keyboardPreview")` 는 **좁힌 본체 안쪽**에 둘 것 — 긋기 시작점·오버레이·팝업이 이
+  좌표계라 바깥에 두면 띠 폭만큼 어긋난다. EarlyTouch 키 찾기는 `.global` 이라 무관
+- 배경은 한손 모드일 때 바깥에서 한 번만 그린다(`keyboardContent(drawsBackground:)`)
+- 폭 하한 0.70 = 375pt + 지구본 표시에서도 기능행이 맞는 선 (`OneHandedLayoutTests`). 하한을 내리면 이 테스트로 확인
+- 이름을 손이 아니라 **위치**로 붙였다 — 긋기 프리셋 "오른손용/왼손용/양손용" 과 혼동(이슈 #31)
+- 띠 버튼 변경은 전체 접근 OFF 면 App Group 에 못 써 다음 `loadAll()` 에서 원래 값으로 돌아온다
+- 새 모델 파일은 메인 앱·테스트 타깃 멤버십 예외 목록에도 넣어야 한다(`scripts/add_target_membership.rb`
+  FILES_TO_ADD — `xcodeproj` gem 이 없으면 pbxproj 의 두 `membershipExceptions` 에 직접 추가)
+
 ### 하단 여백 / 홈 인디케이터 회피 (v2.1.2 build 21 / 리뷰 제보: 스페이스바 → 홈 화면 이탈)
 홈 버튼 없는 아이폰에서 기능행이 화면 맨 아래 홈 제스처 구역에 붙어, 스페이스를
 누르다 홈으로 빠져나간다는 제보. 여백 = `(자동 ON ? 안전영역 : 0) + 추가 여백`
@@ -447,6 +461,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── keyboardHeightScale: Double             (0.85~1.35, 기본 1.0 — 기기 기본 높이에 곱함)
 ├── keyboardAutoBottomInsetEnabled: Bool    (홈 인디케이터 구역 자동 회피, 기본 ON)
 ├── keyboardExtraBottomInset: Double        (자동 여백 위에 더할 추가 여백 0~34pt, 기본 0)
+├── keyboardPlacement: KeyboardPlacement   (한손 모드 .full 기본/.left/.right) + oneHandedWidthRatio (0.70~0.90)
 ├── showGlobeKey: Bool                      (v2.2.6 부터 렌더 미사용 — 지구본은 needsInputModeSwitchKey 로 자동)
 ├── consonantDiagonalDerivationEnabled: Bool (자음 대각선 진입 파생, 기본 OFF=순정 모아키)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)

@@ -27,6 +27,8 @@ final class KeyboardSettings: ObservableObject {
         static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
+        static let keyboardPlacement = "keyboardPlacement"
+        static let oneHandedWidthRatio = "oneHandedWidthRatio"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
         static let longPressDelay = "longPressDelay"
         static let clickSoundEnabled = "clickSoundEnabled"
@@ -231,6 +233,17 @@ final class KeyboardSettings: ObservableObject {
     /// 설치와의 호환을 위해 남겨 둔다.
     @Published var showGlobeKey: Bool = false {
         didSet { guard !isLoading else { return }; writePrimitive(showGlobeKey, forKey: Keys.showGlobeKey) }
+    }
+
+    /// 한손 모드 위치 (기본 `.full` = 꺼짐). 키보드의 띠 버튼으로도 바뀐다 — 전체 접근이
+    /// 꺼져 있으면 App Group 에 못 써서 다음에 키보드를 띄울 때(`loadAll`) 원래 값으로 돌아온다.
+    @Published var keyboardPlacement: KeyboardPlacement = .full {
+        didSet { guard !isLoading else { return }; writePrimitive(keyboardPlacement.rawValue, forKey: Keys.keyboardPlacement) }
+    }
+
+    /// 한손 모드에서 키보드가 차지하는 폭 비율 (`KeyboardPlacement.widthRatioRange`).
+    @Published var oneHandedWidthRatio: Double = KeyboardPlacement.defaultWidthRatio {
+        didSet { guard !isLoading else { return }; writePrimitive(oneHandedWidthRatio, forKey: Keys.oneHandedWidthRatio) }
     }
 
     /// 자음 키에서 **대각선으로 진입**한 뒤 이어 그어 천지인 규칙으로 복합모음을
@@ -502,6 +515,10 @@ final class KeyboardSettings: ObservableObject {
         assign(\.keyboardAutoBottomInsetEnabled, defaults.object(forKey: Keys.keyboardAutoBottomInset) as? Bool ?? true)
         assign(\.keyboardExtraBottomInset, defaults.object(forKey: Keys.keyboardExtraBottomInset) as? Double ?? KeyboardMetrics.defaultExtraBottomInset)
         assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
+        assign(\.keyboardPlacement,
+               (defaults.object(forKey: Keys.keyboardPlacement) as? String)
+                   .flatMap(KeyboardPlacement.init(rawValue:)) ?? .full)
+        assign(\.oneHandedWidthRatio, defaults.object(forKey: Keys.oneHandedWidthRatio) as? Double ?? KeyboardPlacement.defaultWidthRatio)
         assign(\.consonantDiagonalDerivationEnabled, defaults.object(forKey: Keys.consonantDiagonalDerivation) as? Bool ?? false)
         assign(\.longPressDelay, defaults.object(forKey: Keys.longPressDelay) as? Double ?? 0.5)
         assign(\.clickSoundEnabled, defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false)
@@ -637,6 +654,8 @@ final class KeyboardSettings: ObservableObject {
         keyboardAutoBottomInsetEnabled = true
         keyboardExtraBottomInset = KeyboardMetrics.defaultExtraBottomInset
         showGlobeKey = false
+        keyboardPlacement = .full
+        oneHandedWidthRatio = KeyboardPlacement.defaultWidthRatio
         consonantDiagonalDerivationEnabled = false
         longPressDelay = 0.5
         wordDeleteEnabled = true

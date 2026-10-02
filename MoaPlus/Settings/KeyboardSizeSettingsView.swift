@@ -121,6 +121,31 @@ struct KeyboardSizeSettingsView: View {
             }
 
             Section {
+                Picker("키보드 위치", selection: $settings.keyboardPlacement) {
+                    ForEach(KeyboardPlacement.allCases, id: \.self) { placement in
+                        Text(placement.displayName).tag(placement)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if settings.keyboardPlacement != .full {
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("키보드 폭")
+                            Spacer()
+                            Text("\(Int((settings.oneHandedWidthRatio * 100).rounded()))%")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $settings.oneHandedWidthRatio,
+                               in: KeyboardPlacement.widthRatioRange, step: 0.02)
+                    }
+                }
+            } header: {
+                Text("한손 모드")
+            } footer: {
+                Text("키보드를 좁혀 왼쪽이나 오른쪽에 붙입니다. 아이폰 세로 화면에서만 적용됩니다. 키보드의 빈쪽에 있는 화살표로 반대쪽으로 옮기고, 네모 화살표로 전체 폭으로 돌아갈 수 있습니다. 위 미리보기에 바로 반영됩니다.")
+            }
+
+            Section {
                 Text("아이패드와 홈 버튼이 있는 아이폰에서는 기능 행 맨 왼쪽에 지구본 키가 자동으로 나타나 다른 키보드로 전환할 수 있습니다. 스페이스바는 그만큼 좁아집니다.\n\n최신 iOS 아이폰은 시스템이 키보드 아래에 지구본 바를 직접 표시하므로 지구본 키가 따로 나타나지 않습니다.")
                     .font(.footnote)
                     .foregroundColor(.secondary)

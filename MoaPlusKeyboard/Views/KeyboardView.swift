@@ -96,6 +96,78 @@ struct KeyboardView: View {
     }
 
     var body: some View {
+        GeometryReader { outer in
+            if let side = oneHandedSide(fullWidth: outer.size.width) {
+                // 한손 모드: 본체는 좁힌 폭으로 그대로 그리고(그리드·기능행·팝업·오버레이가 모두
+                // 주어진 폭을 따른다), 빈쪽에 위치 전환 띠를 붙인다. 배경은 바깥에서 한 번만.
+                let width = KeyboardPlacement.keyboardWidth(
+                    totalWidth: outer.size.width, ratio: settings.oneHandedWidthRatio)
+                HStack(spacing: 0) {
+                    if side == .right { oneHandedStrip(side: side) }
+                    keyboardContent(drawsBackground: false)
+                        .frame(width: width)
+                    if side == .left { oneHandedStrip(side: side) }
+                }
+                .background(keyboardBackground)
+            } else {
+                keyboardContent(drawsBackground: true)
+            }
+        }
+        // 기능행 키들이 누르는 순간 울릴 수 있게 주입 (이슈 #23).
+        // 그리드 키와 슬롯B 는 `gestureStarted` / `slotBVowelGestureStarted` 가
+        // 이미 터치 다운에서 불리므로 ViewModel 쪽에서 처리한다.
+        .environment(\.keyPressFeedback) { viewModel.keyPressFeedback() }
+        .onAppear { loadBackgroundIfNeeded() }
+        .onChange(of: settings.themeSettings.backgroundImageId) { loadBackgroundIfNeeded() }
+    }
+
+    /// 한손 모드를 실제로 적용할 쪽. 아이폰 세로 화면에서만 — 판정은 **전체 폭** 기준.
+    private func oneHandedSide(fullWidth: CGFloat) -> KeyboardPlacement? {
+        let screen = UIScreen.main.bounds
+        let isPad = layoutOverride?.isPad ?? (UIDevice.current.userInterfaceIdiom == .pad)
+        let isLandscape = layoutOverride?.isLandscape ?? KeyboardMetrics.isLandscapeKeyboard(
+            keyboardWidth: fullWidth,
+            screenShort: min(screen.width, screen.height),
+            screenLong: max(screen.width, screen.height))
+        return settings.keyboardPlacement.effectiveSide(isPad: isPad, isLandscape: isLandscape)
+    }
+
+    /// 한손 모드의 빈쪽 띠: 반대쪽으로 옮기기 + 전체 폭으로 돌아가기 (순정 키보드와 같은 구성).
+    private func oneHandedStrip(side: KeyboardPlacement) -> some View {
+        let bottomInset = KeyboardMetrics.resolvedBottomInset(
+            autoEnabled: settings.keyboardAutoBottomInsetEnabled,
+            deviceInset: viewModel.bottomSafeAreaInset,
+            extra: settings.keyboardExtraBottomInset)
+        let color = settings.resolvedKeyText.opacity(0.6)
+        return VStack(spacing: 28) {
+            Button {
+                viewModel.keyPressFeedback()
+                settings.keyboardPlacement = side == .left ? .right : .left
+            } label: {
+                Image(systemName: side == .left ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 22, weight: .medium))
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(side == .left ? "키보드를 오른쪽으로" : "키보드를 왼쪽으로")
+            Button {
+                viewModel.keyPressFeedback()
+                settings.keyboardPlacement = .full
+            } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("키보드 전체 폭")
+        }
+        .foregroundColor(color)
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, bottomInset)
+    }
+
+    private func keyboardContent(drawsBackground: Bool) -> some View {
         GeometryReader { geometry in
             let centerKeyWidth = KeyboardMetrics.centerKeyWidth(
                 for: geometry.size.width,
@@ -276,7 +348,7 @@ struct KeyboardView: View {
                         .allowsHitTesting(false)
                     }
                 }
-                .background(keyboardBackground)
+                .background(Group { if drawsBackground { keyboardBackground } })
                 .onAppear { viewModel.setCenterKeyWidth(centerKeyWidth) }
                 .onChange(of: centerKeyWidth) { _, newValue in
                     viewModel.setCenterKeyWidth(newValue)
@@ -287,13 +359,11 @@ struct KeyboardView: View {
         // local frame), so the settings preview can position UI based on
         // which half of the keyboard the user touched. Production keyboard
         // ignores this — the value is only consumed in preview mode.
+        //
+        // 한손 모드에서도 **좁힌 본체 안쪽**에 둬야 한다 — 긋기 시작점·오버레이·팝업이 모두
+        // 이 좌표계라, 바깥에 두면 띠 폭만큼 어긋난다. EarlyTouch 의 키 찾기는 `.global`
+        // 이라 띠와 무관하다.
         .coordinateSpace(name: "keyboardPreview")
-        // 기능행 키들이 누르는 순간 울릴 수 있게 주입 (이슈 #23).
-        // 그리드 키와 슬롯B 는 `gestureStarted` / `slotBVowelGestureStarted` 가
-        // 이미 터치 다운에서 불리므로 ViewModel 쪽에서 처리한다.
-        .environment(\.keyPressFeedback) { viewModel.keyPressFeedback() }
-        .onAppear { loadBackgroundIfNeeded() }
-        .onChange(of: settings.themeSettings.backgroundImageId) { loadBackgroundIfNeeded() }
     }
 
     private func loadBackgroundIfNeeded() {

@@ -133,6 +133,12 @@ enum SettingsCatalog {
                        "스페이스", "띄어쓰기", "나가짐", "홈화면", "튕김", "제스처"]
         ),
         SettingsEntry(
+            title: "한손 모드 (키보드 위치)",
+            icon: "keyboard.onehanded.right",
+            destination: .size,
+            keywords: ["한손", "한 손", "한손모드", "왼쪽", "오른쪽", "축소", "작게", "좁게", "큰폰", "프로맥스"]
+        ),
+        SettingsEntry(
             title: "키보드 전환 (지구본) 키",
             icon: "globe",
             destination: .size,
