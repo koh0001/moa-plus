@@ -535,6 +535,7 @@ struct GestureTestView: View {
             Text(vowel)
                 .font(.system(size: 44, weight: .bold))
                 .foregroundColor(accent)
+                .accessibilityIdentifier("gestureTest.vowel.\(title)")  // UI 테스트가 결과를 읽는다
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 56)
             strokeArrowChips(directions, accent: accent)
@@ -618,6 +619,7 @@ struct GestureTestView: View {
             Text(value)
                 .font(.system(.subheadline, design: .monospaced))
                 .fontWeight(.medium)
+                .accessibilityIdentifier("gestureTest.metric.\(title)")
         }
     }
 
