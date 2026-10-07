@@ -80,4 +80,89 @@ final class CurvedFirstStrokeTests: XCTestCase {
         XCTAssertEqual(vowel([(60, 45)]), .ㅣ)
         XCTAssertEqual(vowel([(60, 5)]), .ㅏ)
     }
+
+    // MARK: - 짧은 이어짐 (같은 제보자 재제보, 2026-10-06 로그 v2.2.5 → 수정 v2.2.6)
+    //
+    // 위 수정은 두 번째 조각이 키폭의 0.6배(54pt 기준 32.4pt) 이상일 때만 켜졌다
+    // (`reinterpretMinSecondStrokeRatio`). 휘어 그은 획의 나머지가 짧으면(20~26pt) 재해석이
+    // 꺼져 첫 조각 이름(↙=ㅡ, ↗=ㅣ)이 그대로 남았다. 곧은 조각으로는 이 분할이 재현되지
+    // 않아(첫 조각부터 → 로 잡힘) 실제처럼 휘는 경로로 재생한다 — 아래 경로는 현재 분석기에서
+    // 로그와 같은 분할을 만든다.
+
+    /// 조각마다 진행 방향이 `from`→`to` 로 선형 회전하는 경로를 3pt 간격으로 넣는다.
+    private func replay(_ pieces: [(len: CGFloat, from: Double, to: Double)],
+                        column: Int) -> (strokes: [GestureDirection], magnitudes: [CGFloat],
+                                         vowel: Jungseong?, preview: Jungseong?) {
+        let settings = GestureSettings.default
+        let analyzer = GestureAnalyzer(settings: settings, columnId: column)
+        analyzer.keyWidth = 54
+        var p = CGPoint(x: 200, y: 200)
+        analyzer.addPoint(p)
+        for piece in pieces {
+            let n = max(1, Int((piece.len / 3).rounded()))
+            let step = piece.len / CGFloat(n)
+            for i in 0..<n {
+                let deg = piece.from + (piece.to - piece.from) * (Double(i) + 0.5) / Double(n)
+                let r = deg * .pi / 180
+                p = CGPoint(x: p.x + step * CGFloat(cos(r)), y: p.y - step * CGFloat(sin(r)))
+                analyzer.addPoint(p)
+            }
+        }
+        let resolver = VowelResolver()
+        resolver.swipeProfile = settings.swipeProfile
+        let preview = resolver.peekVowel(directions: analyzer.getDirections(),
+                                         firstStrokeCardinal: analyzer.currentFirstStrokeCardinal())
+        let strokes = analyzer.finalizedStrokeInfos()
+        let detail = analyzer.finalizeGestureDetailed()
+        let vowel = resolver.resolve(directions: detail.directions,
+                                     firstStrokeCardinal: detail.firstStrokeCardinal).vowel
+        return (strokes.map(\.direction), strokes.map(\.magnitude), vowel, preview)
+    }
+
+    /// `[ㄴ] ↙30(199°) ←26(194°) →59(1°) ⇒ ㅡ` — 지우고 `←→ ⇒ ㅔ` 로 다시 침 ("네요" 가 "느요").
+    func test_e2e_report1006_ne_shortLeftContinuation_isE() {
+        let r = replay([(10, 184, 184), (20, 206, 206), (24, 194, 194), (6, 194, 30), (56, 1, 1)], column: 2)
+        XCTAssertEqual(r.strokes, [.downLeft, .left, .right], "로그와 같은 분할이어야 이 경로를 검증한다")
+        XCTAssertLessThan(r.magnitudes[1], 54 * 0.6)
+        XCTAssertEqual(r.vowel, .ㅔ)
+        XCTAssertEqual(r.preview, .ㅔ, "미리보기도 확정과 같아야 한다")
+    }
+
+    /// `[ㅁ] ↙21(211°) ←20(172°) ⇒ ㅡ` — 지우고 `← ⇒ ㅓ` 로 다시 침 ("머" 가 "므").
+    func test_e2e_report1006_meo_shortLeftContinuation_isEo() {
+        let r = replay([(19, 215, 210), (7, 210, 170), (16, 170, 170)], column: 1)
+        XCTAssertEqual(r.strokes, [.downLeft, .left])
+        XCTAssertLessThan(r.magnitudes[1], 54 * 0.6)
+        XCTAssertEqual(r.vowel, .ㅓ)
+        XCTAssertEqual(r.preview, .ㅓ)
+    }
+
+    /// `[ㄱ] ↗37(18°) →26(13°) ⇒ ㅣ` — 두 조각이 모두 거의 수평(합 16°).
+    func test_e2e_report1006_ga_shortRightContinuation_isA() {
+        let r = replay([(10, 0, 0), (22, 27, 27), (32, 13, 13)], column: 4)
+        XCTAssertEqual(r.strokes, [.upRight, .right])
+        XCTAssertLessThan(r.magnitudes[1], 54 * 0.6)
+        XCTAssertEqual(r.vowel, .ㅏ)
+        XCTAssertEqual(r.preview, .ㅏ)
+    }
+
+    /// 반례 — 0.6 기준을 그냥 풀면 깨진다. `[ㅋ] ↗21(31°) →28(16°) ↗52(29°) ⇒ ㅣ` ("버거킹" 의 키).
+    /// 짧은 → 는 흔들림이고 이어진 세 조각의 합(≈26°)은 1열 ↗ 구역 안이다.
+    func test_e2e_report1006_ki_wobblyUpRight_staysI() {
+        let r = replay([(16, 38, 38), (30, 14, 14), (54, 30, 30)], column: 1)
+        XCTAssertEqual(r.strokes, [.upRight, .right, .upRight])
+        XCTAssertLessThan(r.magnitudes[1], 54 * 0.6)
+        XCTAssertEqual(r.vowel, .ㅣ)
+        XCTAssertEqual(r.preview, .ㅣ)
+    }
+
+    /// 이어진 조각 **전부**를 합친다 — 앞 두 조각만 합치면 ≈14°(→)로 ㅏ, 전부 합치면 ≈32°(↗)로 ㅣ.
+    /// 위 반례는 앞 두 조각 합(≈23°)도 1열 ↗ 안이라 이 규칙을 지키지 못한다.
+    func test_e2e_shortContinuation_sumsWholeRun_notFirstTwo() {
+        let r = replay([(24, 24, 24), (22, 0, 0), (50, 50, 50)], column: 3)
+        XCTAssertEqual(r.strokes, [.upRight, .right, .upRight])
+        XCTAssertLessThan(r.magnitudes[1], 54 * 0.6)
+        XCTAssertEqual(r.vowel, .ㅣ)
+        XCTAssertEqual(r.preview, .ㅣ)
+    }
 }

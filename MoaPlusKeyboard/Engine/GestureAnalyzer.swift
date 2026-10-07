@@ -370,12 +370,16 @@ class GestureAnalyzer {
     /// 재해석에 쓸 첫 획의 4방향 스냅 값이다(첫 획이 카디널이거나 획이 1개면 nil).
     /// 채택 여부는 `VowelResolver` 가 트라이 매칭 결과를 비교해 결정한다.
     func finalizeGestureDetailed() -> (directions: [GestureDirection], firstStrokeCardinal: GestureDirection?) {
-        let segments = zip(directions, zip(directionMagnitudes, directionVectors)).map {
-            DirectionSegment(direction: $0.0, magnitude: $0.1.0, vector: $0.1.1)
-        }
-        let normalized = normalizeSegments(segments)
+        let normalized = normalizeSegments(rawSegments)
         return (normalized.map { $0.direction },
                 firstStrokeCardinal(of: normalized))
+    }
+
+    /// 등록된 원시 획(노이즈 트림 전).
+    private var rawSegments: [DirectionSegment] {
+        zip(directions, zip(directionMagnitudes, directionVectors)).map {
+            DirectionSegment(direction: $0.0, magnitude: $0.1.0, vector: $0.1.1)
+        }
     }
 
     /// 재해석을 발동시키는 두 번째 획의 최소 크기 (keyWidth 대비).
@@ -384,27 +388,64 @@ class GestureAnalyzer {
     /// 손 떼며 생기는 호 꼬리는 ~0.45배 이하였다(특성화 테스트 21pt / 50pt).
     /// 0.6 은 양쪽 모두에 마진을 준 중간값 — 꼬리가 재해석을 발동시켜 ㅡ 가
     /// ㅔ 로 승격되는 회귀(`test_upwardArcTailAfterDownLeft…`)를 막는다.
+    /// 예외: 짧아도 재해석 방향과 같은 조각이면 `isShortCurvedContinuation` 이 따로 판정한다.
     private static let reinterpretMinSecondStrokeRatio: CGFloat = 0.6
 
     /// 진행 중(미확정) 제스처의 첫 획 카디널 스냅 — 실시간 미리보기용.
     /// finalize 의 노이즈 트림 전 원시 첫 획을 쓰므로 최종값과 미세하게 다를 수
     /// 있지만, 미리보기는 어차피 획마다 갱신되므로 허용한다.
     func currentFirstStrokeCardinal() -> GestureDirection? {
-        guard directions.count >= 2,
-              let first = directions.first, first.isDiagonal,
-              let vector = directionVectors.first,
-              directionMagnitudes.count >= 2,
-              directionMagnitudes[1] >= keyWidth * Self.reinterpretMinSecondStrokeRatio
-        else { return nil }
-        return cardinalSnap(of: vector)
+        firstStrokeCardinal(of: rawSegments)
     }
 
     private func firstStrokeCardinal(of segments: [DirectionSegment]) -> GestureDirection? {
         guard segments.count >= 2,
               let first = segments.first, first.direction.isDiagonal,
-              segments[1].magnitude >= keyWidth * Self.reinterpretMinSecondStrokeRatio
+              let cardinal = cardinalSnap(of: first.vector)
         else { return nil }
-        return cardinalSnap(of: first.vector)
+        if segments[1].magnitude >= keyWidth * Self.reinterpretMinSecondStrokeRatio {
+            return cardinal
+        }
+        return isShortCurvedContinuation(segments, toward: cardinal) ? cardinal : nil
+    }
+
+    /// 휘어 그은 한 획의 나머지가 짧게 나뉜 경우인지 (같은 제보자 재제보, 2026-10-06 로그).
+    ///
+    /// 두 번째 조각이 짧으면 손 떼는 꼬리와 구분이 안 돼 위 0.6 기준이 재해석을 막는다. 그런데
+    /// 그 조각이 **재해석 방향과 같으면** 꼬리가 아니라 같은 획의 나머지일 수 있다 — ← 를 살짝
+    /// 아래로 꺼지게 시작해 `↙30 ←26` (ㅔ 가 ㅡ), → 를 살짝 뜨게 시작해 `↗37 →26` (ㅏ 가 ㅣ).
+    /// 순정 판정 모델(꺾임이 작으면 한 획, 방향은 합벡터)대로, 첫 조각부터 꺾임 45° 이내로
+    /// 이어지는 조각들의 합벡터를 이 열의 섹터로 다시 분류해 재해석 방향이 나올 때만 인정한다.
+    /// 흔들려 그은 ↗ (`↗21 →28 ↗52`, 합 ≈26°)는 ↗ 로 남는다 (`CurvedFirstStrokeTests`).
+    private func isShortCurvedContinuation(_ segments: [DirectionSegment],
+                                           toward cardinal: GestureDirection) -> Bool {
+        guard segments[1].direction == cardinal else { return false }
+        var net = segments[0].vector
+        var previous = segments[0].vector
+        for segment in segments.dropFirst() {
+            guard Self.turnDegrees(from: previous, to: segment.vector) <= Self.curvedRunMaxTurn else { break }
+            net.dx += segment.vector.dx
+            net.dy += segment.vector.dy
+            previous = segment.vector
+        }
+        return GestureDirection.from(
+            vector: net,
+            sectors: effectiveSectors,
+            rotationOffset: effectiveRotationOffset,
+            threshold: 1,
+            fourWay: settings.swipeProfile.fourWayMode || forceCardinalOnly,
+            fillGap: settings.swipeProfile.gapFillNearest
+        ) == cardinal
+    }
+
+    /// 한 획으로 볼 이웃 조각 간 최대 꺾임. 순정 실측은 ≤55° 흡수 / ≥60° 분리인데, 획 단위
+    /// 순 변위 벡터끼리 비교하는 근사라 여유를 두고 45°.
+    private static let curvedRunMaxTurn: Double = 45
+
+    private static func turnDegrees(from a: CGVector, to b: CGVector) -> Double {
+        let diff = (atan2(Double(b.dy), Double(b.dx)) - atan2(Double(a.dy), Double(a.dx))) * 180 / .pi
+        let wrapped = (diff + 540).truncatingRemainder(dividingBy: 360) - 180
+        return abs(wrapped)
     }
 
     /// 벡터를 사용자 섹터 회전을 존중한 4방향(90° 사분면)으로 스냅한다.
@@ -641,10 +682,7 @@ extension GestureAnalyzer {
     /// finalize 와 동일한 노이즈 트림을 거친 획 목록 — 손을 뗀 뒤 "최종" 표시용.
     /// `finalizeGestureDetailed()` 처럼 상태를 바꾸지 않는다.
     func finalizedStrokeInfos() -> [StrokeInfo] {
-        let segments = zip(directions, zip(directionMagnitudes, directionVectors)).map {
-            DirectionSegment(direction: $0.0, magnitude: $0.1.0, vector: $0.1.1)
-        }
-        return normalizeSegments(segments).enumerated().map { index, segment in
+        normalizeSegments(rawSegments).enumerated().map { index, segment in
             StrokeInfo(id: index, direction: segment.direction,
                        magnitude: segment.magnitude, vector: segment.vector)
         }
