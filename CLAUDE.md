@@ -518,9 +518,21 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
   (`firstStrokeCardinal`)이 **바로 다음 획과 같은 방향**이면 휘어진 한 획으로 보고, 간선 수 동률에서
   버린 획이 적은 재해석을 고른다 (↗→ = ㅏ, ↖← = ㅓ). 이 조건 없이 "버린 획 적은 쪽" 만 쓰면
   ↙↑→ = ㅢ 특성화가 ㅔ 로 깨진다(실측). 가드 `CurvedFirstStrokeTests`
+- **짧은 이어짐 (v2.2.6 / 같은 제보자 재제보)**: 재해석은 두 번째 조각이 키폭 0.6배 이상일 때만
+  켜진다(`reinterpretMinSecondStrokeRatio`, 손 떼는 꼬리 방지). 휜 획의 나머지가 짧으면(20~26pt)
+  꺼져 `↙30 ←26 →59 = ㅡ`(네→느), `↗37 →26 = ㅣ`(가→기)가 남았다. 두 번째 조각이 재해석 방향과
+  **같을 때만**, 첫 조각부터 꺾임 45° 이내로 이어진 조각들의 합벡터를 그 열 섹터로 다시 분류해
+  재해석 방향이 나오면 켠다(`isShortCurvedContinuation`). 결과 = 같은 궤적을 곧게 그은 판정
+  (ㅣ↔ㅗ, ㅡ↔ㅜ 경계도 같은 규칙). 이어진 조각을 **전부** 합칠 것 — 1·2번만 합치면 흔들려 그은
+  ↗ 가 → 로 넘어간다(`test_e2e_shortContinuation_sumsWholeRun_notFirstTwo`; 제보 로그의
+  `↗21 →28 ↗52` = "키" 는 1·2번 합 22° 도 1열 ↗ 안이라 이 가드가 못 된다). 다른 방향 꼬리(↙ 뒤 ↑→)는 0.6 기준 그대로.
+  곧은 조각으로는 이 분할이 재현되지 않아(첫 조각부터 → 로 잡힘) 테스트는 휘는 경로로 재생한다
+  (`CurvedFirstStrokeTests.test_e2e_report1006_*`)
 - 오타 후보 표시: 긋기 로그 직후 첫 입력이 백스페이스면 `GestureDebugLog.markLastLineDeleted()`
   가 줄 끝에 `✗지움`. 대기 플래그 `KeyboardViewModel.typoMarkPending` 은 다른 입력 메서드마다
-  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`)
+  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`).
+  ✗ 는 **첫 백스페이스 직전 줄**에 붙는다 — 여러 글자를 지웠으면 실제 틀린 줄은 그 앞이다.
+  판독은 지운 뒤 다시 친 줄과 비교할 것 (10/06 리포트에서 분석기 오타 2건 모두 ✗ 한 줄 앞)
 
 ### 긋기 노이즈 처리 (GestureAnalyzer)
 - `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다
