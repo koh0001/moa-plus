@@ -154,6 +154,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        EarlyTouchDiagnostics.flush(force: true)
         // The keyboard can be torn down mid-press — e.g. the host app presents
         // a photo picker while the finger is still holding backspace. The
         // repeat timer is driven by a Timer, not by touch events, so nothing
@@ -222,6 +223,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        EarlyTouchDiagnostics.keyboardHeight = view.bounds.height
         guard view.bounds.height != lastDiagnosticBoundsHeight else { return }
         recordGeometryDiagnostic(measured: view.safeAreaInsets.bottom)
     }
@@ -279,6 +281,8 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             queue: .main
         ) { [weak self] _ in
             self?.viewModel.resetGestureState()
+            // 키보드를 띄운 채 리포트를 보내러 앱을 바꾸면 viewWillDisappear 가 안 온다.
+            EarlyTouchDiagnostics.flush(force: true)
         }
     }
 
@@ -392,6 +396,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         view.addSubview(hostingController.view)
         // 하단 절반 키의 누름 시작을 SwiftUI 인식 대기 없이 받는다 (`EarlyTouch.swift`).
         hostingController.view.addGestureRecognizer(EarlyTouchRecognizer())
+        EarlyTouchDiagnostics.startRecording()
         hostingController.didMove(toParent: self)
 
         NSLayoutConstraint.activate([
