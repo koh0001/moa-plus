@@ -99,14 +99,23 @@ enum EarlyTouchRegistry {
         let containing = laidOut.filter { $0.windowFrame.contains(point) }
         let best = containing.min { $0.windowFrame.width * $0.windowFrame.height
                                   < $1.windowFrame.width * $1.windowFrame.height }
-        let nearest: CGVector? = best != nil ? .zero
-            : laidOut.map { offset(from: $0.windowFrame, to: point) }
-                .min { $0.dx * $0.dx + $0.dy * $0.dy < $1.dx * $1.dx + $1.dy * $1.dy }
+        // 타입을 단계마다 드러낸다 — 한 식으로 묶으면 CI 컴파일러(Xcode 26.3)가 타입 추론 시간 초과.
+        var nearest: CGVector? = .zero
+        if best == nil {
+            let offsets: [CGVector] = laidOut.map { offset(from: $0.windowFrame, to: point) }
+            nearest = offsets.min { lengthSquared($0) < lengthSquared($1) }
+        }
         return Lookup(target: best, containing: containing.count, registered: all.count, nearestOffset: nearest)
     }
 
     private static func offset(from r: CGRect, to p: CGPoint) -> CGVector {
-        CGVector(dx: p.x - min(max(p.x, r.minX), r.maxX), dy: p.y - min(max(p.y, r.minY), r.maxY))
+        let nearestX: CGFloat = min(max(p.x, r.minX), r.maxX)
+        let nearestY: CGFloat = min(max(p.y, r.minY), r.maxY)
+        return CGVector(dx: p.x - nearestX, dy: p.y - nearestY)
+    }
+
+    static func lengthSquared(_ v: CGVector) -> CGFloat {
+        v.dx * v.dx + v.dy * v.dy
     }
 }
 
@@ -223,7 +232,8 @@ enum EarlyTouchDiagnostics {
         if lookup.target != nil {
             counts.found += 1
             if lookup.containing > 1 { counts.overlapped += 1 }
-        } else if let o = lookup.nearestOffset, (o.dx * o.dx + o.dy * o.dy).squareRoot() <= gapDistance {
+        } else if let o = lookup.nearestOffset,
+                  EarlyTouchRegistry.lengthSquared(o) <= gapDistance * gapDistance {
             counts.gap += 1
         } else {
             counts.farMiss += 1
@@ -249,8 +259,8 @@ enum EarlyTouchDiagnostics {
         } else {
             counts.lowerNotSeen += 1
         }
-        counts.lastLower = Late(at: now(), ms: match.map { (uptime() - $0.uptime) * 1000 },
-                                y: point.y, height: keyboardHeight)
+        let latencyMs: Double? = match.map { record in (uptime() - record.uptime) * 1000 }
+        counts.lastLower = Late(at: now(), ms: latencyMs, y: point.y, height: keyboardHeight)
         schedule { flush(force: true) }
     }
 
@@ -286,15 +296,16 @@ enum EarlyTouchDiagnostics {
     static func line() -> String {
         let c = counts
         func ms(_ v: Double) -> String { String(format: "%.0fms", v) }
-        var parts = [
-            "\(formatter.string(from: since)) 부터",
-            "아래쪽 터치 \(c.lowerTouches) (도착 최대 \(ms(c.maxArrivalMs)), 키 찾음 \(c.found), 틈 \(c.gap), "
-                + "먼 곳 \(c.farMiss), 겹침 \(c.overlapped))",
-            "SwiftUI 먼저 \(c.swiftUIFirst) (아래쪽 \(c.swiftUIFirstLower): 터치 못 받음 \(c.lowerNotSeen), "
-                + "키 못 찾음 \(c.lowerMissed), 다른 키 \(c.lowerOtherKey), 같은 키 \(c.lowerSameKey))",
-            "아래쪽 롱키 팝업 최대 \(ms(c.popupMaxMs)) 마지막 \(c.popupLastMs.map(ms) ?? "-")",
-            "이미 눌림 \(c.alreadyPressed)",
-        ]
+        let sinceText: String = formatter.string(from: since)
+        let arrival: String = ms(c.maxArrivalMs)
+        let popupMax: String = ms(c.popupMaxMs)
+        let popupLast: String = c.popupLastMs.map(ms) ?? "-"
+        var parts: [String] = []
+        parts.append("\(sinceText) 부터")
+        parts.append("아래쪽 터치 \(c.lowerTouches) (도착 최대 \(arrival), 키 찾음 \(c.found), 틈 \(c.gap), 먼 곳 \(c.farMiss), 겹침 \(c.overlapped))")
+        parts.append("SwiftUI 먼저 \(c.swiftUIFirst) (아래쪽 \(c.swiftUIFirstLower): 터치 못 받음 \(c.lowerNotSeen), 키 못 찾음 \(c.lowerMissed), 다른 키 \(c.lowerOtherKey), 같은 키 \(c.lowerSameKey))")
+        parts.append("아래쪽 롱키 팝업 최대 \(popupMax) 마지막 \(popupLast)")
+        parts.append("이미 눌림 \(c.alreadyPressed)")
         if let l = c.lastLower {
             parts.append(String(format: "마지막 SwiftUI 먼저 %@ 터치부터 %@ y %.0f/%.0fpt",
                                 formatter.string(from: l.at), l.ms.map(ms) ?? "?", l.y, l.height))
