@@ -183,8 +183,8 @@ final class GestureSettingsApplyTests: XCTestCase {
         XCTAssertTrue(r.hasPotentialMatch(directions: [.upRight]))
     }
 
-    /// ↖/↙ 는 원래 꺼졌다 — 그 동작 그대로.
-    func test_disabledUpLeftAndDownLeft_unchanged() {
+    /// 끈 ↖/↙ 의 단독 획 무입력·첫 획만 빠지는 경로·재해석은 그대로 (↙↗ = ㅢ 는 아래 테스트).
+    func test_disabledUpLeftAndDownLeft_singleStrokeAndDropFirstPaths() {
         let r = resolver {
             $0.upLeftMapping = .disabled
             $0.downLeftMapping = .disabled
@@ -294,6 +294,7 @@ final class GestureSettingsApplyTests: XCTestCase {
     private static let upRight60 = CGVector(dx: 42, dy: -42)
     private static let downRight60 = CGVector(dx: 42, dy: 42)
     private static let upLeft60 = CGVector(dx: -42, dy: -42)
+    private static let downLeft60 = CGVector(dx: -42, dy: 42)
 
     func test_e2e_consonantKey_defaultUpRight_isMi() {
         withGestureSettings({ _ in }) { vm in
@@ -317,6 +318,23 @@ final class GestureSettingsApplyTests: XCTestCase {
         withGestureSettings({ $0.swipeProfile.downRightMapping = .disabled }) { vm in
             drive(vm, key: Self.mieumKey, segments: [Self.downRight60, Self.upLeft60])
             XCTAssertEqual(vm.composingText, "믜", "끈 ↘ 로 시작하는 ↘↖ = ㅢ 는 유지")
+        }
+    }
+
+    /// 끈 ↙ 도 ↙↗ = ㅢ — 끄지 않은 것과 같다 (리뷰 반영, 사용자 결정 2026-10-16). 고치기 전에는 끈 ↙ 가
+    /// 트라이에서 건너뛰어져(남은 ↗ = ↑ 한 간선) 첫 획 재해석 ←→ = ㅔ 에 밀려 "메" 가 됐다(실측).
+    func test_e2e_consonantKey_disabledDownLeft_euiStillWorks() {
+        withGestureSettings({ _ in }) { vm in
+            drive(vm, key: Self.mieumKey, segments: [Self.downLeft60, Self.upRight60])
+            XCTAssertEqual(vm.composingText, "믜", "기본: ↙↗ = ㅢ")
+        }
+        withGestureSettings({ $0.swipeProfile.downLeftMapping = .disabled }) { vm in
+            drive(vm, key: Self.mieumKey, segments: [Self.downLeft60, Self.upRight60])
+            XCTAssertEqual(vm.composingText, "믜", "끈 ↙ 로 시작하는 ↙↗ = ㅢ 는 유지")
+        }
+        withGestureSettings({ $0.swipeProfile.downLeftMapping = .disabled }) { vm in
+            drive(vm, key: Self.mieumKey, segments: [Self.downLeft60])
+            XCTAssertEqual(vm.composingText, "ㅁ", "끈 ↙ 단독 획 = 무입력")
         }
     }
 
