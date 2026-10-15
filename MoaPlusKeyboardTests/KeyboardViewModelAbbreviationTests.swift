@@ -545,6 +545,201 @@ final class KeyboardViewModelAbbreviationDesyncTests: XCTestCase {
     }
 }
 
+// MARK: - 앱에서 고친 단축어가 떠 있는 키보드에 닿는가
+
+/// 앱에서 단축어를 **고치면**(트리거·본문·확정 방식·활성화) 이미 떠 있는 키보드에도
+/// 반영돼야 한다.
+///
+/// 예전 뷰모델은 엔진 트라이를 **단축어 개수가 바뀔 때만** 다시 만들었다. 편집·켜고 끄기·
+/// 삭제 후 추가는 개수가 그대로라, 키보드 컨트롤러가 살아 있는 동안 옛 트리거가 계속
+/// 터지고, 끈 단축어는 확장되고, 켠 단축어는 영영 안 터졌다.
+///
+/// 그래서 여기서는 실제 키보드처럼 **뷰모델을 먼저** 만들고 그 뒤에 설정을 바꾼다.
+/// 설정을 넣은 다음 뷰모델을 만드는 위 테스트들은 init 의 첫 로드만 보므로 이 버그를
+/// 잡지 못했다.
+final class KeyboardViewModelAbbreviationReloadTests: XCTestCase {
+    private var viewModel: KeyboardViewModel!
+    private var delegate: TextFieldMockDelegate!
+
+    private var savedStore: ShortcutExpansionStore!
+    private var savedAbbreviationEnabled: Bool!
+    private var savedUndoEnabled: Bool!
+    private var savedKeepConfirmSpace: Bool!
+
+    private let heartID = UUID()    // ㅎㅌ → ♥
+    private let thanksID = UUID()   // ㄱㅅ → 감사합니다
+    private let sorryID = UUID()    // ㅈㅅ → 죄송합니다 (기본 예시처럼 꺼진 채로 시작)
+
+    override func setUp() {
+        super.setUp()
+        let settings = KeyboardSettings.shared
+        savedStore = settings.shortcutExpansionStore
+        savedAbbreviationEnabled = settings.abbreviationEnabled
+        savedUndoEnabled = settings.abbreviationUndoOnBackspaceEnabled
+        savedKeepConfirmSpace = settings.abbreviationKeepConfirmSpaceEnabled
+
+        settings.abbreviationEnabled = true
+        settings.abbreviationUndoOnBackspaceEnabled = true
+        settings.abbreviationKeepConfirmSpaceEnabled = true
+
+        var store = ShortcutExpansionStore()
+        store.add(ShortcutExpansion(id: heartID, trigger: "ㅎㅌ", replacement: "♥"))
+        store.add(ShortcutExpansion(id: thanksID, trigger: "ㄱㅅ", replacement: "감사합니다"))
+        store.add(ShortcutExpansion(id: sorryID, trigger: "ㅈㅅ", replacement: "죄송합니다", isEnabled: false))
+        settings.shortcutExpansionStore = store
+
+        // 키보드가 떠 있는 상태 = 뷰모델이 이미 살아 있다. 이후 변경은 전부 이 인스턴스가 받아야 한다.
+        viewModel = KeyboardViewModel()
+    }
+
+    override func tearDown() {
+        KeyboardSettings.shared.shortcutExpansionStore = savedStore
+        KeyboardSettings.shared.abbreviationEnabled = savedAbbreviationEnabled
+        KeyboardSettings.shared.abbreviationUndoOnBackspaceEnabled = savedUndoEnabled
+        KeyboardSettings.shared.abbreviationKeepConfirmSpaceEnabled = savedKeepConfirmSpace
+        viewModel = nil
+        delegate = nil
+        super.tearDown()
+    }
+
+    /// 새 입력창에 자음들을 치고 스페이스로 확정한 결과.
+    private func typed(_ consonants: [Choseong]) -> String {
+        delegate = TextFieldMockDelegate()
+        viewModel.delegate = delegate
+        for consonant in consonants {
+            viewModel.inputConsonant(consonant)
+        }
+        viewModel.inputSpace()
+        return delegate.text
+    }
+
+    /// 앱 단축어 화면의 편집과 같다 — 같은 `id` 항목을 고쳐 끼우므로 개수는 그대로다.
+    ///
+    /// 익스텐션 프로세스에서는 `loadAll()` 의 대입이 이 대입과 같은 발행을 낸다.
+    /// 실제 `loadAll()` 경로는 `testCrossProcessSaveThenLoadAll_…` 가 따로 본다.
+    private func editInApp(_ id: UUID, _ change: (inout ShortcutExpansion) -> Void) {
+        var store = KeyboardSettings.shared.shortcutExpansionStore
+        guard var expansion = store.expansions.first(where: { $0.id == id }) else {
+            return XCTFail("편집할 단축어가 스토어에 없다")
+        }
+        change(&expansion)
+        store.update(expansion)
+        KeyboardSettings.shared.shortcutExpansionStore = store
+    }
+
+    func testEditedTrigger_newTriggerExpands_oldTriggerDoesNot() {
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "♥ ", "precondition: 처음 로드한 트리거는 확장된다")
+
+        editInApp(heartID) { $0.trigger = "ㄷㄹ" }
+
+        XCTAssertEqual(typed([.ㄷ, .ㄹ]), "♥ ", "고친 트리거가 확장돼야 한다")
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "ㅎㅌ ", "고치기 전 트리거는 더 이상 확장되면 안 된다")
+    }
+
+    func testEditedReplacement_expandsToNewText() {
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "♥ ", "precondition")
+
+        editInApp(heartID) { $0.replacement = "사랑해" }
+
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "사랑해 ", "고친 본문으로 확장돼야 한다")
+    }
+
+    func testEditedCommitMode_toSuggestion_showsCandidateInsteadOfReplacing() {
+        editInApp(heartID) { $0.commitMode = .suggestion }
+
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "ㅎㅌ ",
+                       "후보 선택으로 바꿨으면 스페이스에서 바로 치환하지 않는다")
+        XCTAssertTrue(viewModel.isAbbreviationCandidateVisible, "대신 후보 바가 떠야 한다")
+
+        viewModel.confirmAbbreviation()
+        XCTAssertEqual(delegate.text, "♥ ", "후보를 고르면 치환된다")
+    }
+
+    func testDisabledEntry_stopsExpanding_andReEnablingRestoresIt() {
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "♥ ", "precondition")
+
+        editInApp(heartID) { $0.isEnabled = false }
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "ㅎㅌ ", "앱에서 끈 단축어는 확장되면 안 된다")
+        XCTAssertEqual(typed([.ㄱ, .ㅅ]), "감사합니다 ", "켜져 있는 다른 단축어는 그대로 동작한다")
+
+        editInApp(heartID) { $0.isEnabled = true }
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "♥ ", "다시 켜면 확장돼야 한다")
+    }
+
+    /// 기본 예시(`ShortcutExpansion.examples`)는 꺼진 채로 들어 있다 — 사용자가 앱에서
+    /// 켜는 게 가장 흔한 첫 편집이다.
+    func testEnablingInitiallyDisabledEntry_startsExpanding() {
+        XCTAssertEqual(typed([.ㅈ, .ㅅ]), "ㅈㅅ ", "precondition: 꺼진 채로 로드된 단축어는 확장되지 않는다")
+
+        editInApp(sorryID) { $0.isEnabled = true }
+
+        XCTAssertEqual(typed([.ㅈ, .ㅅ]), "죄송합니다 ", "앱에서 켠 단축어가 확장돼야 한다")
+    }
+
+    func testDeleteOneAndAddAnother_sameCount_activatesNewSet() {
+        var store = KeyboardSettings.shared.shortcutExpansionStore
+        let countBefore = store.expansions.count
+        store.remove(id: heartID)
+        store.add(ShortcutExpansion(trigger: "ㄷㄹ", replacement: "다람쥐"))
+        XCTAssertEqual(store.expansions.count, countBefore, "precondition: 개수가 그대로인 경우를 본다")
+        KeyboardSettings.shared.shortcutExpansionStore = store
+
+        XCTAssertEqual(typed([.ㄷ, .ㄹ]), "다람쥐 ", "새로 추가한 단축어가 확장돼야 한다")
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "ㅎㅌ ", "지운 단축어는 확장되면 안 된다")
+    }
+
+    // MARK: 경로별
+
+    /// 메인 앱 프로세스가 App Group 에 저장 → 키보드의 다윈 알림 / `viewWillAppear` 가
+    /// `loadAll()`. 키보드 쪽에서 실제로 도는 경로 그대로다.
+    ///
+    /// 그 뒤 **키를 하나도 떼기 전에** 새 트리거가 먹어야 한다 — 스페이스·슬롯 B 모음 키·
+    /// 긋기 펑크는 `resetGestureState()` 를 거치지 않으므로, 재로드를 그쪽에만 걸면
+    /// 그 키들로만 친 트리거는 옛 트라이로 판정된다.
+    func testCrossProcessSaveThenLoadAll_reachesEngineBeforeAnyGestureEnds() throws {
+        var store = KeyboardSettings.shared.shortcutExpansionStore
+        guard var heart = store.expansions.first(where: { $0.id == heartID }) else {
+            return XCTFail("편집할 단축어가 스토어에 없다")
+        }
+        heart.trigger = "ㄷㄹ"
+        store.update(heart)
+
+        // 메인 앱의 저장을 흉내 낸다. `KeyboardSettings.Keys` 가 private 이라 키를 문자열로
+        // 적는다 — 이 키는 바꾸면 기존 사용자 단축어가 사라지므로 어차피 고정값이다.
+        let shared = try XCTUnwrap(UserDefaults(suiteName: KeyboardSettings.appGroupId))
+        shared.set(try JSONEncoder().encode(store), forKey: "shortcutExpansions")
+        KeyboardSettings.shared.loadAll()
+        XCTAssertEqual(KeyboardSettings.shared.shortcutExpansionStore, store,
+                       "precondition: loadAll 이 앱의 저장을 읽었다")
+
+        XCTAssertEqual(typed([.ㄷ, .ㄹ]), "♥ ", "loadAll 로 들어온 트리거가 바로 확장돼야 한다")
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "ㅎㅌ ", "옛 트리거는 확장되면 안 된다")
+    }
+
+    /// `viewDidAppear`·호스트 복귀·매 키 뗌이 부르는 `resetGestureState()` 경로.
+    func testStoreChange_thenGestureReset_appliesEditedStore() {
+        editInApp(heartID) { $0.replacement = "사랑해" }
+        viewModel.resetGestureState()
+
+        XCTAssertEqual(typed([.ㅎ, .ㅌ]), "사랑해 ")
+    }
+
+    /// 스토어가 그대로면 재로드는 아무것도 하지 않는다. `gestureEnded` 가 키마다
+    /// `resetGestureState()` 를 부르므로 그 사이에 치던 트리거가 날아가면 안 된다.
+    func testUnchangedStore_gestureResetBetweenKeystrokes_keepsTypedTrigger() {
+        delegate = TextFieldMockDelegate()
+        viewModel.delegate = delegate
+
+        viewModel.inputConsonant(.ㅎ)
+        viewModel.resetGestureState()
+        viewModel.inputConsonant(.ㅌ)
+        viewModel.resetGestureState()
+        viewModel.inputSpace()
+
+        XCTAssertEqual(delegate.text, "♥ ")
+    }
+}
+
 /// 요청 시점에 화면과 어긋난 컨텍스트를 보고하는 델리게이트.
 private final class StaleContextDelegate: KeyboardViewModelDelegate {
     private(set) var text: String = ""

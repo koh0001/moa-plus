@@ -267,6 +267,12 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            // 키보드를 띄운 채 앱만 다녀오면 `viewWillAppear` 의 `loadAll()` 도 돌지 않는다.
+            // 그사이 메인 앱에서 바꾼 설정(단축어 편집 등)이 다윈 알림 하나에만 기대게 되는데,
+            // 그 알림은 호스트가 정지돼 있던 동안 온 것이거나 0.1초 안의 연속 저장이면
+            // (`handleCrossProcessChange` 가 버린다) 놓칠 수 있다. 복귀 시점에 직접 다시 읽는다.
+            // 값이 같으면 대입을 건너뛰므로(`assign`) 바뀐 게 없으면 무동작이다.
+            KeyboardSettings.shared.loadAll()
             self?.recoverTouchDelivery()
         }
 

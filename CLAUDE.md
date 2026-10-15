@@ -539,6 +539,7 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 바뀌고 미적용이었다). 각도 편집기에서 손대면 `.custom`. 가드 `SixWaySectorTests`
 
 ### 약어(단축어) 트리거 매칭 규칙
+- **엔진 트라이는 개수가 아니라 스토어가 조금이라도 바뀌면 다시 만든다** — 개수만 보면 편집·활성화 토글·삭제+추가가 떠 있는 키보드에 안 닿았다. 뷰모델이 `$shortcutExpansionStore` 를 구독해(willSet 발행이라 **받은 값**을 쓸 것) 다음 키 전에 반영한다 (`KeyboardViewModelAbbreviationReloadTests`)
 - 구분자는 두 종류다. **경계 구분자**(`" "` `"\n"`)는 버퍼를 리셋하고, **내용 겸 확정
   구분자**(`.` `,` `!` `?` `;` `:`)는 버퍼에 누적되면서 확정 판정도 트리거한다. 덕분에
   `.ㅎㅌ` `ㅏ..` 같은 기호 트리거가 성립한다

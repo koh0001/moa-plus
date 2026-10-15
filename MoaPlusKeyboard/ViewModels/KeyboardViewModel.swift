@@ -244,21 +244,51 @@ class KeyboardViewModel: ObservableObject {
     /// 정하는 데 쓴다 — 엔진은 확장 직후에만 복원을 요청하므로 이 값은 항상 짝이 맞는다.
     private var lastExpansionKeptDelimiter: Bool = true
 
-    private var lastExpansionCount: Int = -1
+    /// 엔진 트라이를 마지막으로 만든 스토어. `nil` 이면 아직 한 번도 안 만든 것이다.
+    ///
+    /// 예전에는 **개수**만 기억해 개수가 바뀔 때만 다시 만들었다. 그러면 앱에서 트리거·본문·
+    /// 확정 방식을 고치거나, 활성화를 켜고 끄거나, 하나 지우고 하나 더하는 편집(전부 개수 불변)이
+    /// 컨트롤러가 살아 있는 내내 키보드에 닿지 않는다 — 옛 트리거가 계속 터지고, 끈 단축어가
+    /// 확장되고, 켠 단축어는 영영 안 터졌다 (`KeyboardViewModelAbbreviationReloadTests`).
+    private var lastLoadedExpansionStore: ShortcutExpansionStore?
+
+    /// `KeyboardSettings.$shortcutExpansionStore` 구독. 다윈 알림/`viewWillAppear` 의
+    /// `loadAll()` 이 스토어를 바꾸는 즉시 엔진에 반영한다.
+    private var expansionStoreCancellable: AnyCancellable?
 
     /// Reload abbreviation engine when settings change.
     /// Always syncs the master toggle so the user can flip the global
-    /// switch without re-entering the keyboard. The trigger trie is only
-    /// rebuilt when the expansion count actually changed.
+    /// switch without re-entering the keyboard. 트라이는 스토어가 **조금이라도**
+    /// 달라졌을 때만 다시 만든다 (같으면 비교 한 번으로 끝 — `gestureEnded` 가 키마다 부른다).
     private func reloadAbbreviationEngine() {
         abbreviationEngine.delegate = self
         abbreviationEngine.isEnabled = KeyboardSettings.shared.abbreviationEnabled
         abbreviationEngine.isUndoOnBackspaceEnabled = KeyboardSettings.shared.abbreviationUndoOnBackspaceEnabled
 
-        let currentCount = KeyboardSettings.shared.shortcutExpansionStore.expansions.count
-        guard currentCount != lastExpansionCount else { return }
-        lastExpansionCount = currentCount
-        abbreviationEngine.loadExpansions(KeyboardSettings.shared.shortcutExpansionStore)
+        applyExpansionStore(KeyboardSettings.shared.shortcutExpansionStore)
+    }
+
+    private func applyExpansionStore(_ store: ShortcutExpansionStore) {
+        guard store != lastLoadedExpansionStore else { return }
+        lastLoadedExpansionStore = store
+        abbreviationEngine.loadExpansions(store)
+    }
+
+    /// 스토어가 바뀌면 다음 키를 기다리지 않고 바로 트라이를 다시 만든다.
+    ///
+    /// `resetGestureState()` 의 재로드만으로는 부족하다 — 그건 그리드 키를 뗄 때만 돌고,
+    /// 스페이스·엔터·슬롯 B 모음 키·긋기 펑크는 거치지 않는다. 그 키들로만 친 트리거는
+    /// `loadAll()` 이 새 스토어를 들여온 뒤에도 옛 트라이로 판정됐다.
+    ///
+    /// ⚠️ 받은 값을 그대로 넘길 것. `@Published` 는 **willSet** 에서 발행하므로 여기서
+    /// `KeyboardSettings.shared.shortcutExpansionStore` 를 읽으면 아직 옛 값이다
+    /// (`reloadAbbreviationEngine()` 을 부르면 조용히 아무것도 안 한다).
+    /// 구독 직후의 첫 발행은 init 에서 이미 만든 스토어와 같아 비교 한 번으로 끝난다.
+    private func observeExpansionStore() {
+        expansionStoreCancellable = KeyboardSettings.shared.$shortcutExpansionStore
+            .sink { [weak self] store in
+                self?.applyExpansionStore(store)
+            }
     }
 
     /// Tracks the last composing text to enable incremental updates
@@ -287,6 +317,7 @@ class KeyboardViewModel: ObservableObject {
             keyboardMode = .english
         }
         reloadAbbreviationEngine()
+        observeExpansionStore()
     }
 
     /// Push the live center-key width into the gesture analyzer so the
