@@ -319,7 +319,9 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - 배경은 한손 모드일 때 바깥에서 한 번만 그린다(`keyboardContent(drawsBackground:)`)
 - 폭 하한 0.70 = 375pt + 지구본 표시에서도 기능행이 맞는 선 (`OneHandedLayoutTests`). 하한을 내리면 이 테스트로 확인
 - 이름을 손이 아니라 **위치**로 붙였다 — 긋기 프리셋 "오른손용/왼손용/양손용" 과 혼동(이슈 #31)
-- 띠 버튼 변경은 전체 접근 OFF 면 App Group 에 못 써 다음 `loadAll()` 에서 원래 값으로 돌아온다
+- 띠 버튼 변경은 전체 접근 OFF 면 App Group 에 못 써 다음 `loadAll()` 에서 원래 값으로 돌아온다.
+  그래서 호스트 복귀(`NSExtensionHostDidBecomeActive`)의 `loadAll()` 은 `hasFullAccess` 일 때만 돈다 —
+  OFF 에서 돌리면 제어 센터만 내렸다 올려도 띠가 풀린다 (`KeyboardHostActiveReloadTests`)
 - 새 모델 파일은 메인 앱·테스트 타깃 멤버십 예외 목록에도 넣어야 한다(`scripts/add_target_membership.rb`
   FILES_TO_ADD — `xcodeproj` gem 이 없으면 pbxproj 의 두 `membershipExceptions` 에 직접 추가)
 

@@ -272,7 +272,15 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             // 그 알림은 호스트가 정지돼 있던 동안 온 것이거나 0.1초 안의 연속 저장이면
             // (`handleCrossProcessChange` 가 버린다) 놓칠 수 있다. 복귀 시점에 직접 다시 읽는다.
             // 값이 같으면 대입을 건너뛰므로(`assign`) 바뀐 게 없으면 무동작이다.
-            KeyboardSettings.shared.loadAll()
+            //
+            // ⚠️ 전체 접근이 켜져 있을 때만. 꺼져 있으면 공유 컨테이너가 없어 키보드 쪽 저장
+            // (한손 모드 띠 버튼의 `keyboardPlacement` 등)이 남지 않으므로, 여기서 다시 읽으면
+            // 제어 센터만 내렸다 올려도 키보드가 떠 있는 채 원래 값으로 돌아간다. 그 사용자는
+            // 앱의 단축어 편집도 어차피 못 받으니 다시 읽어 얻는 것이 없다
+            // (`KeyboardHostActiveReloadTests`).
+            if self?.hasFullAccess == true {
+                KeyboardSettings.shared.loadAll()
+            }
             self?.recoverTouchDelivery()
         }
 
