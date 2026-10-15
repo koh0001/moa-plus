@@ -231,6 +231,13 @@ enum SettingsCatalog {
             keywords: ["테마", "색", "색상", "배경", "이미지", "사진", "다크", "밝기", "투명"]
         ),
         SettingsEntry(
+            title: "배경 사진 크기 · 맞춤",
+            icon: "photo",
+            destination: .appearance,
+            // "키보드 배경 사진 크기 작게 안 됩니다" — 앱스토어 리뷰 (이슈 #39).
+            keywords: ["배경", "사진", "이미지", "크기", "작게", "줄이", "잘림", "잘려", "꽉", "채우기", "전체", "맞춤", "확대"]
+        ),
+        SettingsEntry(
             title: "소리 · 진동",
             icon: "waveform",
             destination: .feedback,
@@ -305,6 +312,13 @@ enum SettingsCatalog {
             remedy: "키보드 높이를 85%~135%로 조절할 수 있습니다",
             icon: "arrow.up.and.down",
             destination: .size
+        ),
+        SettingsSymptom(
+            // 앱스토어 리뷰 "키보드 배경 사진 크기 작게 안 됩니다" (이슈 #39).
+            symptom: "배경 사진이 잘리거나 너무 크게 나와요",
+            remedy: "배경 이미지에서 ‘전체 보이기’를 고르거나 사진 크기를 줄이세요",
+            icon: "photo",
+            destination: .appearance
         ),
         SettingsSymptom(
             symptom: "특수문자를 바꾸고 싶어요",

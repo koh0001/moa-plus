@@ -135,6 +135,28 @@ struct AppearanceSettingsView: View {
                     }
                 }
 
+                // 사진 맞춤 · 크기 (이슈 #39 — 앱스토어 리뷰 "키보드 배경 사진 크기 작게 안 됩니다")
+                // 사진이 있을 때만 의미가 있다. 위 미리보기가 실제 키보드와 같은 뷰라 바로 반영된다.
+                if settings.themeSettings.backgroundImageId != nil {
+                    Picker("사진 맞춤", selection: $settings.themeSettings.backgroundImageContentMode) {
+                        ForEach(BackgroundImageContentMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    HStack {
+                        Text("사진 크기")
+                        Spacer()
+                        // `Int(v * 100)` 은 0.65 → 64 처럼 내림 오차가 나서 반올림한다.
+                        Text("\(Int((settings.themeSettings.backgroundImageScale * 100).rounded()))%")
+                            .foregroundColor(.secondary)
+                    }
+                    Slider(value: $settings.themeSettings.backgroundImageScale,
+                           in: ThemeSettings.backgroundImageScaleRange,
+                           step: ThemeSettings.backgroundImageScaleStep)
+                }
+
                 // Opacity slider
                 HStack {
                     Text("배경 투명도")
@@ -146,7 +168,7 @@ struct AppearanceSettingsView: View {
             } header: {
                 Text("배경 이미지")
             } footer: {
-                Text("선택한 이미지가 키보드 배경에 표시됩니다. 투명도를 조절하여 키 가독성을 유지하세요.")
+                Text("선택한 이미지가 키보드 배경에 표시됩니다. ‘전체 보이기’를 고르거나 크기를 줄이면 사진이 덮지 않는 곳은 기본 배경색으로 보입니다. 투명도를 조절하여 키 가독성을 유지하세요.")
             }
         }
         .navigationTitle("외형")
@@ -281,11 +303,12 @@ struct KeyboardPreviewCard: View {
                 .fill(Color(.systemGray6))
 
             if let image = backgroundImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(opacity)
-                    .clipped()
+                KeyboardBackgroundImageView(
+                    image: image,
+                    opacity: opacity,
+                    contentMode: themeSettings.backgroundImageContentMode,
+                    scale: themeSettings.backgroundImageScale
+                )
             }
 
             // Keys

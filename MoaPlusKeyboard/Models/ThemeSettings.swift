@@ -195,12 +195,60 @@ enum ButtonTheme: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// 배경 사진을 키보드에 맞추는 방식 (이슈 #39 — 앱스토어 리뷰 "키보드 배경 사진 크기 작게 안 됩니다").
+enum BackgroundImageContentMode: String, Codable, CaseIterable {
+    /// 키보드를 꽉 채운다 — 넘치는 부분은 잘린다. 이 설정이 생기기 전의 유일한 동작이자 기본값.
+    case fill
+    /// 사진 전체가 보이게 줄인다 — 남는 곳은 평소 키보드 배경이 보인다.
+    case fit
+
+    var displayName: String {
+        switch self {
+        case .fill: return "꽉 채우기"
+        case .fit:  return "전체 보이기"
+        }
+    }
+}
+
+/// 배경 사진을 그릴 크기 계산. 뷰와 분리해 둔 순수 함수라 단위 테스트로 고정한다.
+enum BackgroundImageLayout {
+    /// 사진을 `container` 안에 그릴 크기. 사진은 항상 가운데에 놓는다.
+    ///
+    /// 기준 크기는 맞춤 방식이 정하고(꽉 채우기 = 두 변 모두 덮는 최소 배율, 전체 보이기 =
+    /// 두 변 모두 들어가는 최대 배율) 거기에 `scale` 을 곱한다. 종횡비는 언제나 원본 그대로다.
+    /// `scale` 은 `ThemeSettings.backgroundImageScaleRange` 로 잘라 쓴다 — 저장값이 범위를
+    /// 벗어나도(손상·다른 버전) 그리는 크기는 범위 안이다.
+    static func displaySize(
+        imageSize: CGSize,
+        containerSize: CGSize,
+        contentMode: BackgroundImageContentMode,
+        scale: Double
+    ) -> CGSize {
+        guard imageSize.width > 0, imageSize.height > 0,
+              containerSize.width > 0, containerSize.height > 0 else { return .zero }
+        let widthRatio = containerSize.width / imageSize.width
+        let heightRatio = containerSize.height / imageSize.height
+        let base: CGFloat
+        switch contentMode {
+        case .fill: base = max(widthRatio, heightRatio)
+        case .fit:  base = min(widthRatio, heightRatio)
+        }
+        let ratio = base * CGFloat(ThemeSettings.clampedBackgroundImageScale(scale))
+        return CGSize(width: imageSize.width * ratio, height: imageSize.height * ratio)
+    }
+}
+
 /// Complete theme settings
 struct ThemeSettings: Codable, Equatable {
     var appearanceMode: AppearanceMode = .system
     var buttonTheme: ButtonTheme = .defaultGray
     var backgroundImageId: String?
     var backgroundOpacity: Double = 0.3
+    /// 배경 사진 맞춤 방식 (이슈 #39). 기본 `.fill` = 기존 렌더링 그대로.
+    var backgroundImageContentMode: BackgroundImageContentMode = .fill
+    /// 배경 사진 크기 배율 — 맞춤 방식의 기준 크기에 곱한다 (이슈 #39).
+    /// 기본 1.0 = 기존 렌더링 그대로. 범위는 `backgroundImageScaleRange`.
+    var backgroundImageScale: Double = 1.0
     var hapticEnabled: Bool = true
     var hapticStrength: HapticStrength = .normal
     var clickSoundEnabled: Bool = false
@@ -234,4 +282,57 @@ struct ThemeSettings: Codable, Equatable {
     }
 
     static let `default` = ThemeSettings()
+
+    /// 배경 사진 크기 배율 범위 (이슈 #39). 줄이기만 한다 — 1.0 이 맞춤 방식의 기준 크기라
+    /// 키우면 꽉 채우기는 더 잘리고 전체 보이기는 이름과 어긋난다. 0.5 아래는 키 사이로
+    /// 사진이 거의 안 보여 의미가 없다. 설정 슬라이더는 5% 단위.
+    static let backgroundImageScaleRange: ClosedRange<Double> = 0.5...1.0
+    static let backgroundImageScaleStep: Double = 0.05
+
+    /// 범위 밖·비정상(NaN) 저장값을 그릴 수 있는 배율로. 비정상이면 기본 1.0.
+    static func clampedBackgroundImageScale(_ scale: Double) -> Double {
+        guard scale.isFinite else { return 1.0 }
+        return min(max(scale, backgroundImageScaleRange.lowerBound), backgroundImageScaleRange.upperBound)
+    }
+
+    // 저장된 모든 필드를 나열한다 — 빠진 키는 인코딩에서도 조용히 빠진다.
+    private enum CodingKeys: String, CodingKey {
+        case appearanceMode, buttonTheme, backgroundImageId, backgroundOpacity
+        case backgroundImageContentMode, backgroundImageScale
+        case hapticEnabled, hapticStrength, clickSoundEnabled
+        case customKeyBackground, customKeyText, customFunctionKeyBackground
+        case keyBackgroundOpacity, functionKeyBackgroundOpacity
+        case hapticOnTap, hapticOnLongPress, hapticOnLayerSwitch, hapticOnAbbreviationConfirm
+    }
+}
+
+extension ThemeSettings {
+    /// 키가 없으면 기본값으로 채운다. 합성 `Decodable` 은 키 하나만 없어도 `keyNotFound` 로
+    /// 통째로 실패하고, `KeyboardSettings.loadAll()` 은 그때 `.default` 로 떨어져 사용자의
+    /// 테마·배경 사진이 전부 초기화된다 — 새 필드(이슈 #39)가 없는 기존 저장값이 바로 그 경우다.
+    /// 확장(extension)에 둬야 `ThemeSettings()` 기본 생성자가 살아남는다.
+    init(from decoder: Decoder) throws {
+        self.init()
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        appearanceMode = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? appearanceMode
+        buttonTheme = try c.decodeIfPresent(ButtonTheme.self, forKey: .buttonTheme) ?? buttonTheme
+        backgroundImageId = try c.decodeIfPresent(String.self, forKey: .backgroundImageId)
+        backgroundOpacity = try c.decodeIfPresent(Double.self, forKey: .backgroundOpacity) ?? backgroundOpacity
+        // 새 필드는 모르는 값(다른 버전이 쓴 케이스 등)이어도 테마 전체를 잃지 않게 `try?` 로 받는다.
+        backgroundImageContentMode = (try? c.decodeIfPresent(BackgroundImageContentMode.self,
+                                                             forKey: .backgroundImageContentMode)) ?? backgroundImageContentMode
+        backgroundImageScale = (try? c.decodeIfPresent(Double.self, forKey: .backgroundImageScale)) ?? backgroundImageScale
+        hapticEnabled = try c.decodeIfPresent(Bool.self, forKey: .hapticEnabled) ?? hapticEnabled
+        hapticStrength = try c.decodeIfPresent(HapticStrength.self, forKey: .hapticStrength) ?? hapticStrength
+        clickSoundEnabled = try c.decodeIfPresent(Bool.self, forKey: .clickSoundEnabled) ?? clickSoundEnabled
+        customKeyBackground = try c.decodeIfPresent(CodableColor.self, forKey: .customKeyBackground) ?? customKeyBackground
+        customKeyText = try c.decodeIfPresent(CodableColor.self, forKey: .customKeyText) ?? customKeyText
+        customFunctionKeyBackground = try c.decodeIfPresent(CodableColor.self, forKey: .customFunctionKeyBackground) ?? customFunctionKeyBackground
+        keyBackgroundOpacity = try c.decodeIfPresent(Double.self, forKey: .keyBackgroundOpacity) ?? keyBackgroundOpacity
+        functionKeyBackgroundOpacity = try c.decodeIfPresent(Double.self, forKey: .functionKeyBackgroundOpacity) ?? functionKeyBackgroundOpacity
+        hapticOnTap = try c.decodeIfPresent(Bool.self, forKey: .hapticOnTap) ?? hapticOnTap
+        hapticOnLongPress = try c.decodeIfPresent(Bool.self, forKey: .hapticOnLongPress) ?? hapticOnLongPress
+        hapticOnLayerSwitch = try c.decodeIfPresent(Bool.self, forKey: .hapticOnLayerSwitch) ?? hapticOnLayerSwitch
+        hapticOnAbbreviationConfirm = try c.decodeIfPresent(Bool.self, forKey: .hapticOnAbbreviationConfirm) ?? hapticOnAbbreviationConfirm
+    }
 }

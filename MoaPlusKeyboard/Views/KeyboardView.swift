@@ -15,16 +15,23 @@ struct KeyboardView: View {
     @State private var cachedBgImage: UIImage?
     @State private var cachedBgImageId: String?
 
+    /// 키보드 배경. 사진이 덮지 않는 곳(전체 보이기·크기 축소)은 평소 배경색이 보인다 (이슈 #39).
+    ///
+    /// 사진 밑에 깔린 `systemGray6` 은 익스텐션에서는 원래부터 있던 색이다 — 컨트롤러 뷰
+    /// 배경이 `systemGray6`, 호스팅 뷰가 `.clear` 라 반투명 사진은 늘 그 위에 합성됐다.
+    /// 그래서 꽉 채우기·100%(기본)는 픽셀 단위로 예전과 같다. 메인 앱 미리보기만 사진 밑이
+    /// 목록 셀 색에서 실제 키보드와 같은 색으로 바뀐다.
     private var keyboardBackground: some View {
-        Group {
+        ZStack {
+            Color(.systemGray6)
             if let image = cachedBgImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(KeyboardSettings.shared.themeSettings.backgroundOpacity)
-                    .clipped()
-            } else {
-                Color(.systemGray6)
+                let theme = settings.themeSettings
+                KeyboardBackgroundImageView(
+                    image: image,
+                    opacity: theme.backgroundOpacity,
+                    contentMode: theme.backgroundImageContentMode,
+                    scale: theme.backgroundImageScale
+                )
             }
         }
     }
@@ -433,6 +440,38 @@ struct KeyboardView: View {
     let vm = KeyboardViewModel()
     KeyboardView(viewModel: vm, gestureState: vm.gestureState, popupState: vm.popupState)
         .frame(height: 280)
+}
+
+// MARK: - 배경 사진 (이슈 #39)
+
+/// 키보드 배경 사진. 크기는 `BackgroundImageLayout.displaySize` 가 정하고 사진은 항상 가운데.
+///
+/// `image` 는 `KeyboardView.cachedBgImage` 가 들고 있는 다운샘플본(`BackgroundImageManager`
+/// 상한 1536px) 그대로다. 맞춤 방식·크기 슬라이더는 **프레임만** 바꾸고 다시 디코딩·리샘플하지
+/// 않는다 — 익스텐션 메모리 한계(~30MB) 때문에 슬라이더 틱마다 비트맵을 새로 만들면 안 된다.
+/// 사진은 이 뷰의 영역 밖으로 그리지 않는다(꽉 채우기에서 넘치는 부분은 잘린다).
+struct KeyboardBackgroundImageView: View {
+    let image: UIImage
+    let opacity: Double
+    let contentMode: BackgroundImageContentMode
+    let scale: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let size = BackgroundImageLayout.displaySize(
+                imageSize: image.size,
+                containerSize: geo.size,
+                contentMode: contentMode,
+                scale: scale
+            )
+            Image(uiImage: image)
+                .resizable()
+                .frame(width: size.width, height: size.height)
+                .opacity(opacity)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+        .clipped()
+    }
 }
 
 // MARK: - 누름 시점 햅틱 주입 (이슈 #23)
