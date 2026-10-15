@@ -479,6 +479,21 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
 
     func triggerHapticFeedback() {
         HapticManager.shared.playTap()
+        playClickSoundIfEnabled()
+    }
+
+    /// 레이어 전환 키: 햅틱만 레이어 전환 쪽으로 바꾸고 클릭 사운드는 다른 키와 같다 (이슈 #41).
+    func triggerLayerSwitchFeedback() {
+        HapticManager.shared.playLayerSwitch()
+        playClickSoundIfEnabled()
+    }
+
+    /// 롱키 팝업이 열린 순간. 누를 때 이미 클릭했으므로 사운드는 다시 내지 않는다.
+    func triggerLongPressFeedback() {
+        HapticManager.shared.playLongPress()
+    }
+
+    private func playClickSoundIfEnabled() {
         if KeyboardSettings.shared.clickSoundEnabled {
             AudioServicesPlaySystemSound(KeyboardMetrics.clickSoundID)
         }

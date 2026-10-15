@@ -174,14 +174,34 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   글자" = 비어 있지 않은 첫 후보이되 **저장된** 괄호 자동 닫기가 켜져 있으면 닫는 괄호를 건너뛴 것
   (ㄴ `> . }` → `.` 유지), 남는 게 없으면 기본 출력 그대로. 이 설정은 프로퍼티가 아니라 저장소에서 읽는다
   — 이전이 `autoBracketEnabled` 대입보다 먼저 돈다. `resetAll()` 은 이 플래그를 되돌리지 않는다 (`KeyboardViewModelLongPressTests` / `LongPressPrimaryOutputTests`)
-- `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음
+- **롱키 콜백은 키 위치를 함께 넘긴다 (이슈 #40)**: `inputLongPressNumber(_:row:column:)`·
+  `updatePopupSelection(row:column:translationX:)`·`confirmPopupSelection(row:column:)`·`lockShift(row:column:)`.
+  타이머·드래그·뗌은 키 뷰마다 따로 오고, 앞 키가 롤오버·레이어 전환으로 먼저 정리된 **뒤에도** 온다.
+  뷰모델은 지금 눌린 그리드 키(`isActiveGridKey` — 활성 키이고 롤오버 기록에 없음)의 것만 받는다. 위치 없는
+  옛 시그니처로 되돌리면 "ㅈ 누른 채 ㄱ → ㅈ9(ㄱ 사라짐)", "ㅈ 누른 채 123 → $", "앞 키 뗌이 새 키 팝업을 지움"
+  이 되살아난다. 후보는 누를 때 잡은 `activeKeyContent`·`activeKeyMode` 로 `KeyGridView.longPressBinding` 에서
+  만든다(타이머 시점의 모드로 다시 찾지 말 것). `inputLongPressNumber` 는 `Bool` — 키 뷰는 **`true` 일 때만**
+  `showNumberPopup` 을 세운다(먼저 세우면 거절된 키의 뗌이 `onPopupRelease` 로 빠져 `gestureEnded` 가 롤오버
+  기록을 못 지운다). 한/영·123·#+= (`toggleLetterMode`/`toggleSymbolMode`/`toggleSymbolPage`)는 모드를 바꾸기
+  **전에** 눌린 그리드 키를 롤오버와 똑같이 지금 레이어로 확정(팝업이 떠 있으면 확정 없이 닫음)하고
+  롤오버 기록에 넣는다 — 예전에는 그 키의 뗌·롱키가 새 레이어의 같은 칸으로 해석됐다(`LongPressKeyIdentityTests`)
+- `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음.
+  이벤트별 토글 판정은 `HapticManager.isEnabled(_:in:)` 하나(`HapticEventToggleTests`)
 - **햅틱은 키를 누르는 순간 울린다** (이슈 #23). 입력 확정(손 뗄 때)이 아니다 — 긋기 키보드는
   press→release 간격이 길어 확정 시점에 울리면 반응이 늦게 느껴진다. 그리드 키는
   `gestureStarted`, 슬롯B는 `slotBVowelGestureStarted` 가 `keyPressFeedback()` 을 부르고,
   기능행 키는 `EnvironmentValues.keyPressFeedback`(KeyboardView.swift 정의)으로 주입받는다.
   **입력 메서드(`inputConsonant`/`inputSpace`/`toggleLetterMode` 등)에 햅틱을 되살리지 말 것**
   — 키 하나에 진동 두 번이 된다 (`KeyboardViewModelHapticTimingTests` 가드).
-  백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함)
+  백스페이스만 예외로 `deleteBackward()` 안에 남아 있다(자동 반복 틱마다 울려야 함).
+  **레이어 전환 키(한/영 · 123/한글 · #+=/123)는 탭 햅틱 대신 레이어 전환 햅틱** (이슈 #41, 설정 "레이어 전환" —
+  끄면 그 키는 진동 없음, 클릭 사운드는 그대로): `FunctionKeyView(pressFeedback: .layerSwitch)` → 환경 값
+  `layerSwitchPressFeedback` → `viewModel.layerSwitchPressFeedback()` → 델리게이트 `triggerLayerSwitchFeedback()`.
+  `FunctionRowView` 의 레이어 키는 `symbolToggleKey`/`letterToggleKey`/`symbolPageToggleKey` 로만 만든다.
+  **롱키 팝업 햅틱**(설정 "롱프레스 팝업")은 팝업이 실제로 열린 순간 `inputLongPressNumber` 가 받았을 때 한 번
+  (`triggerLongPressFeedback()`, 거른 타이머는 안 울림). v2.2.5 까지 이 두 토글은 호출부가 없어 아무 효과가
+  없었다. 새 델리게이트 메서드는 **프로토콜 본문에** 선언할 것 — 확장 기본값만 두면 정적 디스패치로 컨트롤러
+  구현이 불리지 않는다
 - **라이트/다크 (이슈 #30)**: 밝은 버튼 프리셋(기본 그레이·블루 포인트·베이지)은 `presetDark*` 짝을 가진
   **동적 색**(`UIColor { traits in }`)이라 trait 만 바뀌면 스스로 바뀐다 — 색 캐시 재계산 불필요.
   동적 색은 프리셋별 `static` 팔레트로 **한 번만** 만든다(매번 새로 만들면 `Color` 비교가 달라져
@@ -323,7 +343,8 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 이동·취소에도 **(row, column) 을 넘겨야** 한다 — 위치 없는 `gestureMoved(to:)` 를 그리드에서 다시 쓰면 제보
 "는 → 너ㅡㄴ"(앞 키 손가락 흔들림이 새 키 위치에서 시작한 ←225pt 긋기로 읽힘)가 되살아난다.
 롱프레스 팝업이 떠 있던 앞 키는 확정하지 않고 리셋. 슬롯 B(`activeKey.row == -1`)는 별도 파이프라인이라 제외.
-가드 `KeyboardViewModelRolloverTests` (수정을 끄면 "너ㅡㄴ"/"네" 재현)
+가드 `KeyboardViewModelRolloverTests` (수정을 끄면 "너ㅡㄴ"/"네" 재현). 롱키·팝업 콜백과 레이어 전환도 같은
+규칙을 따른다 — 위 "롱키 콜백은 키 위치를 함께 넘긴다 (이슈 #40)" 참조
 
 ### 한손 모드 (v2.2.5 / 앱스토어 리뷰)
 `KeyboardSettings.keyboardPlacement`(`.full` 기본/`.left`/`.right`) + `oneHandedWidthRatio`(0.70~0.90, 기본 0.82).

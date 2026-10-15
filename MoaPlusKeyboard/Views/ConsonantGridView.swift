@@ -16,14 +16,19 @@ struct KeyGridView: View {
     let onSymbolTap: (String) -> Void
     let onBackspacePressStart: () -> Void
     let onBackspacePressEnd: () -> Void
-    let onLongPressNumber: (String) -> Void
-    var onShiftLongPress: (() -> Void)? = nil
+    /// (글자, row, column) → 팝업을 열었나. 롱키·팝업 콜백도 **키 위치를 함께** 넘긴다 — 타이머와
+    /// 뗌은 키마다 따로 오므로, 위치가 없으면 뷰모델이 롤오버로 먼저 확정한 키나 레이어 전환 전에
+    /// 누른 키의 늦은 신호를 지금 눌린 키의 것으로 해석한다 (이슈 #40).
+    let onLongPressNumber: (String, Int, Int) -> Bool
+    var onShiftLongPress: ((Int, Int) -> Void)? = nil
     let onGestureStart: (Int, Int, CGPoint) -> Void
     /// (row, column, point) — 키 위치를 함께 넘겨야 뷰모델이 롤오버로 먼저 확정한 키의 늦은 이동을 버린다.
     let onGestureMove: (Int, Int, CGPoint) -> Void
     let onGestureEnd: (Int, Int) -> Void
-    var onPopupDrag: ((CGFloat) -> Void)?
-    var onPopupRelease: (() -> Void)?
+    /// (row, column, translationX)
+    var onPopupDrag: ((Int, Int, CGFloat) -> Void)?
+    /// (row, column)
+    var onPopupRelease: ((Int, Int) -> Void)?
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureMove: ((CGPoint) -> Void)? = nil
     var onSlotBVowelGestureEnd: (() -> Void)? = nil
@@ -129,7 +134,7 @@ struct KeyGridView: View {
                             shiftState: shiftState,
                             mode: mode,
                             onLongPress: { number in
-                                onLongPressNumber(number)
+                                onLongPressNumber(number, row, column)
                             },
                             onBackspacePressStart: {
                                 guard case .backspace = content else {
@@ -155,12 +160,12 @@ struct KeyGridView: View {
                                 onGestureEnd(row, column)
                             },
                             onPopupDrag: { translationX in
-                                onPopupDrag?(translationX)
+                                onPopupDrag?(row, column, translationX)
                             },
                             onPopupRelease: {
-                                onPopupRelease?()
+                                onPopupRelease?(row, column)
                             },
-                            onShiftLongPress: onShiftLongPress,
+                            onShiftLongPress: { onShiftLongPress?(row, column) },
                             onGestureCancel: { onGestureCancel?(row, column) }
                         )
                         }   // close else branch (slot B intercept)

@@ -95,25 +95,9 @@ struct FunctionRowView: View {
         HStack(spacing: spacing) {
             globeKeyIfEnabled
 
-            FunctionKeyView(
-                content: AnyView(
-                    Text(symbolToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: symbolToggleWidth,
-                height: height,
-                action: onToggleSymbolPressed
-            )
+            symbolToggleKey(width: symbolToggleWidth)
 
-            FunctionKeyView(
-                content: AnyView(
-                    Text(letterToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: letterToggleWidth,
-                height: height,
-                action: onToggleLetterPressed
-            )
+            letterToggleKey(width: letterToggleWidth)
 
             symbolPageToggleKey(width: punctuationWidth)
 
@@ -168,6 +152,38 @@ struct FunctionRowView: View {
         showGlobeKey ? globeWidth + spacing : 0
     }
 
+    // MARK: - Layer keys (레이어 전환 키)
+    // 123/한글 · 한/영 · #+=/123 은 누르는 순간 탭 햅틱 대신 레이어 전환 햅틱을 낸다 (이슈 #41).
+    // 네 바디가 모두 아래 셋으로만 만들어 `pressFeedback: .layerSwitch` 를 빠뜨릴 자리가 없게 한다.
+
+    /// 123 ↔ 한글/ABC 토글.
+    private func symbolToggleKey(width: CGFloat) -> some View {
+        FunctionKeyView(
+            content: AnyView(
+                Text(symbolToggleLabel)
+                    .font(.system(size: 16, weight: .medium))
+            ),
+            width: width,
+            height: height,
+            pressFeedback: .layerSwitch,
+            action: onToggleSymbolPressed
+        )
+    }
+
+    /// 한/영 토글.
+    private func letterToggleKey(width: CGFloat) -> some View {
+        FunctionKeyView(
+            content: AnyView(
+                Text(letterToggleLabel)
+                    .font(.system(size: 16, weight: .medium))
+            ),
+            width: width,
+            height: height,
+            pressFeedback: .layerSwitch,
+            action: onToggleLetterPressed
+        )
+    }
+
     /// Symbol-page toggle key (#+= / 123). Narrow slot-B width, so the label
     /// uses a slightly smaller font to fit the 3-character labels.
     private func symbolPageToggleKey(width: CGFloat) -> some View {
@@ -180,6 +196,7 @@ struct FunctionRowView: View {
             ),
             width: width,
             height: height,
+            pressFeedback: .layerSwitch,
             action: onSymbolPagePressed ?? {}
         )
     }
@@ -192,25 +209,9 @@ struct FunctionRowView: View {
         HStack(spacing: spacing) {
             globeKeyIfEnabled
 
-            FunctionKeyView(
-                content: AnyView(
-                    Text(symbolToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: symbolToggleWidth,
-                height: height,
-                action: onToggleSymbolPressed
-            )
+            symbolToggleKey(width: symbolToggleWidth)
 
-            FunctionKeyView(
-                content: AnyView(
-                    Text(letterToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: letterToggleWidth,
-                height: height,
-                action: onToggleLetterPressed
-            )
+            letterToggleKey(width: letterToggleWidth)
 
             SpaceKeyView(
                 width: longSpaceWidth,
@@ -244,26 +245,10 @@ struct FunctionRowView: View {
             globeKeyIfEnabled
 
             // Symbol toggle (123/한글)
-            FunctionKeyView(
-                content: AnyView(
-                    Text(symbolToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: symbolToggleWidth,
-                height: height,
-                action: onToggleSymbolPressed
-            )
+            symbolToggleKey(width: symbolToggleWidth)
 
             // Letter toggle (한/영)
-            FunctionKeyView(
-                content: AnyView(
-                    Text(letterToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: letterToggleWidth,
-                height: height,
-                action: onToggleLetterPressed
-            )
+            letterToggleKey(width: letterToggleWidth)
 
             // Space bar
             SpaceKeyView(
@@ -338,26 +323,10 @@ struct FunctionRowView: View {
             }
 
             // Mode toggle (한글/123)
-            FunctionKeyView(
-                content: AnyView(
-                    Text(symbolToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: bimanualToggleWidth,
-                height: height,
-                action: onToggleSymbolPressed
-            )
+            symbolToggleKey(width: bimanualToggleWidth)
 
             // Letter toggle (한/영)
-            FunctionKeyView(
-                content: AnyView(
-                    Text(letterToggleLabel)
-                        .font(.system(size: 16, weight: .medium))
-                ),
-                width: bimanualPunctuationWidth,
-                height: height,
-                action: onToggleLetterPressed
-            )
+            letterToggleKey(width: bimanualPunctuationWidth)
 
             // Space bar (takes remaining width)
             SpaceKeyView(
@@ -897,12 +866,27 @@ struct SpaceKeyView: View {
 struct FunctionKeyView: View {
     /// 누르는 순간의 햅틱 (이슈 #23). 생성 지점이 많아 환경 값으로 주입한다.
     @Environment(\.keyPressFeedback) private var keyPressFeedback
+    /// 레이어 전환 키의 누름 피드백 (이슈 #41) — `pressFeedback == .layerSwitch` 일 때 탭 대신.
+    @Environment(\.layerSwitchPressFeedback) private var layerSwitchPressFeedback
     let content: AnyView
     let width: CGFloat
     let height: CGFloat
+    /// 누르는 순간 어떤 피드백을 낼지. 한/영 · 123/한글 · #+=/123 만 `.layerSwitch`.
+    var pressFeedback: KeyPressFeedbackKind = .tap
     let action: () -> Void
 
     @State private var isPressed = false
+
+    /// SwiftUI 첫 `onChanged` 와 `earlyPress` 중 먼저 온 쪽이 한 번만 부른다 — 두 경로가 같은
+    /// 함수를 타야 피드백 종류가 갈라지지 않는다.
+    private func beginPress() {
+        guard !isPressed else { return }
+        isPressed = true
+        switch pressFeedback {
+        case .tap:         keyPressFeedback()
+        case .layerSwitch: layerSwitchPressFeedback()
+        }
+    }
 
     private var themeBackgroundColor: Color {
         KeyboardSettings.shared.resolvedFunctionKeyBackground
@@ -922,19 +906,14 @@ struct FunctionKeyView: View {
             )
             .gesture(
                 DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if !isPressed {
-                            isPressed = true
-                            keyPressFeedback()
-                        }
-                    }
+                    .onChanged { _ in beginPress() }
                     .onEnded { _ in
                         isPressed = false
                         action()
                     }
             )
             .earlyPress(
-                onPress: { _ in if !isPressed { isPressed = true; keyPressFeedback() } },
+                onPress: { _ in beginPress() },
                 isStillPressed: { isPressed },
                 onUnhandledRelease: { isPressed = false }
             )

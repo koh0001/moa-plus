@@ -44,13 +44,17 @@ struct KeyboardView: View {
             onSymbolTap: { viewModel.inputSymbol($0) },
             onBackspacePressStart: { viewModel.beginBackspacePress() },
             onBackspacePressEnd: { viewModel.endBackspacePress() },
-            onLongPressNumber: { viewModel.inputLongPressNumber($0) },
-            onShiftLongPress: { viewModel.lockShift() },
+            onLongPressNumber: { number, row, column in
+                viewModel.inputLongPressNumber(number, row: row, column: column)
+            },
+            onShiftLongPress: { row, column in viewModel.lockShift(row: row, column: column) },
             onGestureStart: { row, column, point in viewModel.gestureStarted(row: row, column: column, at: point) },
             onGestureMove: { row, column, point in viewModel.gestureMoved(row: row, column: column, to: point) },
             onGestureEnd: { row, column in viewModel.gestureEnded(row: row, column: column) },
-            onPopupDrag: { viewModel.updatePopupSelection(translationX: $0) },
-            onPopupRelease: { viewModel.confirmPopupSelection() },
+            onPopupDrag: { row, column, translationX in
+                viewModel.updatePopupSelection(row: row, column: column, translationX: translationX)
+            },
+            onPopupRelease: { row, column in viewModel.confirmPopupSelection(row: row, column: column) },
             onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
             onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },
             onSlotBVowelGestureEnd: { viewModel.slotBVowelGestureEnded() },
@@ -116,6 +120,9 @@ struct KeyboardView: View {
         // 그리드 키와 슬롯B 는 `gestureStarted` / `slotBVowelGestureStarted` 가
         // 이미 터치 다운에서 불리므로 ViewModel 쪽에서 처리한다.
         .environment(\.keyPressFeedback) { viewModel.keyPressFeedback() }
+        // 레이어 전환 키(한/영 · 123/한글 · #+=/123)는 탭 대신 레이어 전환 햅틱 (이슈 #41).
+        // 이 주입을 빠뜨리면 기본값(no-op)이 실려 그 키들이 조용해진다.
+        .environment(\.layerSwitchPressFeedback) { viewModel.layerSwitchPressFeedback() }
         .onAppear { loadBackgroundIfNeeded() }
         .onChange(of: settings.themeSettings.backgroundImageId) { loadBackgroundIfNeeded() }
     }
@@ -445,9 +452,28 @@ private struct KeyPressFeedbackKey: EnvironmentKey {
     static let defaultValue: () -> Void = {}
 }
 
+/// 레이어 전환 키의 누름 피드백 (이슈 #41). `keyPressFeedback` 과 같은 시점(누르는 순간, 키 하나에
+/// 한 번)이고, 탭 햅틱 **대신** 울린다. 기본값은 no-op.
+private struct LayerSwitchPressFeedbackKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+/// 기능키를 누르는 순간 낼 피드백 종류 (`FunctionKeyView.pressFeedback`).
+enum KeyPressFeedbackKind {
+    /// 일반 키 — 탭 햅틱 (`keyPressFeedback`).
+    case tap
+    /// 한/영 · 123/한글 · #+=/123 — 레이어 전환 햅틱 (`layerSwitchPressFeedback`).
+    case layerSwitch
+}
+
 extension EnvironmentValues {
     var keyPressFeedback: () -> Void {
         get { self[KeyPressFeedbackKey.self] }
         set { self[KeyPressFeedbackKey.self] = newValue }
+    }
+
+    var layerSwitchPressFeedback: () -> Void {
+        get { self[LayerSwitchPressFeedbackKey.self] }
+        set { self[LayerSwitchPressFeedbackKey.self] = newValue }
     }
 }
