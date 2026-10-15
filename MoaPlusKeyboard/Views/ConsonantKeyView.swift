@@ -406,10 +406,10 @@ struct KeyView: View {
                 onShiftLongPress?()
                 return
             }
-            TouchLatencyProbe.event("롱프레스 팝업")
             // 뷰모델이 받은 경우에만 팝업 모드 — 먼저 플래그를 세우면 거절된 키의 뗌이
-            // `onPopupRelease` 로 빠져 `gestureEnded` 를 건너뛴다.
+            // `onPopupRelease` 로 빠져 `gestureEnded` 를 건너뛴다. 지연 기록도 실제로 뜬 팝업만.
             if let number = longPressNumber, onLongPress?(number) == true {
+                TouchLatencyProbe.event("롱프레스 팝업")
                 showNumberPopup = true
             }
         }

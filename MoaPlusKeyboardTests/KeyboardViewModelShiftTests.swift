@@ -85,7 +85,7 @@ final class KeyboardViewModelShiftTests: XCTestCase {
         // The exact coordinates don't matter for this test as long as the
         // gesture lifecycle is exercised correctly.
         vm.gestureStarted(row: 3, column: 0, at: .zero)
-        vm.lockShift()
+        vm.lockShift(row: 3, column: 0)   // 프로덕션 경로 (KeyboardView → 롱프레스 타이머, 이슈 #40)
         XCTAssertEqual(vm.shiftState, .locked, "long-press toggles caps lock on")
 
         vm.gestureEnded(row: 3, column: 0)
@@ -101,7 +101,7 @@ final class KeyboardViewModelShiftTests: XCTestCase {
         vm.shiftState = .locked
 
         vm.gestureStarted(row: 3, column: 0, at: .zero)
-        vm.lockShift()
+        vm.lockShift(row: 3, column: 0)   // 프로덕션 경로 (KeyboardView → 롱프레스 타이머, 이슈 #40)
         XCTAssertEqual(vm.shiftState, .off, "second long-press releases caps lock")
         vm.gestureEnded(row: 3, column: 0)
         XCTAssertEqual(vm.shiftState, .off, "released state survives gesture end")
