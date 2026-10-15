@@ -74,7 +74,7 @@ class VowelResolver {
     /// branch of `resolve(directions:)`. Cardinals map directly
     /// (←ㅓ →ㅏ ↑ㅗ ↓ㅜ); diagonals follow the active SwipeProfile's
     /// DiagonalMapping. Returns nil for `.disabled` mappings (정규화 폴백이
-    /// 끈 대각선을 원시 방향 그대로 돌려줘 `default` 로 떨어진다).
+    /// 끈 대각선을 ↗/↘ 로 돌려줘 `default` 로 떨어진다).
     /// 슬롯 B 모음 키는 멀티 스트로크 파이프라인(`resolve`/`peekVowel`)으로 옮겨
     /// 지금은 프로덕션 호출처가 없다 — 끈 대각선 가드(이슈 #42)도 그쪽에 있다.
     func resolveSingleStroke(direction: GestureDirection) -> Jungseong? {
@@ -133,26 +133,25 @@ class VowelResolver {
     /// 트라이에는 단독 `↗=ㅣ` / `↘=ㅡ` 가 들어 있다 — 매핑을 ㅣ/ㅡ 로 둔 대각선이
     /// 멀티 스트로크에서 정규화돼 닿는 노드다(꼬리가 붙은 ↗↙ = ㅣ, ↖ 가 ↗ 로 접히는
     /// 경로, ↘↖ = ㅢ). 단독 획은 `resolveDirectDiagonal` 이 트라이보다 먼저 처리한다.
-    /// 그런데 "비활성" 매핑은 정규화가 원시 대각선을 그대로 넘기므로
-    /// (`normalizedDirection`), 끈 ↗/↘ 도 같은 노드에 닿아 ㅣ/ㅡ 가 입력됐다
-    /// (↖/↙ 는 트라이 루트에 노드가 없어 원래 꺼졌다).
+    /// "비활성" 매핑도 정규화(`normalizedDirection`)가 기본 매핑과 같은 노드(위 = ↗,
+    /// 아래 = ↘)로 보내므로, 그대로 두면 끈 대각선 단독 획이 ㅣ/ㅡ 가 된다(v2.2.5 까지
+    /// ↗/↘ 가 그랬다). 멀티 스트로크는 기본 매핑과 똑같이 맞는 것이 맞다 — 끈 ↙ 의
+    /// ↙↗ = ㅢ, 끈 ↘ 의 ↘↖ = ㅢ.
     ///
     /// 규칙: 첫 획이 끈 대각선이고 매칭이 **그 첫 노드에서 끝났으면**(= 그 대각선
     /// 혼자 만든 모음) 그 첫 획을 **빼고 나머지 획만 다시 맞춘다**. 끈 대각선으로
     /// 시작하는 멀티 스트로크(↘↖=ㅢ, ↘↑=ㅢ)는 둘째 노드 이상에서 끝나므로 그대로
     /// 성립한다.
     ///
-    /// 첫 획만 빼는 이유(리뷰 반영): ↖/↙ 를 끄면 트라이 루트에 노드가 없어 `match` 가
-    /// 그 획만 건너뛰고 나머지를 맞춘다(↖↓ = ㅜ). ↗/↘ 에서 모음만 지우면 ↗ 노드는
-    /// 자식이 없고 ↘ 노드는 ↖·↑ 뿐이라 뒤 획이 전부 버려져 제스처가 통째로
-    /// 무입력이 된다(↗← = 무입력인데 같은 꼬리의 ↖← = ㅓ). 같은 "비활성" 설정이 대각선마다
-    /// 다르게 동작하지 않도록 ↖/↙ 의 건너뛰기와 같은 결과를 만든다 — 후속 획은
-    /// 정규화에서 항상 카디널이 되고(첫 획이 어느 대각선이든 같은 카디널), 그래서
-    /// 다시 맞춘 결과가 ↗/↘ 단독 노드에 닿지 않는다.
+    /// 첫 획만 빼는 이유(리뷰 반영): 모음만 지우면 ↗ 노드는 자식이 없고 ↘ 노드는
+    /// ↖·↑ 뿐이라 뒤 획이 전부 버려져 제스처가 통째로 무입력이 된다(↗← = 무입력).
+    /// 첫 획을 빼면 뒤 획이 모음이 된다(↗← = ㅓ, ↘↓ = ㅜ) — 네 대각선이 같은 결과다.
+    /// 후속 획은 정규화에서 항상 카디널이 되고(앞 획이 대각선이면 어느 대각선이든 같은
+    /// 카디널), 그래서 다시 맞춘 결과가 ↗/↘ 단독 노드에 닿지 않는다.
     ///
     /// 첫 획 재해석(`cardinalReinterpretation`)은 첫 획을 카디널로 바꿔 따로 맞추므로
     /// 이 가드를 거치지 않지만, `resolve` 에서 **비교 상대가 이 결과**다. 그래서 끈
-    /// ↗/↘ 도 끈 ↖/↙ 와 똑같이 재해석이 간선을 더 많이 따라갔거나 휘어진 한 획
+    /// 대각선은 네 방향 모두 재해석이 간선을 더 많이 따라갔거나 휘어진 한 획
     /// 동률일 때만 이긴다 — ↗↙ 왕복(→ 스냅) = ㅐ 는 2 대 1 로 재해석, 가파른
     /// ↗←(↑ 스냅) = ㅓ 는 1 대 1 동률이라 원래 해석(↖← 와 같음).
     ///
@@ -221,7 +220,11 @@ class VowelResolver {
         case .normalizeRight, .vowelA: return .right
         case .vowelI:  return .upRight   // Normalize to ↗ so pattern trie recognizes ㅣ patterns
         case .vowelEu: return .downRight // Normalize to ↘ so pattern trie recognizes ㅡ patterns
-        case .disabled: return direction
+        // 끈 대각선은 **기본 매핑(위 = ㅣ, 아래 = ㅡ)과 같은 노드**로 보낸다 (이슈 #42). 단독 획만
+        // `matchExcludingDisabledDiagonal` 이 걸러 내고, 멀티 스트로크는 기본 매핑과 똑같이 맞는다 —
+        // 원시 방향 그대로 넘기면 ↖/↙ 는 트라이 루트에 노드가 없어 건너뛰어져 끈 ↙ 의 ↙↗ = ㅢ 가 ㅗ 로
+        // 깨졌다(끈 ↘ 의 ↘↖ = ㅢ 는 성립 — 같은 설정이 대각선마다 달랐다).
+        case .disabled: return direction == .upLeft || direction == .upRight ? .upRight : .downRight
         }
     }
 

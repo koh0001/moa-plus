@@ -5,9 +5,10 @@ import CoreGraphics
 ///
 /// 1. **방향별 모음 매핑 "비활성"**: ↗/↘ 를 비활성으로 꺼도 ㅣ/ㅡ 가 입력됐다. 정규화가 끈
 ///    대각선을 원시 방향 그대로 넘기고(`VowelResolver.normalizedDirection`), 트라이에 단독
-///    `↗=ㅣ` `↘=ㅡ` 가 있어 그 노드에 닿았기 때문이다. ↖/↙ 는 트라이 루트에 노드가 없어 원래
-///    꺼졌다. 결정: 끈 대각선은 **단독 획**으로 모음을 만들지 않고, 그 대각선으로 시작하는
-///    멀티 스트로크(↘↖=ㅢ, ↘↑=ㅢ, 첫 획 재해석)는 그대로 둔다. 기본 매핑은 무변화.
+///    `↗=ㅣ` `↘=ㅡ` 가 있어 그 노드에 닿았기 때문이다. ↖/↙ 는 트라이 루트에 노드가 없어 단독
+///    획은 꺼졌지만 그 대신 ↙↗ = ㅢ 같은 멀티 스트로크까지 건너뛰어졌다. 결정: 끈 대각선은
+///    **단독 획**으로 모음을 만들지 않고, 그 대각선으로 시작하는 멀티 스트로크(↘↖=ㅢ, ↙↗=ㅢ,
+///    ↘↑=ㅢ, 첫 획 재해석)는 그대로 둔다. 기본 매핑은 무변화.
 /// 2. **4방향 전용 모드**: 설정 화면이 "긋기 각도·방향 설정은 무시" 라며 전체 회전 슬라이더를
 ///    끄는데, 분석기는 저장된 `axisRotation` 을 계속 빼고 사분면을 나눴다. 열별 회전(세로 라인별
 ///    보정)은 4방향에서도 켜진 채 남는 별도 설정이라 유지한다.
@@ -194,7 +195,30 @@ final class GestureSettingsApplyTests: XCTestCase {
         XCTAssertEqual(r.resolve(directions: [.upLeft, .downRight], firstStrokeCardinal: .left).vowel, .ㅔ,
                        "↖↘ = ㅔ 재해석 유지")
         XCTAssertEqual(r.resolve(directions: [.upLeft, .down]).vowel, .ㅜ,
-                       "트라이 루트에 없는 첫 획은 건너뛴다 (기존 동작)")
+                       "끈 첫 획만 빠지고 뒤 획이 모음 (기존 동작과 같은 결과)")
+    }
+
+    /// ㅢ 는 끈 대각선이 어느 쪽이든 유지 — 끈 ↙ 의 ↙↗ 는 끈 ↘ 의 ↘↖ 와 같다 (리뷰 반영).
+    /// 고치기 전에는 끈 ↙ 를 원시 방향 그대로 넘겨 트라이 루트에서 건너뛰어졌고, 남은 ↗(→ ↑) 가
+    /// ㅗ 가 됐다 — "단독 획만 끈다" 는 결정과 어긋난다.
+    func test_disabledDownLeft_euiStillWorks_likeDisabledDownRight() {
+        let left = resolver { $0.downLeftMapping = .disabled }
+        let right = resolver { $0.downRightMapping = .disabled }
+        XCTAssertNil(left.resolve(directions: [.downLeft]).vowel, "단독 획은 여전히 무입력")
+        XCTAssertEqual(left.resolve(directions: [.downLeft, .upRight]).vowel, .ㅢ, "↙(끔)↗ = ㅢ")
+        XCTAssertEqual(left.resolve(directions: [.downLeft, .up]).vowel, .ㅢ, "↙(끔)↑ = ㅢ")
+        XCTAssertEqual(right.resolve(directions: [.downRight, .upLeft]).vowel, .ㅢ, "↘(끔)↖ = ㅢ")
+        // 실제 입력은 첫 획 재해석 후보를 함께 넘긴다 — 반전 동률은 ㅢ 우선 (기본 매핑과 같음).
+        let candidates: [GestureDirection?] = [nil, .down, .left]
+        for cardinal in candidates {
+            XCTAssertEqual(left.resolve(directions: [.downLeft, .upRight], firstStrokeCardinal: cardinal).vowel, .ㅢ,
+                           "↙(끔)↗, 재해석 후보 \(String(describing: cardinal))")
+            XCTAssertEqual(left.peekVowel(directions: [.downLeft, .upRight], firstStrokeCardinal: cardinal), .ㅢ,
+                           "미리보기 = 확정")
+        }
+        // 뒤 획만 모음을 만드는 경로는 그대로.
+        XCTAssertEqual(left.resolve(directions: [.downLeft, .down]).vowel, .ㅜ)
+        XCTAssertEqual(left.resolve(directions: [.downLeft, .right]).vowel, .ㅏ)
     }
 
     /// 6방향 프리셋은 쓰지 않는 대각선을 매핑이 아니라 섹터 폭 0 으로 끈다 — 살아 있는 쌍 무변화.
