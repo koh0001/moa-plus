@@ -882,9 +882,19 @@ struct FunctionKeyView: View {
     private func beginPress() {
         guard !isPressed else { return }
         isPressed = true
-        switch pressFeedback {
-        case .tap:         keyPressFeedback()
-        case .layerSwitch: layerSwitchPressFeedback()
+        Self.pressFeedbackAction(for: pressFeedback,
+                                 tap: keyPressFeedback,
+                                 layerSwitch: layerSwitchPressFeedback)()
+    }
+
+    /// 누름 피드백 종류 → 부를 클로저 (이슈 #41). 두 갈래를 바꿔 쓰면 모든 기능키가 엉뚱한 진동을
+    /// 내므로 `LayerSwitchHapticWiringTests` 가 고정한다.
+    static func pressFeedbackAction(for kind: KeyPressFeedbackKind,
+                                    tap: @escaping () -> Void,
+                                    layerSwitch: @escaping () -> Void) -> () -> Void {
+        switch kind {
+        case .tap:         return tap
+        case .layerSwitch: return layerSwitch
         }
     }
 

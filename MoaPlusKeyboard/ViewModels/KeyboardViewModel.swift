@@ -378,7 +378,8 @@ class KeyboardViewModel: ObservableObject {
     /// shift toggles the lock without needing a precise double-tap.
     /// Marks the gesture as long-press-handled so the tap fired when the
     /// finger lifts doesn't toggle the state right back off.
-    func lockShift() {
+    /// 바깥에서는 키 정체를 확인하는 `lockShift(row:column:)` 만 부른다 (이슈 #40).
+    private func lockShift() {
         guard keyboardMode == .english else { return }
         shiftState = (shiftState == .locked) ? .off : .locked
         lastShiftTapTimestamp = nil

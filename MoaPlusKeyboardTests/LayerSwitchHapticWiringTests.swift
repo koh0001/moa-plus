@@ -86,7 +86,26 @@ final class LayerSwitchHapticWiringTests: XCTestCase {
                        layerKeys: 3, tapKeys: 1, "양손 · 심볼")
     }
 
+    // MARK: - FunctionKeyView: 종류 → 클로저
+
+    /// 기능행이 고른 종류를 키가 맞는 클로저로 바꾸는지 — 두 갈래가 뒤바뀌면 위 개수 테스트와
+    /// 아래 주입 테스트는 그대로 통과하면서 모든 기능키가 엉뚱한 진동을 낸다.
+    func test_functionKey_pressFeedbackKind_callsMatchingClosure() {
+        var tap = 0
+        var layer = 0
+        FunctionKeyView.pressFeedbackAction(for: .tap, tap: { tap += 1 }, layerSwitch: { layer += 1 })()
+        XCTAssertEqual(tap, 1)
+        XCTAssertEqual(layer, 0)
+        FunctionKeyView.pressFeedbackAction(for: .layerSwitch, tap: { tap += 1 }, layerSwitch: { layer += 1 })()
+        XCTAssertEqual(tap, 1, "레이어 전환 키가 탭 진동을 냈다")
+        XCTAssertEqual(layer, 1)
+    }
+
     // MARK: - KeyboardView: 환경 값 주입
+
+    /// 한계: `Mirror` 는 `GeometryReader` 클로저 안을 못 본다 — 본문 최상위 수정자 체인만 확인한다.
+    /// 주입을 그 안이나 자식 뷰로 옮기면 이 테스트가 "주입하지 않는다" 로 실패하고(동작은 정상),
+    /// 안쪽에서 같은 키를 덮어써도 이 테스트는 잡지 못한다.
 
     /// `KeyboardView` 가 주입한 두 누름 피드백이 뷰모델의 해당 햅틱으로 이어지는지.
     /// `.environment(\.layerSwitchPressFeedback)` 줄을 지우면 기본값(no-op)이 실려 레이어 키가 조용해진다.
