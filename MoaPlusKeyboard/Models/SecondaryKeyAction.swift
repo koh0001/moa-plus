@@ -144,22 +144,40 @@ struct SecondaryKeyAction: Codable, Equatable, Identifiable {
 
     // MARK: - 일회성 이전 (이슈 #37)
 
-    /// 수정 전에는 손 뗄 때 `popupOutputs[0]` 이 들어가고 롱프레스 출력은 무시됐다. 출력이
-    /// 들어가게 고치면 저장된 매핑의 뜻이 바뀌므로, 기본 매핑에 있는 키만 한 번 옮겨 준다.
+    /// 수정 전 롱키를 그대로 떼면 들어가던 글자 — 팝업 후보 중 공백을 걷어 비어 있지 않은 첫
+    /// 글자. 괄호 자동 닫기가 켜져 있으면(롱키는 한글·영문 문자 모드에서만 저장된 매핑을 쓴다)
+    /// 닫는 괄호를 건너뛴다. 예전 뷰모델이 후보를 이렇게 거른 뒤 `candidates[0]` 을 넣었다.
+    /// 없으면 `nil` — 그때는 트리거(한글 = 고정표 = 기본 출력, 영문 숫자 = 저장된 출력)가 들어갔다.
+    private func legacyReleaseOutput(filteringClosingBrackets: Bool) -> String? {
+        popupOutputs.lazy
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty && !(filteringClosingBrackets && Self.closingBrackets.contains($0)) })
+    }
+
+    /// 수정 전에는 손 뗄 때 (닫는 괄호를 거른) 첫 후보가 들어가고 롱프레스 출력은 무시됐다.
+    /// 출력이 들어가게 고치면 저장된 매핑의 뜻이 바뀌므로, 기본 매핑에 있는 키만 한 번 옮겨 준다.
     ///
-    /// - 출력이 **기본값 그대로**이고 첫 후보가 그와 다르면(= 후보 순서를 바꿔 결과를 고른
-    ///   사용자) 첫 후보를 롱프레스 출력으로 삼는다 — 떼면 들어가는 글자가 그대로 유지된다.
-    ///   힌트도 예전 출력과 같았으면 따라간다.
+    /// - 출력이 **기본값 그대로**(또는 공백뿐)인데 예전에 들어가던 글자(`legacyReleaseOutput`)가
+    ///   그와 다르면(= 후보 순서를 바꿔 결과를 고른 사용자) 그 글자를 롱프레스 출력으로 삼는다 —
+    ///   떼면 들어가는 글자가 그대로 유지된다. 힌트도 기본값 그대로면 따라간다.
+    ///   - `filteringClosingBrackets` 는 **저장된** 괄호 자동 닫기 설정이다. 켜져 있으면 닫는 괄호는
+    ///     예전에도 후보에서 빠져 들어가지 않았으므로 건너뛴다(ㄴ `> . }` → 예전에도 지금도 `.`).
+    ///   - 거른 뒤 남는 후보가 없으면 예전에는 트리거가 들어갔다 — 한글은 고정표 = 기본 출력,
+    ///     영문 숫자는 저장된 출력(= 기본값)이라 그대로 둔다. 공백뿐인 출력은 기본 출력으로 채운다
+    ///     (예전 편집 화면은 공백뿐인 출력의 저장을 막지 않았고, 그대로 두면 이제 닫는 괄호여도
+    ///     첫 후보가 들어간다).
     /// - 출력을 **직접 고친** 항목은 출력·후보를 그대로 두되, 힌트가 기본값 그대로면(= 손대지
-    ///   않았으면) 새 출력(`effectivePrimary`)으로 바꾼다. 수정 전 편집 화면은 힌트를 따라
-    ///   바꾸지 않았고, 이제 떼면 그 출력이 들어가므로 키에 예전 글자가 남는다(이슈 #37 제보자
-    ///   상태: ㅈ 힌트 7 · 출력 @). 그 뒤의 편집 화면(`applyingEdit`)은 **지금 저장된 출력**과
-    ///   비교하므로 이 경우를 고치지 못한다.
+    ///   않았으면) 새 출력으로 바꾼다. 수정 전 편집 화면은 힌트를 따라 바꾸지 않았고, 이제 떼면
+    ///   그 출력이 들어가므로 키에 예전 글자가 남는다(이슈 #37 제보자 상태: ㅈ 힌트 7 · 출력 @).
+    ///   그 뒤의 편집 화면(`applyingEdit`)은 **지금 저장된 출력**과 비교하므로 이 경우를 고치지 못한다.
     ///
     /// 기본 매핑(29개 모두 힌트 == 출력 == 첫 후보)과 힌트를 직접 고친 항목은 그대로 둔다.
-    /// 결과에 다시 적용해도 바뀌지 않는다 — 첫 갈래는 출력 == 첫 후보가 되고 출력이 기본값에서
-    /// 벗어나며, 둘째 갈래는 힌트가 기본값에서 벗어나(또는 이미 출력과 같아) 다시 걸리지 않는다.
-    static func migratingForPrimaryOutput(_ actions: [SecondaryKeyAction]) -> [SecondaryKeyAction] {
+    /// 같은 `filteringClosingBrackets` 로 결과에 다시 적용해도 바뀌지 않는다 — 첫 갈래는 출력이
+    /// 예전 결과와 같아지거나(다시 걸리지 않음) 기본값에서 벗어나 둘째 갈래로 가고, 둘째 갈래는
+    /// 힌트가 기본값에서 벗어나(또는 이미 출력과 같아) 다시 걸리지 않는다.
+    static func migratingForPrimaryOutput(
+        _ actions: [SecondaryKeyAction], filteringClosingBrackets: Bool
+    ) -> [SecondaryKeyAction] {
         let defaultActions = Dictionary(
             defaults.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
         return actions.map { action in
@@ -168,23 +186,19 @@ struct SecondaryKeyAction: Codable, Equatable, Identifiable {
             let hint = action.visibleHint.trimmingCharacters(in: .whitespacesAndNewlines)
             var migrated = action
 
-            if primary == defaultAction.primaryLongPressOutput {
-                // 출력은 기본값 — 후보 순서를 바꿨으면 첫 후보가 예전 결과였다.
-                guard let firstPopup = action.popupOutputs.lazy
-                          .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-                          .first(where: { !$0.isEmpty }),
-                      firstPopup != primary else { return action }
-                if hint == primary {
-                    migrated.visibleHint = firstPopup
+            if primary == defaultAction.primaryLongPressOutput || primary.isEmpty {
+                // 출력은 기본값(또는 공백뿐) — 예전에 들어가던 글자를 출력으로 삼는다.
+                let released = action.legacyReleaseOutput(filteringClosingBrackets: filteringClosingBrackets)
+                    ?? defaultAction.primaryLongPressOutput
+                guard released != primary else { return action }
+                if hint == defaultAction.visibleHint {
+                    migrated.visibleHint = released
                 }
-                migrated.primaryLongPressOutput = firstPopup
+                migrated.primaryLongPressOutput = released
             } else {
-                // 출력을 고쳤다(공백뿐인 출력 포함 — 그때 들어가는 글자는 첫 후보).
-                // 힌트를 손대지 않았으면 이제 들어가는 글자를 따라간다.
-                let output = action.effectivePrimary
-                guard hint == defaultAction.visibleHint,
-                      !output.isEmpty, output != hint else { return action }
-                migrated.visibleHint = output
+                // 출력을 고쳤다. 힌트를 손대지 않았으면 이제 들어가는 글자(= 고친 출력)를 따라간다.
+                guard hint == defaultAction.visibleHint, primary != hint else { return action }
+                migrated.visibleHint = primary
             }
             return migrated
         }

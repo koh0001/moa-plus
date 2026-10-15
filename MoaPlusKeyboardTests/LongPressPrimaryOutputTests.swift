@@ -5,7 +5,8 @@ import XCTest
 /// - `SecondaryKeyAction.effectivePrimary` / `effectiveCandidates` 가 후보의 유일한 출처다
 ///   (뷰모델·팝업 오버레이·키 힌트·설정 화면이 모두 이것을 쓴다).
 /// - 그리드 트리거는 `KeyGridView.longPressBinding` — `ConsonantGridView` 가 부르는 바로 그 함수.
-/// - 기존 사용자 일회성 이전: 팝업 후보 순서를 바꿔 결과를 고른 사용자는 결과가 유지되고,
+/// - 기존 사용자 일회성 이전: 팝업 후보 순서를 바꿔 결과를 고른 사용자는 결과가 유지되고
+///   (예전 결과 = 저장된 괄호 자동 닫기 설정으로 닫는 괄호를 거른 첫 후보),
 ///   출력만 고치고 힌트는 기본값 그대로인 사용자(제보자 상태)는 힌트가 새 출력을 따라간다.
 final class LongPressPrimaryOutputTests: XCTestCase {
     private var pin: LongPressSettingsPin!
@@ -212,7 +213,7 @@ final class LongPressPrimaryOutputTests: XCTestCase {
     }
 
     func test_migration_static_reorderedUserKeepsResult_hintFollows() {
-        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(reorderedJieut)
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(reorderedJieut, filteringClosingBrackets: true)
         let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: migrated)!
         XCTAssertEqual(jieut.primaryLongPressOutput, "&")
         XCTAssertEqual(jieut.visibleHint, "&", "힌트가 예전 출력과 같았으면 따라간다")
@@ -224,17 +225,21 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         var actions = reorderedJieut
         actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].visibleHint = "★"
         let jieut = SecondaryKeyAction.action(
-            forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+            forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions, filteringClosingBrackets: true))!
         XCTAssertEqual(jieut.primaryLongPressOutput, "&")
         XCTAssertEqual(jieut.visibleHint, "★")
     }
 
     func test_migration_static_defaultsAndUnknownKeysUntouched() {
-        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(SecondaryKeyAction.defaults),
-                       SecondaryKeyAction.defaults)
+        // 괄호 자동 닫기 설정과 무관하다 — ㄱ `9 ( )` 의 첫 후보 9 는 닫는 괄호가 아니고,
+        // 영문 0 `)` 는 거르면 후보가 없어 예전에도 트리거(= 저장된 출력 `)`)가 들어갔다.
+        for filtering in [true, false] {
+            XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(SecondaryKeyAction.defaults, filteringClosingBrackets: filtering),
+                           SecondaryKeyAction.defaults, "filtering=\(filtering)")
+        }
         // 저장소에 없는 keyId 는 대상이 아니다.
         let unknown = [SecondaryKeyAction(keyId: "★", visibleHint: "x", primaryLongPressOutput: "x", popupOutputs: ["y"])]
-        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(unknown), unknown)
+        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(unknown, filteringClosingBrackets: true), unknown)
     }
 
     /// 이슈 #37 제보자 상태: ㅈ 의 출력만 @ 로 고치고 힌트·후보는 기본값(7 / 7 &).
@@ -251,7 +256,7 @@ final class LongPressPrimaryOutputTests: XCTestCase {
     }
 
     func test_migration_static_editedPrimaryWithDefaultHint_hintFollowsPrimary() {
-        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(reporterJieut)
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(reporterJieut, filteringClosingBrackets: true)
         let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: migrated)!
         XCTAssertEqual(jieut.visibleHint, "@", "손대지 않은(기본값) 힌트는 새 출력을 따라간다")
         XCTAssertEqual(jieut.primaryLongPressOutput, "@", "고친 출력은 그대로")
@@ -268,7 +273,7 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         // 출력 @ · 후보 & 7 · 힌트 기본값 7 → 출력·후보는 그대로, 힌트만 @.
         var actions = reorderedJieut
         actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].primaryLongPressOutput = "@"
-        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions, filteringClosingBrackets: true))!
         XCTAssertEqual(jieut.primaryLongPressOutput, "@")
         XCTAssertEqual(jieut.popupOutputs, ["&", "7"])
         XCTAssertEqual(jieut.visibleHint, "@")
@@ -277,7 +282,7 @@ final class LongPressPrimaryOutputTests: XCTestCase {
     func test_migration_static_editedPrimaryWithCustomHint_untouched() {
         var actions = reporterJieut
         actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].visibleHint = "★"
-        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(actions), actions,
+        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(actions, filteringClosingBrackets: true), actions,
                        "힌트를 직접 고친 항목은 출력을 고쳤어도 그대로")
     }
 
@@ -285,33 +290,112 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         // 앞뒤 공백이 붙은 출력은 공백을 걷은 값을 힌트로 쓴다(떼면 들어가는 글자 = effectivePrimary).
         var actions = reporterJieut
         actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].primaryLongPressOutput = " @ "
-        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions, filteringClosingBrackets: true))!
         XCTAssertEqual(jieut.visibleHint, "@")
         XCTAssertEqual(jieut.primaryLongPressOutput, " @ ", "출력 자체는 이전이 건드리지 않는다")
     }
 
-    func test_migration_static_blankPrimary_hintFollowsFirstPopupOrStays() {
-        // 공백뿐인 출력은 예전 편집 화면이 저장을 막지 않았다. 떼면 들어가는 글자는 첫 후보다.
-        func jieut(primary: String, popup: [String]) -> SecondaryKeyAction {
-            let actions = SecondaryKeyAction.defaults.map { a -> SecondaryKeyAction in
-                guard a.keyId == "ㅈ" else { return a }
-                var e = a
-                e.primaryLongPressOutput = primary
-                e.popupOutputs = popup
-                return e
-            }
-            return SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+    /// 기본 매핑에서 ㅈ 만 고친 매핑을 이전한 결과의 ㅈ.
+    private func migratedJieut(primary: String? = nil, popup: [String], hint: String? = nil,
+                               filtering: Bool) -> SecondaryKeyAction {
+        migratedKey("ㅈ", primary: primary, popup: popup, hint: hint, filtering: filtering)
+    }
+
+    private func migratedKey(_ keyId: String, primary: String? = nil, popup: [String], hint: String? = nil,
+                             filtering: Bool) -> SecondaryKeyAction {
+        let actions = SecondaryKeyAction.defaults.map { a -> SecondaryKeyAction in
+            guard a.keyId == keyId else { return a }
+            var e = a
+            if let primary { e.primaryLongPressOutput = primary }
+            if let hint { e.visibleHint = hint }
+            e.popupOutputs = popup
+            return e
         }
-        let reordered = jieut(primary: "  ", popup: ["&", "7"])
+        return SecondaryKeyAction.action(
+            forKey: keyId, from: SecondaryKeyAction.migratingForPrimaryOutput(actions, filteringClosingBrackets: filtering))!
+    }
+
+    func test_migration_static_blankPrimary_filledWithOldResult_hintFollows() {
+        // 공백뿐인 출력은 예전 편집 화면이 저장을 막지 않았다. 예전에 떼면 들어가던 글자로 채운다.
+        let reordered = migratedJieut(primary: "  ", popup: ["&", "7"], filtering: true)
         XCTAssertEqual(reordered.visibleHint, "&", "힌트가 빈 글자가 되지 않고 들어가는 글자(첫 후보)를 따라간다")
-        XCTAssertEqual(reordered.primaryLongPressOutput, "  ")
+        XCTAssertEqual(reordered.primaryLongPressOutput, "&")
         XCTAssertEqual(reordered.effectivePrimary, "&")
 
-        let kept = jieut(primary: "", popup: ["7", "&"])
+        let kept = migratedJieut(primary: "", popup: ["7", "&"], filtering: true)
         XCTAssertEqual(kept.visibleHint, "7", "들어가는 글자가 힌트와 같으면 그대로")
+        XCTAssertEqual(kept.primaryLongPressOutput, "7")
 
-        let empty = jieut(primary: " ", popup: [" ", ""])
+        let empty = migratedJieut(primary: " ", popup: [" ", ""], filtering: true)
         XCTAssertEqual(empty.visibleHint, "7", "들어갈 글자가 없으면 힌트를 비우지 않는다")
+        XCTAssertEqual(empty.primaryLongPressOutput, "7", "후보도 없으면 예전 트리거(고정표 = 기본 출력)")
+
+        let customHint = migratedJieut(primary: " ", popup: ["&", "7"], hint: "★", filtering: true)
+        XCTAssertEqual(customHint.primaryLongPressOutput, "&")
+        XCTAssertEqual(customHint.visibleHint, "★", "직접 고친 힌트는 그대로")
+    }
+
+    func test_migration_static_blankPrimary_closerFirst_usesClosingBracketFilter() {
+        // 공백뿐인 출력 + 첫 후보가 닫는 괄호. 그대로 두면 effectivePrimary(필터 없음) 가 ) 를 넣는다.
+        let on = migratedJieut(primary: " ", popup: [")", "&"], filtering: true)
+        XCTAssertEqual(on.primaryLongPressOutput, "&", "괄호 자동 닫기 ON 이면 예전에도 ) 는 빠져 & 가 들어갔다")
+        XCTAssertEqual(on.visibleHint, "&")
+
+        let allClosers = migratedJieut(primary: " ", popup: [")", "]"], filtering: true)
+        XCTAssertEqual(allClosers.primaryLongPressOutput, "7", "후보가 모두 빠지면 예전에는 트리거(기본 출력)")
+        XCTAssertEqual(allClosers.visibleHint, "7")
+
+        let off = migratedJieut(primary: " ", popup: [")", "&"], filtering: false)
+        XCTAssertEqual(off.primaryLongPressOutput, ")", "괄호 자동 닫기 OFF 면 예전에도 ) 가 들어갔다")
+        XCTAssertEqual(off.visibleHint, ")")
+    }
+
+    // MARK: 괄호 자동 닫기 — 예전 뷰모델은 닫는 괄호를 거른 뒤 첫 후보를 넣었다
+
+    func test_migration_static_closerFirst_autoBracketOn_keepsOldResult() {
+        // 리뷰 지적 사례: 닫는 괄호를 맨 앞에 둔 매핑. ON 이면 예전에도 지금도 같은 글자.
+        let nieun = migratedKey("ㄴ", popup: [">", ".", "}"], filtering: true)
+        XCTAssertEqual(nieun.primaryLongPressOutput, ".", "예전 후보 [.] → . (> 로 옮기면 결과가 바뀐다)")
+        XCTAssertEqual(nieun.visibleHint, ".")
+        XCTAssertEqual(nieun.popupOutputs, [">", ".", "}"], "후보는 건드리지 않는다")
+        XCTAssertEqual(nieun.effectiveCandidates(filteringClosingBrackets: true).first, ".")
+
+        let giyeok = migratedKey("ㄱ", popup: [")", "9", "("], filtering: true)
+        XCTAssertEqual(giyeok.primaryLongPressOutput, "9")
+        XCTAssertEqual(giyeok.visibleHint, "9")
+
+        // 후보가 전부 닫는 괄호 → 예전 후보 [] → 트리거(고정표 7) 가 들어갔다 = 기본 출력 유지.
+        let jieut = migratedJieut(popup: [")", "]"], filtering: true)
+        XCTAssertEqual(jieut.primaryLongPressOutput, "7")
+        XCTAssertEqual(jieut.visibleHint, "7")
+
+        // 영문 숫자 1: 예전 후보 [] → 트리거 = 저장된 출력 ! 가 들어갔다.
+        let one = migratedKey("1", popup: [")"], filtering: true)
+        XCTAssertEqual(one.primaryLongPressOutput, "!")
+        XCTAssertEqual(one.visibleHint, "!")
+    }
+
+    func test_migration_static_closerFirst_autoBracketOff_promotesCloser() {
+        // 같은 매핑이라도 괄호 자동 닫기 OFF 면 예전에 첫 후보(닫는 괄호)가 그대로 들어갔다.
+        let nieun = migratedKey("ㄴ", popup: [">", ".", "}"], filtering: false)
+        XCTAssertEqual(nieun.primaryLongPressOutput, ">")
+        XCTAssertEqual(nieun.visibleHint, ">", "힌트가 기본값 그대로면 따라간다")
+
+        XCTAssertEqual(migratedKey("ㄱ", popup: [")", "9", "("], filtering: false).primaryLongPressOutput, ")")
+        XCTAssertEqual(migratedJieut(popup: [")", "]"], filtering: false).primaryLongPressOutput, ")")
+        XCTAssertEqual(migratedKey("1", popup: [")"], filtering: false).primaryLongPressOutput, ")")
+    }
+
+    func test_migration_static_closerFirst_autoBracketOn_promotesFirstNonCloser() {
+        // 닫는 괄호를 건너뛴 첫 글자가 기본 출력과 다르면 그 글자로 옮긴다 — 힌트도 따라간다.
+        let jieut = migratedJieut(popup: [")", "&", "7"], filtering: true)
+        XCTAssertEqual(jieut.primaryLongPressOutput, "&")
+        XCTAssertEqual(jieut.visibleHint, "&")
+        XCTAssertEqual(jieut.effectiveCandidates(filteringClosingBrackets: true), ["&", "7"])
+
+        let custom = migratedJieut(popup: [")", "&", "7"], hint: "★", filtering: true)
+        XCTAssertEqual(custom.primaryLongPressOutput, "&")
+        XCTAssertEqual(custom.visibleHint, "★")
     }
 
     func test_migration_static_englishDigitKey_editedPrimary_hintFollows() {
@@ -322,7 +406,7 @@ final class LongPressPrimaryOutputTests: XCTestCase {
             e.primaryLongPressOutput = "]"
             return e
         }
-        let zero = SecondaryKeyAction.action(forKey: "0", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        let zero = SecondaryKeyAction.action(forKey: "0", from: SecondaryKeyAction.migratingForPrimaryOutput(actions, filteringClosingBrackets: true))!
         XCTAssertEqual(zero.visibleHint, "]")
         XCTAssertEqual(zero.primaryLongPressOutput, "]")
         XCTAssertEqual(zero.popupOutputs, [")"])
@@ -333,9 +417,26 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         custom[custom.firstIndex(where: { $0.keyId == "ㅈ" })!].visibleHint = "★"
         var both = reorderedJieut
         both[both.firstIndex(where: { $0.keyId == "ㄱ" })!].primaryLongPressOutput = "["
-        for input in [reorderedJieut, reporterJieut, custom, both] {
-            let once = SecondaryKeyAction.migratingForPrimaryOutput(input)
-            XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(once), once)
+        // 닫는 괄호가 맨 앞인 매핑 + 공백뿐인 출력 (괄호 자동 닫기 설정에 따라 결과가 갈린다).
+        let closers = SecondaryKeyAction.defaults.map { a -> SecondaryKeyAction in
+            var e = a
+            switch a.keyId {
+            case "ㄴ": e.popupOutputs = [">", ".", "}"]
+            case "ㄱ": e.popupOutputs = [")", "9", "("]
+            case "ㅈ": e.popupOutputs = [")", "]"]
+            case "ㄷ": e.primaryLongPressOutput = " "; e.popupOutputs = [")", "*"]
+            case "ㅂ": e.primaryLongPressOutput = ""; e.popupOutputs = ["}"]
+            case "1": e.popupOutputs = [")"]
+            default: break
+            }
+            return e
+        }
+        for filtering in [true, false] {
+            for input in [reorderedJieut, reporterJieut, custom, both, closers] {
+                let once = SecondaryKeyAction.migratingForPrimaryOutput(input, filteringClosingBrackets: filtering)
+                XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(once, filteringClosingBrackets: filtering), once,
+                               "filtering=\(filtering)")
+            }
         }
     }
 
@@ -386,6 +487,68 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         XCTAssertEqual(jieut?.visibleHint, "@")
         XCTAssertEqual(jieut?.primaryLongPressOutput, "@")
         XCTAssertEqual(jieut?.popupOutputs, ["7", "&"])
+    }
+
+    /// `shared` 가 쓰는 저장소에 괄호 자동 닫기 값을 직접 쓴다(`nil` = 키 삭제). 프로퍼티(메모리)는
+    /// 그대로 둬서 이전이 프로퍼티가 아니라 저장소를 읽는지 가른다 — 프로퍼티로 바꾸면 둘이 같이
+    /// 바뀌어 구분이 안 된다. 키 이름은 `KeyboardSettings.Keys.autoBracketEnabled`.
+    private func writeAutoBracketOnDisk(_ value: Bool?) {
+        let store = KeyboardSettings.shared.isUsingAppGroup
+            ? UserDefaults(suiteName: KeyboardSettings.appGroupId)! : .standard
+        if let value {
+            store.set(value, forKey: "autoBracketEnabled")
+        } else {
+            store.removeObject(forKey: "autoBracketEnabled")
+        }
+    }
+
+    /// 첫 `init` 에서 `loadAll()` 은 이전을 `autoBracketEnabled` 대입보다 먼저 돌린다 — 그때 프로퍼티는
+    /// 아직 메모리 기본값(true)이라, 프로퍼티를 읽으면 괄호 자동 닫기를 끈 사용자의 결과가 바뀐다.
+    func test_migration_loadAll_readsAutoBracketFromDisk_notProperty() {
+        let s = KeyboardSettings.shared
+        // ㄴ 의 후보만 닫는 괄호가 맨 앞이 되게 바꾼 사용자 (출력은 기본값 . 그대로).
+        func migrateCloserFirstNieun(memory: Bool, disk: Bool?) -> SecondaryKeyAction? {
+            LongPressSettingsPin.edit("ㄴ") { $0.popupOutputs = [">", ".", "}"] }
+            s.autoBracketEnabled = memory
+            writeAutoBracketOnDisk(disk)
+            s.longPressPrimaryMigrated = false
+            s.loadAll()
+            XCTAssertTrue(s.longPressPrimaryMigrated)
+            return s.secondaryAction(forKey: "ㄴ")
+        }
+
+        // 저장소 OFF · 메모리 ON → 예전에는 첫 후보 > 가 그대로 들어갔다.
+        let off = migrateCloserFirstNieun(memory: true, disk: false)
+        XCTAssertEqual(off?.primaryLongPressOutput, ">")
+        XCTAssertEqual(off?.visibleHint, ">")
+        XCTAssertFalse(s.autoBracketEnabled, "이전 뒤 loadAll 이 프로퍼티를 저장소 값으로 맞춘다")
+
+        // 저장소 ON · 메모리 OFF → 예전에는 > } 가 빠져 . 가 들어갔다 = 그대로.
+        let on = migrateCloserFirstNieun(memory: false, disk: true)
+        XCTAssertEqual(on?.primaryLongPressOutput, ".")
+        XCTAssertEqual(on?.visibleHint, ".")
+
+        // 키 없음(설정을 한 번도 바꾸지 않은 대부분의 사용자) · 메모리 OFF → 기본값 ON 으로 본다.
+        let absent = migrateCloserFirstNieun(memory: false, disk: nil)
+        XCTAssertEqual(absent?.primaryLongPressOutput, ".")
+        XCTAssertTrue(s.autoBracketEnabled)
+    }
+
+    func test_migration_loadAll_closerFirstReview_cases_autoBracketOn() {
+        // 리뷰 지적 사례를 저장소 경유로: 괄호 자동 닫기 기본값(ON)에서 ㄱ `) 9 (` → 9, ㅈ `) ]` → 7.
+        let s = KeyboardSettings.shared
+        s.secondaryKeyActions = SecondaryKeyAction.defaults.map {
+            var e = $0
+            if $0.keyId == "ㄱ" { e.popupOutputs = [")", "9", "("] }
+            if $0.keyId == "ㅈ" { e.popupOutputs = [")", "]"] }
+            return e
+        }
+        writeAutoBracketOnDisk(true)
+        s.longPressPrimaryMigrated = false
+        s.loadAll()
+        XCTAssertEqual(s.secondaryAction(forKey: "ㄱ")?.primaryLongPressOutput, "9")
+        XCTAssertEqual(s.secondaryAction(forKey: "ㅈ")?.primaryLongPressOutput, "7")
+        XCTAssertEqual(s.secondaryAction(forKey: "ㄱ")?.popupOutputs, [")", "9", "("])
     }
 
     func test_migration_runsOnlyOnce_laterReorderDoesNotMovePrimary() {

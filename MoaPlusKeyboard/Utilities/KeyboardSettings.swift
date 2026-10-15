@@ -137,11 +137,17 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(longPressPrimaryMigrated, forKey: Keys.longPressPrimaryMigrated) }
     }
 
-    /// 이슈 #37 이전: 수정 전에는 롱키를 그대로 떼면 `popupOutputs[0]` 이 들어가고 롱프레스
-    /// 출력은 무시됐다. 팝업 후보 순서를 바꿔 결과를 고른 기존 사용자가 업데이트 후에도 같은
-    /// 글자를 받도록 첫 후보를 롱프레스 출력으로 옮기고, 출력만 고치고 힌트는 기본값 그대로인
-    /// 사용자(제보자 상태)는 힌트를 새 출력으로 맞춘다
+    /// 이슈 #37 이전: 수정 전에는 롱키를 그대로 떼면 (괄호 자동 닫기가 켜져 있으면 닫는 괄호를
+    /// 거른) 첫 후보가 들어가고 롱프레스 출력은 무시됐다. 팝업 후보 순서를 바꿔 결과를 고른 기존
+    /// 사용자가 업데이트 후에도 같은 글자를 받도록 그 글자를 롱프레스 출력으로 옮기고, 출력만
+    /// 고치고 힌트는 기본값 그대로인 사용자(제보자 상태)는 힌트를 새 출력으로 맞춘다
     /// (`SecondaryKeyAction.migratingForPrimaryOutput`).
+    ///
+    /// 괄호 자동 닫기는 프로퍼티가 아니라 **저장소에서** 읽는다 — `loadAll()` 이 이 함수를
+    /// `autoBracketEnabled` 대입보다 먼저 부르므로, 첫 `init` 에서 프로퍼티는 아직 메모리 기본값
+    /// (true)이다. 끈 사용자를 켠 것으로 보면 닫는 괄호를 맨 앞에 둔 매핑(ㄱ `) 9 (`)의 결과가
+    /// 바뀐다. 키가 없으면(한 번도 바꾸지 않음) 기본값 true. 저장된 매핑은 한글·영문 문자 모드의
+    /// 롱키만 쓰므로 거를지 여부 = 이 설정이다.
     ///
     /// `loadAll()` 안(`isLoading` = true)에서 불리므로 `didSet` 은 인덱스만 재빌드하고 디스크에
     /// 쓰지 않는다 — 바뀐 경우에만 여기서 **한 번** 직접 저장하고 기록을 남긴다. 크로스프로세스
@@ -149,7 +155,9 @@ final class KeyboardSettings: ObservableObject {
     /// 내므로(결과에 다시 적용해도 무변화) 알릴 필요가 없다.
     private func migrateLongPressPrimaryIfNeeded() {
         guard !longPressPrimaryMigrated else { return }
-        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(secondaryKeyActions)
+        let autoBracketOnDisk = defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(
+            secondaryKeyActions, filteringClosingBrackets: autoBracketOnDisk)
         if migrated != secondaryKeyActions {
             secondaryKeyActions = migrated
             save(migrated, forKey: Keys.secondaryKeyActions)
