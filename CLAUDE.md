@@ -539,23 +539,35 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 바뀌고 미적용이었다). 각도 편집기에서 손대면 `.custom`. 가드 `SixWaySectorTests`
 
 **"비활성" 매핑 (이슈 #42)**: 끈 대각선은 **단독 획으로 모음을 만들지 않는다**. 그 대각선으로
-시작하는 멀티 스트로크(↘↖=ㅢ, ↘↑=ㅢ, 첫 획 재해석 ↗↙=ㅐ·휘어진 ↗→=ㅏ)는 그대로 성립한다.
+시작하는 멀티 스트로크(↘↖=ㅢ, ↘↑=ㅢ)는 그대로 성립한다.
 v2.2.5 까지 ↗/↘ 를 꺼도 ㅣ/ㅡ 가 들어갔다 — `normalizedDirection` 이 끈 대각선을 원시 방향 그대로
-넘기고 트라이에 단독 `↗=ㅣ` `↘=ㅡ` 노드가 있어서다(↖/↙ 는 루트 노드가 없어 원래 꺼졌다).
-트라이 노드는 지우지 말 것 — 기본 매핑의 멀티 스트로크 정규화와 클래식/확장형 ㅣ/ㅡ 가 쓴다. 대신
+넘기고 트라이에 단독 `↗=ㅣ` `↘=ㅡ` 노드가 있어서다(↖/↙ 는 루트 노드가 없어 `match` 가 그 획만 건너뛰었다).
+트라이 노드는 지우지 말 것 — 단독 획은 `resolveDirectDiagonal` 이 트라이보다 먼저 처리하지만, 꼬리가 붙은
+↗↙=ㅣ·↖ 가 ↗ 로 접히는 정규화 경로·↘↖=ㅢ 가 이 노드를 지난다. 대신
 `VowelResolver.matchExcludingDisabledDiagonal` 이 "첫 획이 끈 대각선이고 매칭이 첫 노드에서
-끝남"(`consumedCount == 1`)이면 모음을 지운다. 판정은 **원래 첫 획**의 매핑으로 — 정규화된 첫
-획으로 보면 ↖(ㅣ) 가 ↗ 로 접힌 경우를 끈 ↗ 로 오인한다. `resolve`·`peekVowel`·`hasPotentialMatch`·
-`resolveSingleStroke`(슬롯 B) 공통, 자음 키(`handleKoreanModeGesture`)는 `resolve` 를 탄다.
+끝남"(`consumedCount == 1`)이면 **그 첫 획만 빼고 나머지 획을 다시 맞춘다** — ↖/↙ 의 건너뛰기와 같은
+결과라 네 대각선이 한 규칙이다(↗←=ㅓ 는 ↖←, ↘↓=ㅜ 는 ↙↓ 와 같음). 모음만 지우면 ↗ 노드는 자식이 없어
+뒤 획까지 통째로 무입력이 됐다(리뷰 반영). 첫 획 재해석은 이 결과와 비교되므로 ↖/↙ 와 똑같이 간선을 더
+많이 따라갔거나 휘어진 한 획 동률일 때만 이긴다(↗↙ 왕복=ㅐ·휘어진 ↗→=ㅏ 유지, 가파른 ↗←=ㅓ).
+판정은 **원래 첫 획**의 매핑으로 — 정규화된 첫 획으로 보면 ↖(ㅣ) 가 ↗ 로 접힌 경우를 끈 ↗ 로 오인한다.
+적용 경로는 `resolve`(자음 키 확정 `handleKoreanModeGesture`·긋기 테스트 최종 결과 `resolvedPreviewVowel`·
+슬롯 B 확정 `slotBVowelGestureEnded`)와 `peekVowel`(`gestureMoved`·`slotBVowelGestureMoved` 미리보기).
+`resolveSingleStroke` 는 슬롯 B 가 멀티 스트로크 파이프라인으로 옮긴 뒤 프로덕션 호출처가 없고(끈 대각선은
+정규화 폴백이 이미 nil), `hasPotentialMatch` 도 테스트 전용이다. 자음 대각선 파생
+(`consonantDiagonalDerivationEnabled`, 기본 OFF)을 켜면 자음 키는 `resolveConsonantDiagonalVowel` 이
+멀티 스트로크를 먼저 가로채고 이 매핑을 보지 않는다 — 네 대각선 공통이라 그대로 둔다.
 6방향 프리셋은 매핑이 아니라 섹터 폭 0 으로 끄므로 무관. 가드 `GestureSettingsApplyTests`
 
-**4방향 전용 모드의 회전 (이슈 #42)**: 설정 화면은 4방향에서 "긋기 각도·방향 설정은 무시" 라며
+**4방향 전용 모드의 회전 (이슈 #42)**: 설정 화면은 4방향에서 "각도·방향 설정은 적용되지 않습니다" 라며
 프리셋·방향 설정·전체 회전을 끈다. 그래서 인식기는 `SwipeProfile.effectiveAxisRotation`(4방향이면 0)
 을 쓴다 — v2.2.5 까지는 저장된 `axisRotation` 을 계속 빼서 보이지 않는 값만큼 사분면이 기울었다.
 저장값은 지우지 않는다(4방향을 끄면 돌아옴). **열별 회전은 유지** — 세로 라인별 보정 섹션은 4방향에서도
 켜져 있고 자체 토글(`columnCorrectionEnabled`)이 있다. 섹터 폭·빈 각도 처리는 원래 4방향 분기
-(`GestureDirection.from` 의 `fourWay`)가 무시한다. 회전을 새로 읽는 곳(미리보기 포함: `GestureTestModel.rotationOffset`,
-`DirectionPieChart.columnCorrectionSlices`)도 `axisRotation` 이 아니라 이 값을 쓸 것
+(`GestureDirection.from` 의 `fourWay`)가 무시한다. 열 회전까지 더한 최종 회전은
+`GestureSettings.recognizerRotationOffset(forColumn:)` 한 곳에서 계산하고 인식기(`GestureAnalyzer`)와 긋기
+실시간 테스트(`GestureTestModel.rotationOffset`)가 같이 쓴다. 열별 보정 미리보기
+(`DirectionPieChart.columnCorrectionSlices`)는 편집 중인 열 회전 값을 받으므로 `effectiveAxisRotation` 만
+더한다. 회전을 새로 읽는 곳도 `axisRotation` 을 직접 쓰지 말 것
 
 ### 약어(단축어) 트리거 매칭 규칙
 - 구분자는 두 종류다. **경계 구분자**(`" "` `"\n"`)는 버퍼를 리셋하고, **내용 겸 확정

@@ -27,8 +27,13 @@ final class GestureSettingsApplyTests: XCTestCase {
         let r = resolver { $0.upRightMapping = .disabled }
         XCTAssertNil(r.resolve(directions: [.upRight]).vowel, "끈 ↗ 단독 획은 ㅣ 가 아니라 무입력")
         XCTAssertNil(r.peekVowel(directions: [.upRight]), "미리보기도 입력과 같아야 한다")
-        XCTAssertNil(r.resolveSingleStroke(direction: .upRight), "슬롯 B 단일 획 경로")
-        XCTAssertFalse(r.hasPotentialMatch(directions: [.upRight]), "↗ 로 시작하는 멀티 스트로크 패턴은 없다")
+        XCTAssertNil(r.resolveSingleStroke(direction: .upRight),
+                     "단일 획 API 도 무입력 (프로덕션 호출처는 없음 — 슬롯 B 는 아래 E2E 가 지킨다)")
+        // 끈 첫 획은 건너뛰므로 뒤 획이 아직 모음을 만들 수 있다 — ↖ 를 끈 것과 같다.
+        XCTAssertTrue(r.hasPotentialMatch(directions: [.upRight]), "끈 ↗ 뒤 획(↓ = ㅜ 등)이 남아 있다")
+        let mirror = resolver { $0.upLeftMapping = .disabled }
+        XCTAssertEqual(r.hasPotentialMatch(directions: [.upRight]),
+                       mirror.hasPotentialMatch(directions: [.upLeft]), "끈 ↖ 와 같은 판정")
     }
 
     func test_disabledDownRight_singleStroke_producesNoVowel() {
@@ -60,11 +65,90 @@ final class GestureSettingsApplyTests: XCTestCase {
     }
 
     /// 재해석 후보가 없을 때(둘째 획이 짧음) 트라이가 건너뛴 꼬리 뒤로 끈 ↗ 의 ㅣ 가 되살아나면
-    /// 단독 획과 같은 버그다.
-    func test_disabledUpRight_withSkippedTail_doesNotFallBackToI() {
+    /// 단독 획과 같은 버그다. 대신 끈 첫 획만 빠지고 뒤 획이 모음이 된다 — ↖/↙ 를 끈 경우
+    /// (트라이 루트에 노드가 없어 첫 획만 건너뜀)와 같은 결과 (리뷰 반영).
+    func test_disabledUpRight_withTail_dropsOnlyTheDisabledStroke() {
         let r = resolver { $0.upRightMapping = .disabled }
-        XCTAssertNil(r.resolve(directions: [.upRight, .downLeft]).vowel)
-        XCTAssertNil(r.resolve(directions: [.upRight, .left]).vowel)
+        XCTAssertEqual(r.resolve(directions: [.upRight, .downLeft]).vowel, .ㅜ, "↗(끔) ↙ → ↓ = ㅜ, ㅣ 아님")
+        XCTAssertEqual(r.resolve(directions: [.upRight, .left]).vowel, .ㅓ, "↗(끔) ← → ← = ㅓ")
+        XCTAssertEqual(r.peekVowel(directions: [.upRight, .left]), .ㅓ, "미리보기도 입력과 같다")
+        XCTAssertTrue(r.hasPotentialMatch(directions: [.upRight, .left]))
+    }
+
+    func test_disabledDownRight_withTail_dropsOnlyTheDisabledStroke() {
+        let r = resolver { $0.downRightMapping = .disabled }
+        XCTAssertEqual(r.resolve(directions: [.downRight, .down]).vowel, .ㅜ, "↘(끔) ↓ → ↓ = ㅜ, ㅡ 아님")
+        XCTAssertEqual(r.resolve(directions: [.downRight, .right]).vowel, .ㅏ, "↘(끔) → → → = ㅏ")
+        XCTAssertEqual(r.resolve(directions: [.downRight, .up]).vowel, .ㅢ, "↘↑ = ㅢ 는 그대로 (건너뛰지 않음)")
+    }
+
+    /// 같은 "비활성" 설정은 네 대각선 모두 같은 규칙 — 끈 ↗/↘ 는 거울상인 끈 ↖/↙ 와 같은 모음을
+    /// 낸다. 고치기 전에는 ↗/↘ 쪽만 제스처 전체가 무입력이 됐다.
+    func test_disabledDiagonals_behaveLikeTheirMirrors() {
+        let right = resolver {
+            $0.upRightMapping = .disabled
+            $0.downRightMapping = .disabled
+        }
+        let left = resolver {
+            $0.upLeftMapping = .disabled
+            $0.downLeftMapping = .disabled
+        }
+        // (끈 ↗/↘ 시퀀스, 끈 ↖/↙ 시퀀스, 기대 모음) — 뒤 획만 모음을 만든다.
+        let cases: [([GestureDirection], [GestureDirection], Jungseong)] = [
+            ([.upRight, .left],    [.upLeft, .left],     .ㅓ),
+            ([.upRight, .right],   [.upLeft, .right],    .ㅏ),
+            ([.upRight, .down],    [.upLeft, .down],     .ㅜ),
+            ([.upRight, .downLeft], [.upLeft, .downRight], .ㅜ),
+            ([.downRight, .down],  [.downLeft, .down],   .ㅜ),
+            ([.downRight, .left],  [.downLeft, .left],   .ㅓ),
+            ([.downRight, .right], [.downLeft, .right],  .ㅏ),
+            ([.upRight, .left, .right], [.upLeft, .left, .right], .ㅔ),
+        ]
+        for (rightSeq, leftSeq, expected) in cases {
+            XCTAssertEqual(right.resolve(directions: rightSeq).vowel, expected, "\(rightSeq)")
+            XCTAssertEqual(left.resolve(directions: leftSeq).vowel, expected, "\(leftSeq)")
+        }
+        // 단독 획은 양쪽 모두 무입력.
+        for d in [GestureDirection.upRight, .downRight] { XCTAssertNil(right.resolve(directions: [d]).vowel) }
+        for d in [GestureDirection.upLeft, .downLeft] { XCTAssertNil(left.resolve(directions: [d]).vowel) }
+    }
+
+    /// 실제 입력은 2획 이상이면 대개 첫 획 재해석 후보(`firstStrokeCardinal`)를 함께 넘긴다.
+    /// 재해석은 이 가드의 결과와 비교되므로, 꼬리가 같은 한 끈 ↗/↘ 와 끈 ↖/↙ 는 어떤 후보에서도
+    /// 같은 모음을 내야 한다 — 가드가 모음만 지우던 때는 재해석이 동률에서도 이겨 갈라졌다
+    /// (가파른 ↗← = ㅗ, ↖← = ㅓ). 미리보기도 확정과 같아야 한다.
+    func test_disabledDiagonals_matchMirrors_underFirstStrokeReinterpretation() {
+        let right = resolver {
+            $0.upRightMapping = .disabled
+            $0.downRightMapping = .disabled
+        }
+        let left = resolver {
+            $0.upLeftMapping = .disabled
+            $0.downLeftMapping = .disabled
+        }
+        // 꼬리(원시 방향)가 같은 쌍만 — 대각선 꼬리는 재해석된 첫 획에 따라 다른 카디널로 접힌다.
+        let pairs: [([GestureDirection], [GestureDirection])] = [
+            ([.upRight, .left],          [.upLeft, .left]),
+            ([.upRight, .right],         [.upLeft, .right]),
+            ([.upRight, .down],          [.upLeft, .down]),
+            ([.upRight, .left, .right],  [.upLeft, .left, .right]),
+            ([.downRight, .down],        [.downLeft, .down]),
+            ([.downRight, .left],        [.downLeft, .left]),
+            ([.downRight, .right],       [.downLeft, .right]),
+        ]
+        let candidates: [GestureDirection?] = [nil, .up, .down, .left, .right]
+        for (rightSeq, leftSeq) in pairs {
+            for cardinal in candidates {
+                let r = right.resolve(directions: rightSeq, firstStrokeCardinal: cardinal).vowel
+                let l = left.resolve(directions: leftSeq, firstStrokeCardinal: cardinal).vowel
+                XCTAssertEqual(r, l, "\(rightSeq) vs \(leftSeq), 재해석 후보 \(String(describing: cardinal))")
+                XCTAssertEqual(right.peekVowel(directions: rightSeq, firstStrokeCardinal: cardinal), r,
+                               "미리보기 = 확정 \(rightSeq) \(String(describing: cardinal))")
+            }
+        }
+        // 대표 사례: 가파른 ↗(↑ 스냅) + ← 는 1 대 1 동률이라 원래 해석(ㅓ), ↗↙ 왕복(→ 스냅)은 2 대 1 로 ㅐ.
+        XCTAssertEqual(right.resolve(directions: [.upRight, .left], firstStrokeCardinal: .up).vowel, .ㅓ)
+        XCTAssertEqual(right.resolve(directions: [.upRight, .downLeft], firstStrokeCardinal: .right).vowel, .ㅐ)
     }
 
     /// 판정은 **원래 첫 획**의 매핑으로 한다 — ↖(ㅣ) 는 정규화에서 ↗ 로 접히므로, 정규화된 첫
@@ -253,6 +337,20 @@ final class GestureSettingsApplyTests: XCTestCase {
         p.fourWayMode = true
         XCTAssertEqual(p.effectiveAxisRotation, 0)
         XCTAssertEqual(p.axisRotation, 12.5, "저장값은 지우지 않는다 — 4방향을 끄면 그대로 돌아온다")
+    }
+
+    /// 인식기와 긋기 실시간 테스트가 같이 쓰는 회전 식 — 전체 회전(4방향이면 0) + 열별 회전, 열 0 은 전체만.
+    func test_recognizerRotationOffset_sumsGlobalAndColumnRotation() {
+        var gs = GestureSettings.default
+        gs.swipeProfile.axisRotation = 20
+        XCTAssertEqual(gs.recognizerRotationOffset(forColumn: 1), 23, accuracy: 1e-9, "전체 20° + 1열 기본 3°")
+        XCTAssertEqual(gs.recognizerRotationOffset(forColumn: 3), 20, accuracy: 1e-9, "가운데 열은 열 회전 0°")
+        XCTAssertEqual(gs.recognizerRotationOffset(forColumn: 0), 20, accuracy: 1e-9, "열 정보 없음 = 전체 회전만")
+        gs.swipeProfile.fourWayMode = true
+        XCTAssertEqual(gs.recognizerRotationOffset(forColumn: 1), 3, accuracy: 1e-9, "4방향: 전체 회전 0, 열 회전 유지")
+        XCTAssertEqual(gs.recognizerRotationOffset(forColumn: 0), 0, accuracy: 1e-9)
+        gs.columnCorrectionEnabled = false
+        XCTAssertEqual(gs.recognizerRotationOffset(forColumn: 1), 0, accuracy: 1e-9, "보정을 끄면 열 회전도 0")
     }
 
     /// 저장된 전체 회전 20° 는 4방향에서 0° 와 똑같이 판정돼야 한다 (전 각도 스윕).

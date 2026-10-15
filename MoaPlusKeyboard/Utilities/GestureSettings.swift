@@ -92,6 +92,17 @@ struct GestureSettings: Codable, Equatable {
         return override.rotationOffsetDeg
     }
 
+    /// 인식기가 이 열에서 실제로 쓰는 회전 = 전체 회전 + 열별 회전. 열 0(열 정보
+    /// 없음)은 전체 회전만. 전체 회전은 4방향 전용 모드면 0 이다
+    /// (`SwipeProfile.effectiveAxisRotation`, 이슈 #42).
+    /// 인식기(`GestureAnalyzer`)와 긋기 실시간 테스트(`GestureTestModel.rotationOffset`)가
+    /// 이 한 식을 같이 쓴다 — 식을 곳곳에 손으로 적으면 한쪽만 고쳐 그림과 판정이 어긋난다.
+    func recognizerRotationOffset(forColumn columnId: Int) -> Double {
+        let global = swipeProfile.effectiveAxisRotation
+        guard columnId > 0 else { return global }
+        return global + effectiveRotationOffset(forColumn: columnId)
+    }
+
     /// Get ㅣ sector width delta for a specific column
     func verticalIWidthDelta(forColumn columnId: Int) -> Double {
         let override = columnOverride(forColumn: columnId)
