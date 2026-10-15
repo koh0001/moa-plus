@@ -139,8 +139,9 @@ final class KeyboardSettings: ObservableObject {
 
     /// 이슈 #37 이전: 수정 전에는 롱키를 그대로 떼면 `popupOutputs[0]` 이 들어가고 롱프레스
     /// 출력은 무시됐다. 팝업 후보 순서를 바꿔 결과를 고른 기존 사용자가 업데이트 후에도 같은
-    /// 글자를 받도록, 첫 후보를 롱프레스 출력으로 옮긴다
-    /// (`SecondaryKeyAction.migratingReorderedPopupPrimaries`).
+    /// 글자를 받도록 첫 후보를 롱프레스 출력으로 옮기고, 출력만 고치고 힌트는 기본값 그대로인
+    /// 사용자(제보자 상태)는 힌트를 새 출력으로 맞춘다
+    /// (`SecondaryKeyAction.migratingForPrimaryOutput`).
     ///
     /// `loadAll()` 안(`isLoading` = true)에서 불리므로 `didSet` 은 인덱스만 재빌드하고 디스크에
     /// 쓰지 않는다 — 바뀐 경우에만 여기서 **한 번** 직접 저장하고 기록을 남긴다. 크로스프로세스
@@ -148,7 +149,7 @@ final class KeyboardSettings: ObservableObject {
     /// 내므로(결과에 다시 적용해도 무변화) 알릴 필요가 없다.
     private func migrateLongPressPrimaryIfNeeded() {
         guard !longPressPrimaryMigrated else { return }
-        let migrated = SecondaryKeyAction.migratingReorderedPopupPrimaries(secondaryKeyActions)
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(secondaryKeyActions)
         if migrated != secondaryKeyActions {
             secondaryKeyActions = migrated
             save(migrated, forKey: Keys.secondaryKeyActions)

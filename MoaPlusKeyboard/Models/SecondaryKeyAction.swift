@@ -144,28 +144,48 @@ struct SecondaryKeyAction: Codable, Equatable, Identifiable {
 
     // MARK: - 일회성 이전 (이슈 #37)
 
-    /// 수정 전에는 손 뗄 때 `popupOutputs[0]` 이 들어갔으므로, 팝업 후보 순서를 바꿔
-    /// 결과를 고른 사용자가 있다. 출력이 들어가게 고치면 그 사용자의 결과가 바뀌므로
-    /// 한 번만 옮겨 준다: 롱프레스 출력이 **기본값 그대로**이고 첫 후보가 그와 다르면
-    /// 첫 후보를 롱프레스 출력으로 삼는다(힌트도 예전 출력과 같았으면 따라간다).
-    /// 기본 매핑(29개 모두 출력 == 첫 후보)과 출력을 직접 고친 항목은 그대로 둔다.
-    /// 결과에 다시 적용해도 바뀌지 않는다(첫 후보 == 출력이 되므로).
-    static func migratingReorderedPopupPrimaries(_ actions: [SecondaryKeyAction]) -> [SecondaryKeyAction] {
-        let defaultPrimaries = Dictionary(
-            defaults.map { ($0.keyId, $0.primaryLongPressOutput) }, uniquingKeysWith: { first, _ in first })
+    /// 수정 전에는 손 뗄 때 `popupOutputs[0]` 이 들어가고 롱프레스 출력은 무시됐다. 출력이
+    /// 들어가게 고치면 저장된 매핑의 뜻이 바뀌므로, 기본 매핑에 있는 키만 한 번 옮겨 준다.
+    ///
+    /// - 출력이 **기본값 그대로**이고 첫 후보가 그와 다르면(= 후보 순서를 바꿔 결과를 고른
+    ///   사용자) 첫 후보를 롱프레스 출력으로 삼는다 — 떼면 들어가는 글자가 그대로 유지된다.
+    ///   힌트도 예전 출력과 같았으면 따라간다.
+    /// - 출력을 **직접 고친** 항목은 출력·후보를 그대로 두되, 힌트가 기본값 그대로면(= 손대지
+    ///   않았으면) 새 출력(`effectivePrimary`)으로 바꾼다. 수정 전 편집 화면은 힌트를 따라
+    ///   바꾸지 않았고, 이제 떼면 그 출력이 들어가므로 키에 예전 글자가 남는다(이슈 #37 제보자
+    ///   상태: ㅈ 힌트 7 · 출력 @). 그 뒤의 편집 화면(`applyingEdit`)은 **지금 저장된 출력**과
+    ///   비교하므로 이 경우를 고치지 못한다.
+    ///
+    /// 기본 매핑(29개 모두 힌트 == 출력 == 첫 후보)과 힌트를 직접 고친 항목은 그대로 둔다.
+    /// 결과에 다시 적용해도 바뀌지 않는다 — 첫 갈래는 출력 == 첫 후보가 되고 출력이 기본값에서
+    /// 벗어나며, 둘째 갈래는 힌트가 기본값에서 벗어나(또는 이미 출력과 같아) 다시 걸리지 않는다.
+    static func migratingForPrimaryOutput(_ actions: [SecondaryKeyAction]) -> [SecondaryKeyAction] {
+        let defaultActions = Dictionary(
+            defaults.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
         return actions.map { action in
-            guard let defaultPrimary = defaultPrimaries[action.keyId] else { return action }
+            guard let defaultAction = defaultActions[action.keyId] else { return action }
             let primary = action.primaryLongPressOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard primary == defaultPrimary,
-                  let firstPopup = action.popupOutputs.lazy
-                      .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-                      .first(where: { !$0.isEmpty }),
-                  firstPopup != primary else { return action }
+            let hint = action.visibleHint.trimmingCharacters(in: .whitespacesAndNewlines)
             var migrated = action
-            if action.visibleHint.trimmingCharacters(in: .whitespacesAndNewlines) == primary {
-                migrated.visibleHint = firstPopup
+
+            if primary == defaultAction.primaryLongPressOutput {
+                // 출력은 기본값 — 후보 순서를 바꿨으면 첫 후보가 예전 결과였다.
+                guard let firstPopup = action.popupOutputs.lazy
+                          .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                          .first(where: { !$0.isEmpty }),
+                      firstPopup != primary else { return action }
+                if hint == primary {
+                    migrated.visibleHint = firstPopup
+                }
+                migrated.primaryLongPressOutput = firstPopup
+            } else {
+                // 출력을 고쳤다(공백뿐인 출력 포함 — 그때 들어가는 글자는 첫 후보).
+                // 힌트를 손대지 않았으면 이제 들어가는 글자를 따라간다.
+                let output = action.effectivePrimary
+                guard hint == defaultAction.visibleHint,
+                      !output.isEmpty, output != hint else { return action }
+                migrated.visibleHint = output
             }
-            migrated.primaryLongPressOutput = firstPopup
             return migrated
         }
     }

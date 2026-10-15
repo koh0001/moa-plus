@@ -167,8 +167,10 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   `KeyGridView.longPressBinding` — 한글은 자음 키 + 고정표(`KeyboardMetrics.longPressNumbers`)가 nil 이
   아닌 자리만(고정표 = 문/대체값), 트리거 없는 칸은 힌트도 없다. 기존 사용자 일회성 이전:
   `loadAll()` 의 `migrateLongPressPrimaryIfNeeded()`(플래그 `longPressPrimaryMigrated`) 가 출력이 기본값
-  그대로인데 첫 후보가 다른 키(= 후보 순서를 바꿔 결과를 고른 사용자)의 출력을 첫 후보로 옮긴다.
-  `resetAll()` 은 이 플래그를 되돌리지 않는다 (`KeyboardViewModelLongPressTests` / `LongPressPrimaryOutputTests`)
+  그대로인데 첫 후보가 다른 키(= 후보 순서를 바꿔 결과를 고른 사용자)의 출력을 첫 후보로 옮기고, 출력을
+  고쳤는데 힌트가 **기본값** 그대로인 키(= 제보자 상태: ㅈ 힌트 7 · 출력 @)의 힌트를 새 출력으로 맞춘다
+  (`SecondaryKeyAction.migratingForPrimaryOutput`). 편집 화면(`applyingEdit`)은 지금 저장된 출력과 비교해
+  힌트를 따라가게 하므로 이 둘째 경우는 이전에서만 고쳐진다. `resetAll()` 은 이 플래그를 되돌리지 않는다 (`KeyboardViewModelLongPressTests` / `LongPressPrimaryOutputTests`)
 - `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음
 - **햅틱은 키를 누르는 순간 울린다** (이슈 #23). 입력 확정(손 뗄 때)이 아니다 — 긋기 키보드는
   press→release 간격이 길어 확정 시점에 울리면 반응이 늦게 느껴진다. 그리드 키는

@@ -5,7 +5,8 @@ import XCTest
 /// - `SecondaryKeyAction.effectivePrimary` / `effectiveCandidates` 가 후보의 유일한 출처다
 ///   (뷰모델·팝업 오버레이·키 힌트·설정 화면이 모두 이것을 쓴다).
 /// - 그리드 트리거는 `KeyGridView.longPressBinding` — `ConsonantGridView` 가 부르는 바로 그 함수.
-/// - 기존 사용자 일회성 이전: 팝업 후보 순서를 바꿔 결과를 고른 사용자는 결과가 유지된다.
+/// - 기존 사용자 일회성 이전: 팝업 후보 순서를 바꿔 결과를 고른 사용자는 결과가 유지되고,
+///   출력만 고치고 힌트는 기본값 그대로인 사용자(제보자 상태)는 힌트가 새 출력을 따라간다.
 final class LongPressPrimaryOutputTests: XCTestCase {
     private var pin: LongPressSettingsPin!
 
@@ -28,8 +29,11 @@ final class LongPressPrimaryOutputTests: XCTestCase {
 
     func test_defaults_primaryIsFirstPopupOutput_andCandidatesUnchanged() {
         // 기본 매핑 29개는 출력 == 첫 후보이고 중복이 없다 → 고친 뒤에도 기본 사용자에게 보이는 게 같다.
+        // 힌트 == 출력도 지킨다 — 일회성 이전이 "힌트가 기본값 = 손대지 않음" 으로 판정하고, 다시
+        // 적용해도 무변화인 근거가 이것이다.
         for action in SecondaryKeyAction.defaults {
             XCTAssertEqual(action.effectivePrimary, action.popupOutputs.first, action.keyId)
+            XCTAssertEqual(action.visibleHint, action.primaryLongPressOutput, action.keyId)
             XCTAssertEqual(action.effectiveCandidates(filteringClosingBrackets: false), action.popupOutputs, action.keyId)
         }
     }
@@ -208,7 +212,7 @@ final class LongPressPrimaryOutputTests: XCTestCase {
     }
 
     func test_migration_static_reorderedUserKeepsResult_hintFollows() {
-        let migrated = SecondaryKeyAction.migratingReorderedPopupPrimaries(reorderedJieut)
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(reorderedJieut)
         let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: migrated)!
         XCTAssertEqual(jieut.primaryLongPressOutput, "&")
         XCTAssertEqual(jieut.visibleHint, "&", "힌트가 예전 출력과 같았으면 따라간다")
@@ -220,24 +224,119 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         var actions = reorderedJieut
         actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].visibleHint = "★"
         let jieut = SecondaryKeyAction.action(
-            forKey: "ㅈ", from: SecondaryKeyAction.migratingReorderedPopupPrimaries(actions))!
+            forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
         XCTAssertEqual(jieut.primaryLongPressOutput, "&")
         XCTAssertEqual(jieut.visibleHint, "★")
     }
 
-    func test_migration_static_defaultsAndEditedPrimariesUntouched_andIdempotent() {
-        XCTAssertEqual(SecondaryKeyAction.migratingReorderedPopupPrimaries(SecondaryKeyAction.defaults),
+    func test_migration_static_defaultsAndUnknownKeysUntouched() {
+        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(SecondaryKeyAction.defaults),
                        SecondaryKeyAction.defaults)
-        // 출력을 직접 고친 사용자(출력 @, 후보 & 7)는 그대로 — 이미 원하는 출력을 적었다.
-        var edited = reorderedJieut
-        edited[edited.firstIndex(where: { $0.keyId == "ㅈ" })!].primaryLongPressOutput = "@"
-        XCTAssertEqual(SecondaryKeyAction.migratingReorderedPopupPrimaries(edited), edited)
         // 저장소에 없는 keyId 는 대상이 아니다.
         let unknown = [SecondaryKeyAction(keyId: "★", visibleHint: "x", primaryLongPressOutput: "x", popupOutputs: ["y"])]
-        XCTAssertEqual(SecondaryKeyAction.migratingReorderedPopupPrimaries(unknown), unknown)
-        // 다시 적용해도 무변화.
-        let once = SecondaryKeyAction.migratingReorderedPopupPrimaries(reorderedJieut)
-        XCTAssertEqual(SecondaryKeyAction.migratingReorderedPopupPrimaries(once), once)
+        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(unknown), unknown)
+    }
+
+    /// 이슈 #37 제보자 상태: ㅈ 의 출력만 @ 로 고치고 힌트·후보는 기본값(7 / 7 &).
+    /// 수정 전 편집 화면은 힌트를 따라 바꾸지 않았고, 이제 떼면 @ 가 들어가므로 키에 7 이 남는다.
+    /// 편집 화면을 다시 저장해도(`applyingEdit` 은 지금 저장된 출력 @ 와 비교) 고쳐지지 않으므로
+    /// 이전에서 힌트를 맞춘다.
+    private var reporterJieut: [SecondaryKeyAction] {
+        SecondaryKeyAction.defaults.map {
+            guard $0.keyId == "ㅈ" else { return $0 }
+            var e = $0
+            e.primaryLongPressOutput = "@"
+            return e
+        }
+    }
+
+    func test_migration_static_editedPrimaryWithDefaultHint_hintFollowsPrimary() {
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(reporterJieut)
+        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: migrated)!
+        XCTAssertEqual(jieut.visibleHint, "@", "손대지 않은(기본값) 힌트는 새 출력을 따라간다")
+        XCTAssertEqual(jieut.primaryLongPressOutput, "@", "고친 출력은 그대로")
+        XCTAssertEqual(jieut.popupOutputs, ["7", "&"], "후보도 그대로")
+        XCTAssertEqual(migrated.filter { $0.keyId != "ㅈ" }, SecondaryKeyAction.defaults.filter { $0.keyId != "ㅈ" })
+
+        // 이전 뒤 편집 화면을 그대로 저장해도 힌트가 유지된다 (예전에는 7 이 그대로 남았다).
+        let resaved = jieut.applyingEdit(visibleHint: jieut.visibleHint, primaryOutput: jieut.primaryLongPressOutput,
+                                         popupText: jieut.popupOutputs.joined(separator: " "))
+        XCTAssertEqual(resaved.visibleHint, "@")
+    }
+
+    func test_migration_static_editedPrimaryAndPopupReordered_hintFollowsPrimary() {
+        // 출력 @ · 후보 & 7 · 힌트 기본값 7 → 출력·후보는 그대로, 힌트만 @.
+        var actions = reorderedJieut
+        actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].primaryLongPressOutput = "@"
+        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        XCTAssertEqual(jieut.primaryLongPressOutput, "@")
+        XCTAssertEqual(jieut.popupOutputs, ["&", "7"])
+        XCTAssertEqual(jieut.visibleHint, "@")
+    }
+
+    func test_migration_static_editedPrimaryWithCustomHint_untouched() {
+        var actions = reporterJieut
+        actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].visibleHint = "★"
+        XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(actions), actions,
+                       "힌트를 직접 고친 항목은 출력을 고쳤어도 그대로")
+    }
+
+    func test_migration_static_editedPrimary_hintTrimmed() {
+        // 앞뒤 공백이 붙은 출력은 공백을 걷은 값을 힌트로 쓴다(떼면 들어가는 글자 = effectivePrimary).
+        var actions = reporterJieut
+        actions[actions.firstIndex(where: { $0.keyId == "ㅈ" })!].primaryLongPressOutput = " @ "
+        let jieut = SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        XCTAssertEqual(jieut.visibleHint, "@")
+        XCTAssertEqual(jieut.primaryLongPressOutput, " @ ", "출력 자체는 이전이 건드리지 않는다")
+    }
+
+    func test_migration_static_blankPrimary_hintFollowsFirstPopupOrStays() {
+        // 공백뿐인 출력은 예전 편집 화면이 저장을 막지 않았다. 떼면 들어가는 글자는 첫 후보다.
+        func jieut(primary: String, popup: [String]) -> SecondaryKeyAction {
+            let actions = SecondaryKeyAction.defaults.map { a -> SecondaryKeyAction in
+                guard a.keyId == "ㅈ" else { return a }
+                var e = a
+                e.primaryLongPressOutput = primary
+                e.popupOutputs = popup
+                return e
+            }
+            return SecondaryKeyAction.action(forKey: "ㅈ", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        }
+        let reordered = jieut(primary: "  ", popup: ["&", "7"])
+        XCTAssertEqual(reordered.visibleHint, "&", "힌트가 빈 글자가 되지 않고 들어가는 글자(첫 후보)를 따라간다")
+        XCTAssertEqual(reordered.primaryLongPressOutput, "  ")
+        XCTAssertEqual(reordered.effectivePrimary, "&")
+
+        let kept = jieut(primary: "", popup: ["7", "&"])
+        XCTAssertEqual(kept.visibleHint, "7", "들어가는 글자가 힌트와 같으면 그대로")
+
+        let empty = jieut(primary: " ", popup: [" ", ""])
+        XCTAssertEqual(empty.visibleHint, "7", "들어갈 글자가 없으면 힌트를 비우지 않는다")
+    }
+
+    func test_migration_static_englishDigitKey_editedPrimary_hintFollows() {
+        // 영문 숫자 0 (기본 힌트·출력 ")") 의 출력을 ] 로 고친 사용자도 같은 규칙.
+        let actions = SecondaryKeyAction.defaults.map { a -> SecondaryKeyAction in
+            guard a.keyId == "0" else { return a }
+            var e = a
+            e.primaryLongPressOutput = "]"
+            return e
+        }
+        let zero = SecondaryKeyAction.action(forKey: "0", from: SecondaryKeyAction.migratingForPrimaryOutput(actions))!
+        XCTAssertEqual(zero.visibleHint, "]")
+        XCTAssertEqual(zero.primaryLongPressOutput, "]")
+        XCTAssertEqual(zero.popupOutputs, [")"])
+    }
+
+    func test_migration_static_idempotent() {
+        var custom = reporterJieut
+        custom[custom.firstIndex(where: { $0.keyId == "ㅈ" })!].visibleHint = "★"
+        var both = reorderedJieut
+        both[both.firstIndex(where: { $0.keyId == "ㄱ" })!].primaryLongPressOutput = "["
+        for input in [reorderedJieut, reporterJieut, custom, both] {
+            let once = SecondaryKeyAction.migratingForPrimaryOutput(input)
+            XCTAssertEqual(SecondaryKeyAction.migratingForPrimaryOutput(once), once)
+        }
     }
 
     func test_migration_loadAll_reorderedUserKeepsResult_persistsAndSetsFlag() {
@@ -270,6 +369,23 @@ final class LongPressPrimaryOutputTests: XCTestCase {
         s.longPressPrimaryMigrated = false
         s.loadAll()
         XCTAssertEqual(s.secondaryAction(forKey: "ㅈ")?.primaryLongPressOutput, "@")
+        XCTAssertEqual(s.secondaryAction(forKey: "ㅈ")?.popupOutputs, ["&", "7"])
+        XCTAssertEqual(s.secondaryAction(forKey: "ㅈ")?.visibleHint, "@", "기본값 힌트는 고친 출력을 따라간다")
+    }
+
+    func test_migration_loadAll_reporterState_hintFollows_persistsAndSetsFlag() {
+        let s = KeyboardSettings.shared
+        s.secondaryKeyActions = reporterJieut
+        s.longPressPrimaryMigrated = false
+        s.loadAll()
+        XCTAssertTrue(s.longPressPrimaryMigrated)
+        XCTAssertEqual(s.secondaryAction(forKey: "ㅈ")?.visibleHint, "@")
+        // 한 번 더 읽어도(= 디스크에서 다시) 이전된 값 — 저장이 빠지면 여기서 힌트 7 로 돌아온다.
+        s.loadAll()
+        let jieut = s.secondaryAction(forKey: "ㅈ")
+        XCTAssertEqual(jieut?.visibleHint, "@")
+        XCTAssertEqual(jieut?.primaryLongPressOutput, "@")
+        XCTAssertEqual(jieut?.popupOutputs, ["7", "&"])
     }
 
     func test_migration_runsOnlyOnce_laterReorderDoesNotMovePrimary() {
