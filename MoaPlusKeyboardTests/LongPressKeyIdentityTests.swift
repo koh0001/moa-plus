@@ -235,18 +235,161 @@ final class LongPressKeyIdentityTests: XCTestCase {
 
     /// 상태가 이미 정리된 뒤(`resetGestureState` — 백그라운드 전환 등) 다른 키가 눌렸다면, 앞 키는
     /// 롤오버 기록에도 없다. 그 키의 늦은 콜백도 새 키를 건드리면 안 된다.
+    ///
+    /// 타이머를 거절당한 키 뷰는 일반 제스처로 남으므로 실제로 오는 건 이동(`gestureMoved`)과
+    /// 뗌(`gestureEnded`)이다 (리뷰 — 예전 테스트는 이 둘을 보내지 않아 `gestureEnded` 가 ㄴ 의
+    /// 분석기로 ㅇ 을 넣고 ㄴ 의 상태를 지우는 걸 못 잡았다: "ㅇㄴ").
     func test_c_staleKeyAfterReset_callbacksDoNotTouchNewKey() {
         let o = ieung, n = nieun
         let oTrigger = press(o)
         vm.resetGestureState()
         press(n)
-        XCTAssertFalse(timerFires(o, trigger: oTrigger))
+        let accepted = timerFires(o, trigger: oTrigger)
+        XCTAssertFalse(accepted)
+        // ㅇ 손가락의 흔들림 — ㄴ 의 분석기에 들어가면 ㄴ 이 긴 ← 긋기(ㅓ)로 읽힌다 (이슈 #31/#32 와 같은 꼴).
+        vm.gestureMoved(row: o.row, column: o.column, to: CGPoint(x: -120, y: 0))
+        lift(o, popupMode: accepted)                     // 거절됐으므로 onGestureEnd
         vm.confirmPopupSelection(row: o.row, column: o.column)
         vm.cancelGesture(row: o.row, column: o.column)
-        XCTAssertEqual(vm.gestureState.activeKey?.row, n.row)
+        XCTAssertEqual(vm.gestureState.activeKey?.row, n.row, "ㅇ 의 늦은 뗌이 ㄴ 의 activeKey 를 지웠다")
         XCTAssertEqual(vm.gestureState.activeKey?.column, n.column)
+        XCTAssertTrue(host.insertedTexts.isEmpty, "ㅇ 의 늦은 뗌이 무언가를 넣었다")
         lift(n, popupMode: false)
-        XCTAssertEqual(host.text, "ㄴ")
+        XCTAssertEqual(host.text, "ㄴ", "ㅇ 의 늦은 뗌·이동이 ㄴ 의 긋기로 해석됐다")
+    }
+
+    /// 위와 같은데 ㄴ 의 팝업이 이미 떠 있다 — ㅇ 의 뗌이 ㄴ 의 억제 플래그를 가져가 ㄴ 의 팝업과
+    /// 결과를 지우면 안 된다 (리뷰).
+    func test_c_staleKeyAfterReset_releaseDoesNotTakeNewKeysPopup() {
+        let o = ieung, n = nieun
+        let oTrigger = press(o)
+        vm.resetGestureState()
+        let nTrigger = press(n)
+        XCTAssertFalse(timerFires(o, trigger: oTrigger))
+        XCTAssertTrue(timerFires(n, trigger: nTrigger))
+        lift(o, popupMode: false)
+        XCTAssertEqual(popupAnchor?.row, n.row, "ㅇ 의 늦은 뗌이 ㄴ 의 팝업을 닫았다")
+        XCTAssertEqual(popupAnchor?.column, n.column)
+        XCTAssertTrue(host.insertedTexts.isEmpty)
+        lift(n, popupMode: true)
+        XCTAssertEqual(host.insertedTexts, ["."], "ㄴ 의 롱키 결과가 사라졌다")
+        XCTAssertEqual(host.text, ".")
+    }
+
+    // MARK: - 슬롯 B 모음 키와 겹칠 때 (리뷰)
+    //
+    // 슬롯 B(`slotB == .vowelKey` / 확장형 임베드)는 `activeKey` 를 (-1,-1) 로 바꾸는 별도 파이프라인이다.
+    // 그리드 키 팝업의 문(`isActiveGridKey`)이 생긴 뒤로, 슬롯 B 가 그리드 키를 정리하지 않고 `activeKey`
+    // 를 바꾸면 그 키의 팝업 뗌이 거절돼 팝업이 다음 키 위에 남았다.
+
+    private static let slotBOrigin = CGPoint(x: 200, y: 230)
+
+    private func slotBDown() { vm.slotBVowelGestureStarted(at: Self.slotBOrigin) }
+
+    /// 슬롯 B 에서 → 로 80pt — 분석기 문턱을 넉넉히 넘는다(`KeyboardViewModelVowelDragTests` 와 같은 길이).
+    private func slotBDragRight() {
+        for i in 1...4 {
+            vm.slotBVowelGestureMoved(to: CGPoint(x: Self.slotBOrigin.x + CGFloat(i) * 20,
+                                                  y: Self.slotBOrigin.y))
+        }
+    }
+
+    private func slotBUp() { vm.slotBVowelGestureEnded() }
+
+    /// ㅈ 팝업이 뜬 채 모음 키를 누른다 — 그리드 롤오버와 같이 팝업은 확정 없이 닫힌다. 예전에는 ㅈ 의
+    /// 뗌이 거절돼 팝업이 남았고, 다음 키(ㄱ) 위에 그려졌으며, ㄱ→ㄴ 롤오버가 그 팝업 때문에 ㄱ 을
+    /// 확정 없이 버렸다.
+    func test_slotB_pressedWhileGridPopupOpen_closesPopup_nextKeysUnaffected() {
+        let j = jieut, g = giyeok, n = nieun
+        XCTAssertTrue(timerFires(j, trigger: press(j)))
+        slotBDown()
+        XCTAssertNil(vm.longPressPopupText, "모음 키를 눌렀는데 ㅈ 의 팝업이 남았다")
+        XCTAssertTrue(vm.longPressPopupCandidates.isEmpty)
+        lift(j, popupMode: true)                         // ㅈ 은 팝업 모드였으므로 onPopupRelease
+        XCTAssertTrue(host.insertedTexts.isEmpty, "닫힌 팝업의 후보가 들어갔다")
+        slotBDragRight()
+        slotBUp()
+        XCTAssertEqual(host.text, "ㅏ")
+
+        press(g)
+        XCTAssertNil(popupAnchor, "ㅈ 의 팝업이 ㄱ 위에 남았다")
+        press(n)                                         // 롤오버 — ㄱ 은 여기서 확정돼야 한다
+        lift(g, popupMode: false)
+        lift(n, popupMode: false)
+        XCTAssertEqual(host.text, "ㅏㄱㄴ", "남은 팝업 때문에 롤오버가 ㄱ 을 버렸다")
+    }
+
+    /// 두 엄지 롤오버 ㅈ → 모음 키 (B1 의 가장 흔한 입력). 모음 키를 누르는 순간 ㅈ 을 자기 획으로 확정하고
+    /// ㅈ 손가락의 이후 신호는 버린다 — 안 하면 ㅈ 의 흔들림이 모음 키 분석기에 들어가 ㅈ 이 긴 긋기로
+    /// 읽히고, ㅈ 의 뗌이 모음 키의 분석기를 지운다.
+    func test_slotB_rolloverFromGridKey_commitsGridKeyOnce_vowelFromSlotBStroke() {
+        let j = jieut
+        press(j)
+        slotBDown()
+        vm.gestureMoved(row: j.row, column: j.column, to: CGPoint(x: 1, y: 0))   // ㅈ 손가락 흔들림
+        lift(j, popupMode: false)
+        slotBDragRight()
+        slotBUp()
+        XCTAssertEqual(host.text, "자", "ㅈ 이 빠졌거나 모음 키 획이 ㅈ 의 흔들림과 섞였다")
+    }
+
+    /// 천지인 동작(`.cheonjiin`)도 같은 문을 지나야 한다 — 누름은 공통이라 롤오버 확정도 같다.
+    func test_slotB_rolloverFromGridKey_cheonjiin_commitsGridKeyOnce() {
+        setVowelKeyBehavior(.cheonjiin)
+        let j = jieut
+        press(j)
+        slotBDown()
+        vm.gestureMoved(row: j.row, column: j.column, to: CGPoint(x: 1, y: 0))
+        lift(j, popupMode: false)
+        slotBDragRight()                                 // 천지인: → = ㅡ
+        slotBUp()
+        XCTAssertEqual(host.text, "즈")
+    }
+
+    /// 모음 키를 누른 채 ㅈ 롱키 팝업을 연 뒤 모음 키를 먼저 뗀다 — 모음 키의 뗌이 ㅈ 의 `activeKey` 를
+    /// 지우면 ㅈ 의 팝업 드래그·뗌이 거절돼 팝업이 다음 키 위에 남는다.
+    func test_slotBHeld_gridKeyPopup_survivesSlotBRelease_andOwnReleaseInserts() {
+        assertGridPopupSurvivesSlotBRelease()
+    }
+
+    /// 천지인 동작은 슬롯 B 뗌이 따로 끝나는 분기라 따로 본다.
+    func test_slotBHeld_gridKeyPopup_survivesSlotBRelease_cheonjiin() {
+        setVowelKeyBehavior(.cheonjiin)
+        assertGridPopupSurvivesSlotBRelease()
+    }
+
+    private func setVowelKeyBehavior(_ behavior: VowelKeyBehavior) {
+        var layout = KeyboardSettings.shared.layoutCustomization   // tearDown 의 pin.restore() 가 되돌린다
+        layout.vowelKeyBehavior = behavior
+        KeyboardSettings.shared.layoutCustomization = layout
+    }
+
+    /// 슬롯 B 의 뗌이 이끄는 결과(앞의 ㆍ 등)는 모음 키·그리드 키가 분석기를 함께 쓰는 기존 동작이라
+    /// 보지 않는다 — ㅈ 의 팝업이 살아 있는지, ㅈ 의 뗌이 고른 후보를 한 번 넣고 닫는지, 다음 키가
+    /// 멀쩡한지만 본다.
+    private func assertGridPopupSurvivesSlotBRelease(file: StaticString = #filePath, line: UInt = #line) {
+        let j = jieut, g = giyeok, n = nieun
+        slotBDown()
+        XCTAssertTrue(timerFires(j, trigger: press(j)), "모음 키를 누른 채라도 ㅈ 자신의 롱키는 열려야 한다",
+                      file: file, line: line)
+        slotBUp()
+        XCTAssertEqual(popupAnchor?.row, j.row, "모음 키의 뗌이 ㅈ 의 팝업을 떼어 냈다", file: file, line: line)
+        XCTAssertEqual(popupAnchor?.column, j.column, file: file, line: line)
+        vm.updatePopupSelection(row: j.row, column: j.column, translationX: 45)
+        XCTAssertEqual(vm.longPressPopupSelectedIndex, 1, "ㅈ 의 드래그가 거절됐다", file: file, line: line)
+        lift(j, popupMode: true)
+        XCTAssertEqual(host.insertedTexts.filter { $0 == "&" }.count, 1, "ㅈ 이 고른 후보가 한 번 들어가야 한다",
+                       file: file, line: line)
+        XCTAssertFalse(host.insertedTexts.contains("7"), file: file, line: line)
+        XCTAssertNil(vm.longPressPopupText, "ㅈ 의 뗌이 팝업을 닫지 못했다", file: file, line: line)
+
+        press(g)
+        XCTAssertNil(popupAnchor, "ㅈ 의 팝업이 ㄱ 위에 남았다", file: file, line: line)
+        press(n)
+        lift(g, popupMode: false)
+        lift(n, popupMode: false)
+        XCTAssertTrue(host.text.hasSuffix("&ㄱㄴ"), "남은 팝업 때문에 롤오버가 ㄱ 을 버렸다 — \(host.text)",
+                      file: file, line: line)
     }
 
     // MARK: - (d) 팝업이 떠 있을 때 레이어를 바꾸면 팝업을 닫는다

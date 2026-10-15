@@ -184,7 +184,15 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   `showNumberPopup` 을 세운다(먼저 세우면 거절된 키의 뗌이 `onPopupRelease` 로 빠져 `gestureEnded` 가 롤오버
   기록을 못 지운다). 한/영·123·#+= (`toggleLetterMode`/`toggleSymbolMode`/`toggleSymbolPage`)는 모드를 바꾸기
   **전에** 눌린 그리드 키를 롤오버와 똑같이 지금 레이어로 확정(팝업이 떠 있으면 확정 없이 닫음)하고
-  롤오버 기록에 넣는다 — 예전에는 그 키의 뗌·롱키가 새 레이어의 같은 칸으로 해석됐다(`LongPressKeyIdentityTests`)
+  롤오버 기록에 넣는다 — 예전에는 그 키의 뗌·롱키가 새 레이어의 같은 칸으로 해석됐다(`LongPressKeyIdentityTests`).
+  이 셋과 롤오버는 `supersedeHeldGridKey()` 하나를 부른다. **`activeKey` 를 바꾸는 곳은 팝업 주인을 지켜야 한다**
+  — 팝업은 주인 키가 활성일 때만 닫히므로, 그리드 키를 정리하지 않고 `activeKey` 를 바꾸면 팝업이 다음 키 위에
+  남고 다음 롤오버가 그 팝업 때문에 키를 확정 없이 버린다. 그래서 슬롯 B 모음 키는 누를 때
+  (`slotBVowelGestureStarted`, 분석기 초기화 **전**) 눌린 그리드 키를 같은 함수로 정리하고, 뗄 때는
+  `activeKey` 가 아직 자기 것(-1,-1)일 때만 지운다(`releaseSlotBActiveKey` — 모음 키를 누른 채 누른 그리드 키의
+  팝업을 지키려고). `resetGestureState`(백그라운드 등) 뒤 다른 키가 눌렸으면 앞 키는 롤오버 기록에도 없다 —
+  그 키의 이동·뗌은 `isStaleGridKey` 로 버린다(`gestureEnded` 에서는 새 키의 억제 플래그 검사보다 **먼저**).
+  이 문은 슬롯 B(-1)를 막지 않는다 — 그리드 키 → 모음 키 롤오버의 그리드 키 뗌을 버리면 글자가 빠진다
 - `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음.
   이벤트별 토글 판정은 `HapticManager.isEnabled(_:in:)` 하나(`HapticEventToggleTests`)
 - **햅틱은 키를 누르는 순간 울린다** (이슈 #23). 입력 확정(손 뗄 때)이 아니다 — 긋기 키보드는
@@ -342,7 +350,9 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 에 넣는다. 그 키의 늦은 `gestureMoved(row:column:to:)`·`gestureEnded`·`cancelGesture` 는 버린다. 그래서 그리드는
 이동·취소에도 **(row, column) 을 넘겨야** 한다 — 위치 없는 `gestureMoved(to:)` 를 그리드에서 다시 쓰면 제보
 "는 → 너ㅡㄴ"(앞 키 손가락 흔들림이 새 키 위치에서 시작한 ←225pt 긋기로 읽힘)가 되살아난다.
-롱프레스 팝업이 떠 있던 앞 키는 확정하지 않고 리셋. 슬롯 B(`activeKey.row == -1`)는 별도 파이프라인이라 제외.
+롱프레스 팝업이 떠 있던 앞 키는 확정하지 않고 리셋. 슬롯 B(`activeKey.row == -1`)는 별도 파이프라인이라 **앞 키로서는**
+제외한다 — 모음 키를 누른 채 그리드 키를 눌러도 모음 키는 확정되지 않는다(두 키가 분석기 하나를 같이 쓰는 기존 동작,
+미해결). 반대로 그리드 키를 누른 채 모음 키를 누르면 그리드 키를 롤오버로 확정한다(이슈 #40 리뷰).
 가드 `KeyboardViewModelRolloverTests` (수정을 끄면 "너ㅡㄴ"/"네" 재현). 롱키·팝업 콜백과 레이어 전환도 같은
 규칙을 따른다 — 위 "롱키 콜백은 키 위치를 함께 넘긴다 (이슈 #40)" 참조
 

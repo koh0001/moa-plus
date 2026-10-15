@@ -313,7 +313,7 @@ class KeyboardViewModel: ObservableObject {
 
     func toggleSymbolMode() {
         if previewMode { return }
-        supersedeActiveGestureForLayerChange()
+        supersedeHeldGridKey()
         stopBackspaceRepeat()
         commitCurrent()
         symbolPage = 0   // 심볼 진입/이탈 시 항상 page 0 에서 시작
@@ -324,13 +324,13 @@ class KeyboardViewModel: ObservableObject {
     /// currently in a symbol mode (the toggle key only renders there).
     func toggleSymbolPage() {
         guard keyboardMode.isSymbol else { return }
-        supersedeActiveGestureForLayerChange()
+        supersedeHeldGridKey()
         symbolPage = (symbolPage + 1) % KeyboardMetrics.symbolPageCount
     }
 
     func toggleLetterMode() {
         if previewMode { return }
-        supersedeActiveGestureForLayerChange()
+        supersedeHeldGridKey()
         stopBackspaceRepeat()
         commitCurrent()
         symbolPage = 0   // 심볼→문자 전환 시 페이지 상태 초기화
@@ -574,6 +574,11 @@ class KeyboardViewModel: ObservableObject {
     // 나머지 모음은 천지인 합성으로 쌓는다.
 
     func slotBVowelGestureStarted(at point: CGPoint) {
+        // 눌려 있던 그리드 키는 롤오버와 똑같이 먼저 정리한다 (이슈 #40 리뷰): 자기 획으로 확정하고
+        // (팝업이 떠 있었으면 확정 없이 닫고) 그 손가락의 이후 신호를 버린다. 아래에서 분석기를
+        // 초기화하고 `activeKey` 를 (-1,-1) 로 바꾸기 **전에** 불러야 한다 — 안 하면 그 키의 팝업
+        // 뗌이 `isActiveGridKey` 에 거절돼 팝업이 다음 키 위에 남고, 흔들림이 모음 키 분석기로 들어간다.
+        supersedeHeldGridKey()
         typoMarkPending = false
         keyPressFeedback()
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
@@ -629,12 +634,19 @@ class KeyboardViewModel: ObservableObject {
             firstStrokeCardinal: gestureAnalyzer.currentFirstStrokeCardinal())
     }
 
+    /// 슬롯 B 를 뗄 때 `activeKey` 는 **아직 슬롯 B 의 것일 때만** 지운다 (이슈 #40 리뷰). 모음 키를
+    /// 누른 채 그리드 키를 누르면 그 키가 주인이 되는데, 여기서 지우면 그 키의 롱키 타이머·팝업
+    /// 드래그·팝업 뗌이 `isActiveGridKey` 에 거절돼 팝업이 닫히지 않고 다음 키 위에 남는다.
+    private func releaseSlotBActiveKey() {
+        if let active = activeKey, active.row < 0 { activeKey = nil }
+    }
+
     func slotBVowelGestureEnded() {
         if vowelKeyBehavior == .cheonjiin {
             let dx = slotBVowelLastPoint.x - slotBVowelStartPoint.x
             let primitive = cheonjiinPrimitive(dx: dx)
             gestureAnalyzer.reset()
-            activeKey = nil
+            releaseSlotBActiveKey()
             gestureStartPoint = nil
             gestureDirections = []
             previewVowel = nil
@@ -648,7 +660,7 @@ class KeyboardViewModel: ObservableObject {
         let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
         gestureAnalyzer.reset()
         // Clear gestureState so the overlay disappears.
-        activeKey = nil
+        releaseSlotBActiveKey()
         gestureStartPoint = nil
         gestureDirections = []
         previewVowel = nil
@@ -1028,6 +1040,19 @@ class KeyboardViewModel: ObservableObject {
         return active.row == row && active.column == column && !isSuperseded(row: row, column: column)
     }
 
+    /// **다른** 그리드 키가 지금 제스처의 주인인가 — 이 키는 롤오버 기록에도 없는 낡은 키다
+    /// (그 사이 `resetGestureState` 로 상태가 정리된 뒤 새 키가 눌린 경우, 이슈 #40 리뷰). 그런 키의
+    /// 이동·뗌은 새 키의 분석기·억제 플래그·`activeKey` 를 건드리면 안 된다 — 뗌이 새 키의 분석기로
+    /// 이 키를 넣고 새 키의 상태를 지워 "ㅇㄴ" 이 되거나, 새 키의 팝업 플래그를 가져가 팝업과 결과를 지운다.
+    ///
+    /// 슬롯 B(`activeKey.row == -1`)는 **제외**한다: 그리드 키 → 모음 키 롤오버에서 그리드 키의 뗌을
+    /// 버리면 안 된다(그 키는 모음 키를 누를 때 롤오버로 확정되지만, 그 경로가 빠져도 글자가 사라지지
+    /// 않게). `cancelGesture` 의 문은 슬롯 B 도 막는다 — 취소는 입력을 만들지 않으므로.
+    private func isStaleGridKey(row: Int, column: Int) -> Bool {
+        guard let active = activeKey, active.row >= 0 else { return false }
+        return !(active.row == row && active.column == column)
+    }
+
     /// 두 엄지 롤오버 (이슈 #31/#32): 앞 키를 떼기 전에 다른 그리드 키가 눌리면, 앞 키를
     /// **그때까지 자기 손가락이 그은 만큼**으로 먼저 확정하고 그 손가락의 이후 신호는 버린다.
     ///
@@ -1037,16 +1062,20 @@ class KeyboardViewModel: ObservableObject {
     /// 슬롯 B 모음 키(`activeKey.row == -1`)는 자체 파이프라인이라 건드리지 않는다.
     private func supersedeActiveGesture(byRow row: Int, column: Int) {
         guard let prev = activeKey, !(prev.row == row && prev.column == column) else { return }
-        supersedeActiveGestureForLayerChange()
+        supersedeHeldGridKey()
     }
 
-    /// 레이어 전환(한/영·123·#+=) 직전에도 롤오버와 똑같이 한다 (이슈 #40): 눌려 있는 그리드 키를
-    /// **지금 레이어로** 먼저 확정하고(팝업이 떠 있었으면 확정 없이 닫는다) 그 손가락의 이후 신호를
-    /// 버린다. 안 하면 그 키의 롱키 타이머·뗌이 새 레이어의 같은 칸으로 해석된다 — ㅈ 을 누른 채
-    /// 123 을 누르면 "$"(심볼 (1,2) = 4 의 대체 문자), 롱키 없이 떼도 "4". 떠 있던 팝업은 새
-    /// 모드로 후보를 다시 걸러 빈 칸·엉뚱한 자리에 남았다. 모드·페이지를 바꾸기 **전에** 불러야 한다.
-    /// 롤오버(`supersedeActiveGesture(byRow:column:)`)도 같은 키 재누름만 거른 뒤 이 함수를 쓴다.
-    private func supersedeActiveGestureForLayerChange() {
+    /// 눌려 있는 그리드 키를 **지금 레이어·자기 획으로** 먼저 확정하고(팝업이 떠 있었으면 확정 없이
+    /// 닫는다) 롤오버 기록에 넣어 그 손가락의 이후 신호를 버린다. 부르는 곳은 셋이다.
+    /// - 롤오버(`supersedeActiveGesture(byRow:column:)`) — 같은 키 재누름만 거른 뒤.
+    /// - 레이어 전환(한/영·123·#+=, 이슈 #40): 안 하면 그 키의 롱키 타이머·뗌이 새 레이어의 같은
+    ///   칸으로 해석된다 — ㅈ 을 누른 채 123 을 누르면 "$"(심볼 (1,2) = 4 의 대체 문자), 롱키 없이
+    ///   떼도 "4". 떠 있던 팝업은 새 모드로 후보를 다시 걸러 빈 칸·엉뚱한 자리에 남았다. 모드·페이지를
+    ///   바꾸기 **전에** 불러야 한다.
+    /// - 슬롯 B 모음 키 누름(이슈 #40 리뷰): 슬롯 B 는 `activeKey` 를 (-1,-1) 로 바꾸므로, 안 하면 그
+    ///   키의 팝업 뗌이 거절돼 팝업이 다음 키 위에 남는다. 분석기를 초기화하기 **전에** 불러야 한다.
+    /// 슬롯 B 자신(`activeKey.row == -1`)은 그리드 키가 아니므로 건드리지 않는다.
+    private func supersedeHeldGridKey() {
         guard let prev = activeKey, prev.row >= 0 else { return }
         if popupState.text != nil {
             // 롱프레스 팝업을 띄운 채 다른 키를 누른 경우 — 팝업 후보를 고른 게 아니므로 확정하지 않는다.
@@ -1125,9 +1154,11 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
-    /// 키별 이동. 롤오버로 먼저 확정한 키의 손가락 이동은 버린다.
+    /// 키별 이동. 롤오버로 먼저 확정한 키와 다른 키가 눌린 뒤의 낡은 키(`isStaleGridKey`)의
+    /// 손가락 이동은 버린다 — 새 키의 분석기에 들어가면 새 키가 긴 긋기로 읽힌다.
     func gestureMoved(row: Int, column: Int, to point: CGPoint) {
-        guard !isSuperseded(row: row, column: column) else { return }
+        guard !isSuperseded(row: row, column: column),
+              !isStaleGridKey(row: row, column: column) else { return }
         gestureMoved(to: point)
     }
 
@@ -1190,6 +1221,9 @@ class KeyboardViewModel: ObservableObject {
             supersededKeys.remove(at: i)
             return
         }
+        // 다른 그리드 키가 눌린 뒤의 낡은 뗌 — 아래 억제 플래그는 그 새 키의 것이므로 **그보다 먼저**
+        // 걸러야 한다. 롱키 타이머를 거절당한 키 뷰는 일반 제스처로 남아 뗌이 여기로 온다.
+        if isStaleGridKey(row: row, column: column) { return }
         if didHandleLongPressNumberInCurrentGesture {
             didHandleLongPressNumberInCurrentGesture = false
             resetGestureState()
