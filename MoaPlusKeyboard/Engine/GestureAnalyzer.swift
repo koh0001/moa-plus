@@ -123,7 +123,10 @@ class GestureAnalyzer {
     private var effectiveRotationOffset: Double {
         // Global axis rotation applies to every column (and to columnId 0);
         // per-column rotationOffset is summed on top of it.
-        let global = settings.swipeProfile.axisRotation
+        // 4방향 전용 모드에서는 전체 회전이 0 이다(설정 화면이 "각도 설정 무시" 로
+        // 슬라이더를 끈다, 이슈 #42). 열별 회전은 세로 라인별 보정 토글이 따로
+        // 다스리므로 그대로 더한다. `cardinalSnap`(첫 획 재해석)도 이 값을 쓴다.
+        let global = settings.swipeProfile.effectiveAxisRotation
         guard columnId > 0 else { return global }
         return global + settings.effectiveRotationOffset(forColumn: columnId)
     }

@@ -181,6 +181,15 @@ struct SwipeProfile: Codable, Equatable {
     /// behaviour. Range ±20° is enforced by the UI.
     var axisRotation: Double = 0
 
+    /// 인식기가 실제로 쓰는 전체 회전 (이슈 #42). 4방향 전용 모드는 설정 화면이
+    /// "긋기 각도·방향 설정은 무시" 라고 약속하고 전체 회전 슬라이더를 끄므로,
+    /// 저장된 `axisRotation` 과 무관하게 0 이다 — 슬라이더를 돌려 둔 채 4방향을
+    /// 켠 사용자의 사분면이 보이지 않는 값만큼 기울어 있던 문제. 열별 회전(세로
+    /// 라인별 보정)은 4방향에서도 켜진 채 남는 별도 설정이라 여기 들어가지 않는다.
+    /// 인식기(`GestureAnalyzer`)와 설정 미리보기가 모두 이 값을 읽어야 그림과
+    /// 판정이 어긋나지 않는다.
+    var effectiveAxisRotation: Double { fourWayMode ? 0 : axisRotation }
+
     /// When `true` (default), an angle that no sector claims (a gap opened by
     /// per-side narrowing) is recognised as the nearest-center direction —
     /// `GestureDirection.from`'s STEP3 fallback — so narrowing never leaves a

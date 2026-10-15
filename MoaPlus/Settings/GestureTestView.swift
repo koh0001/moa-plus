@@ -79,7 +79,8 @@ final class GestureTestModel: ObservableObject {
         // Mirror GestureAnalyzer.effectiveRotationOffset: global axis rotation
         // applies to every column, with per-column rotation summed on top, so
         // the drawn sectors match what the live recognizer actually uses.
-        settings.gestureSettings.swipeProfile.axisRotation
+        // 4방향 전용 모드에서는 전체 회전이 0 (`SwipeProfile.effectiveAxisRotation`).
+        settings.gestureSettings.swipeProfile.effectiveAxisRotation
             + settings.gestureSettings.effectiveRotationOffset(forColumn: selectedColumn)
     }
 

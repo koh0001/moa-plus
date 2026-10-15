@@ -538,6 +538,25 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 프리셋 피커는 `SwipeProfile.applyingPreset` 로 **섹터까지** 쓴다(v2.2.2 까지 오른손/왼손은 라벨만
 바뀌고 미적용이었다). 각도 편집기에서 손대면 `.custom`. 가드 `SixWaySectorTests`
 
+**"비활성" 매핑 (이슈 #42)**: 끈 대각선은 **단독 획으로 모음을 만들지 않는다**. 그 대각선으로
+시작하는 멀티 스트로크(↘↖=ㅢ, ↘↑=ㅢ, 첫 획 재해석 ↗↙=ㅐ·휘어진 ↗→=ㅏ)는 그대로 성립한다.
+v2.2.5 까지 ↗/↘ 를 꺼도 ㅣ/ㅡ 가 들어갔다 — `normalizedDirection` 이 끈 대각선을 원시 방향 그대로
+넘기고 트라이에 단독 `↗=ㅣ` `↘=ㅡ` 노드가 있어서다(↖/↙ 는 루트 노드가 없어 원래 꺼졌다).
+트라이 노드는 지우지 말 것 — 기본 매핑의 멀티 스트로크 정규화와 클래식/확장형 ㅣ/ㅡ 가 쓴다. 대신
+`VowelResolver.matchExcludingDisabledDiagonal` 이 "첫 획이 끈 대각선이고 매칭이 첫 노드에서
+끝남"(`consumedCount == 1`)이면 모음을 지운다. 판정은 **원래 첫 획**의 매핑으로 — 정규화된 첫
+획으로 보면 ↖(ㅣ) 가 ↗ 로 접힌 경우를 끈 ↗ 로 오인한다. `resolve`·`peekVowel`·`hasPotentialMatch`·
+`resolveSingleStroke`(슬롯 B) 공통, 자음 키(`handleKoreanModeGesture`)는 `resolve` 를 탄다.
+6방향 프리셋은 매핑이 아니라 섹터 폭 0 으로 끄므로 무관. 가드 `GestureSettingsApplyTests`
+
+**4방향 전용 모드의 회전 (이슈 #42)**: 설정 화면은 4방향에서 "긋기 각도·방향 설정은 무시" 라며
+프리셋·방향 설정·전체 회전을 끈다. 그래서 인식기는 `SwipeProfile.effectiveAxisRotation`(4방향이면 0)
+을 쓴다 — v2.2.5 까지는 저장된 `axisRotation` 을 계속 빼서 보이지 않는 값만큼 사분면이 기울었다.
+저장값은 지우지 않는다(4방향을 끄면 돌아옴). **열별 회전은 유지** — 세로 라인별 보정 섹션은 4방향에서도
+켜져 있고 자체 토글(`columnCorrectionEnabled`)이 있다. 섹터 폭·빈 각도 처리는 원래 4방향 분기
+(`GestureDirection.from` 의 `fourWay`)가 무시한다. 회전을 새로 읽는 곳(미리보기 포함: `GestureTestModel.rotationOffset`,
+`DirectionPieChart.columnCorrectionSlices`)도 `axisRotation` 이 아니라 이 값을 쓸 것
+
 ### 약어(단축어) 트리거 매칭 규칙
 - 구분자는 두 종류다. **경계 구분자**(`" "` `"\n"`)는 버퍼를 리셋하고, **내용 겸 확정
   구분자**(`.` `,` `!` `?` `;` `:`)는 버퍼에 누적되면서 확정 판정도 트리거한다. 덕분에

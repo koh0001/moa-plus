@@ -34,7 +34,7 @@ class VowelResolver {
         }
 
         let normalized = normalizeForMatching(directions)
-        let match = patternTrie.match(normalized)
+        let match = matchExcludingDisabledDiagonal(normalized, firstStroke: directions[0])
 
         if let alt = cardinalReinterpretation(directions, firstStrokeCardinal: firstStrokeCardinal) {
             let altMatch = patternTrie.match(alt)
@@ -76,6 +76,10 @@ class VowelResolver {
     /// DiagonalMapping. Used by slot-B vowel key (no multi-stroke compound).
     /// Returns nil for `.disabled` mappings.
     func resolveSingleStroke(direction: GestureDirection) -> Jungseong? {
+        // "비활성" 으로 끈 대각선은 단독 획으로 모음을 만들지 않는다 (이슈 #42).
+        // 아래 정규화 폴백도 nil 로 떨어지지만, `resolve` 의 가드와 같은 규칙임을
+        // 명시해 두 경로가 갈라지지 않게 한다.
+        if isDisabledDiagonal(direction) { return nil }
         if let directVowel = resolveDirectDiagonal(direction) {
             return directVowel
         }
@@ -120,22 +124,59 @@ class VowelResolver {
         }
 
         let normalized = normalizeForMatching(directions)
-        let match = patternTrie.match(normalized)
+        let match = matchExcludingDisabledDiagonal(normalized, firstStroke: directions[0])
         return match.vowel != nil || match.hasLongerMatch
+    }
+
+    // MARK: - Disabled diagonal guard (이슈 #42)
+
+    /// 트라이 매칭 + "비활성" 대각선 가드.
+    ///
+    /// 트라이에는 단독 `↗=ㅣ` / `↘=ㅡ` 가 들어 있다 — 매핑을 ㅣ/ㅡ 로 둔 대각선이
+    /// 멀티 스트로크에서 정규화돼 닿는 노드이자, 클래식/확장형 레이아웃의 ㅣ/ㅡ
+    /// 경로다. 그런데 "비활성" 매핑은 정규화가 원시 대각선을 그대로 넘기므로
+    /// (`normalizedDirection`), 끈 ↗/↘ 도 같은 노드에 닿아 ㅣ/ㅡ 가 입력됐다
+    /// (↖/↙ 는 트라이 루트에 노드가 없어 원래 꺼졌다).
+    ///
+    /// 규칙: 첫 획이 끈 대각선이고 매칭이 **그 첫 노드에서 끝났으면**(= 그 대각선
+    /// 혼자 만든 모음) 모음이 없다. 끈 대각선으로 시작하는 멀티 스트로크(↘↖=ㅢ,
+    /// ↘↑=ㅢ)는 둘째 노드 이상에서 끝나므로 그대로 성립하고, 첫 획 재해석
+    /// (`cardinalReinterpretation`)은 첫 획을 카디널로 바꾸므로 이 가드와 무관하다.
+    ///
+    /// 판정은 **원래 첫 획**의 매핑으로 한다. 정규화된 첫 획으로 보면 ↖(ㅣ) 이 ↗ 로
+    /// 접힌 경우를 끈 ↗ 로 오인한다.
+    private func matchExcludingDisabledDiagonal(_ normalized: [GestureDirection],
+                                                firstStroke: GestureDirection) -> PatternTrie.MatchResult {
+        let match = patternTrie.match(normalized)
+        guard match.vowel != nil,
+              match.consumedCount == 1,
+              isDisabledDiagonal(firstStroke) else { return match }
+        return PatternTrie.MatchResult(vowel: nil,
+                                       consumedCount: 0,
+                                       hasLongerMatch: match.hasLongerMatch,
+                                       matchedCount: match.matchedCount)
+    }
+
+    private func isDisabledDiagonal(_ direction: GestureDirection) -> Bool {
+        diagonalMapping(for: direction) == .disabled
+    }
+
+    /// 대각선의 사용자 매핑. 카디널이면 nil.
+    private func diagonalMapping(for direction: GestureDirection) -> DiagonalMapping? {
+        switch direction {
+        case .upLeft:    return swipeProfile.upLeftMapping
+        case .upRight:   return swipeProfile.upRightMapping
+        case .downLeft:  return swipeProfile.downLeftMapping
+        case .downRight: return swipeProfile.downRightMapping
+        case .up, .down, .left, .right: return nil
+        }
     }
 
     // MARK: - Direct diagonal vowel mapping
 
     /// Resolve a diagonal direction to a vowel based on SwipeProfile mapping
     private func resolveDirectDiagonal(_ direction: GestureDirection) -> Jungseong? {
-        let mapping: DiagonalMapping
-        switch direction {
-        case .upLeft:    mapping = swipeProfile.upLeftMapping
-        case .upRight:   mapping = swipeProfile.upRightMapping
-        case .downLeft:  mapping = swipeProfile.downLeftMapping
-        case .downRight: mapping = swipeProfile.downRightMapping
-        default: return nil
-        }
+        guard let mapping = diagonalMapping(for: direction) else { return nil }
 
         let vowel: Jungseong?
         switch mapping {
@@ -155,14 +196,7 @@ class VowelResolver {
 
     /// Get the normalized direction for a diagonal based on its mapping
     private func normalizedDirection(for direction: GestureDirection) -> GestureDirection {
-        let mapping: DiagonalMapping
-        switch direction {
-        case .upLeft:    mapping = swipeProfile.upLeftMapping
-        case .upRight:   mapping = swipeProfile.upRightMapping
-        case .downLeft:  mapping = swipeProfile.downLeftMapping
-        case .downRight: mapping = swipeProfile.downRightMapping
-        default: return direction
-        }
+        guard let mapping = diagonalMapping(for: direction) else { return direction }
 
         switch mapping {
         case .normalizeUp, .vowelO:    return .up

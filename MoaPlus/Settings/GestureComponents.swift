@@ -320,8 +320,9 @@ extension DirectionPieChart {
         // Mirror GestureAnalyzer.effectiveRotationOffset: the global axis
         // rotation applies on top of the per-column rotation, so the column
         // preview shows the same ring the recogniser uses for this column.
+        // 4방향 전용 모드에서는 전체 회전이 0 (`SwipeProfile.effectiveAxisRotation`).
         let bases = baseSlices(sectors: profile.sectors, profile: profile,
-                               rotationOffset: rotationOffset + profile.axisRotation,
+                               rotationOffset: rotationOffset + profile.effectiveAxisRotation,
                                iDelta: iDelta, euDelta: euDelta)
         let fixedLabels = ["ㅏ", nil, "ㅗ", nil, "ㅓ", nil, "ㅜ", nil]
 
