@@ -78,4 +78,95 @@ struct SecondaryKeyAction: Codable, Equatable, Identifiable {
         let source = actions ?? defaults
         return source.first(where: { $0.keyId == keyId })
     }
+
+    // MARK: - 롱키 후보 (이슈 #37 — 후보의 유일한 출처)
+
+    /// 괄호 자동 닫기가 켜진 문자 모드에서 팝업 후보에서 빼는 닫는 괄호.
+    /// 여는 괄호를 넣으면 짝이 같이 들어가므로 닫는 괄호만 따로 고를 일이 없다.
+    /// 뷰모델·팝업 오버레이·힌트가 각자 들고 있던 같은 목록을 여기로 모았다.
+    static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
+
+    /// 닫는 괄호를 후보에서 뺄 상황인가 — 괄호 자동 닫기 ON + 문자 모드.
+    /// 심볼 모드는 "이 글자를 달라" 는 화면이라 빼면 `)` 의 대체 문자(`] } >`)가 사라진다.
+    static func filtersClosingBrackets(autoBracketEnabled: Bool, mode: KeyboardMode) -> Bool {
+        autoBracketEnabled && !mode.isSymbol
+    }
+
+    /// 롱키를 누르고 그대로 떼면 들어가는 글자 = 설정의 **롱프레스 출력**(앞뒤 공백 제거).
+    /// 비어 있으면 팝업 후보 중 비어 있지 않은 첫 글자, 그것도 없으면 `""`.
+    ///
+    /// 이슈 #37: 손 뗄 때 `popupOutputs[0]` 을 넣고 이 값은 읽지 않아서, 롱프레스 출력만
+    /// 바꾼 사용자(ㅈ: 후보 `7 &` 그대로)는 계속 7 을 받았다.
+    var effectivePrimary: String {
+        let primary = primaryLongPressOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !primary.isEmpty { return primary }
+        return popupOutputs.lazy
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty }) ?? ""
+    }
+
+    /// 팝업 후보 — `effectivePrimary` 가 맨 앞(드래그 없이 떼면 이것), 나머지는 팝업 후보를
+    /// 순서대로 공백 제거 후 빈 칸·중복(맨 앞 글자 포함)을 뺀 것.
+    ///
+    /// `filteringClosingBrackets` 는 **나머지에만** 적용한다. 맨 앞 글자는 사용자가 고른
+    /// 결과라 닫는 괄호여도 남긴다 — 빼면 떼는 순간 다음 후보가 들어가고, 후보가 전부
+    /// 닫는 괄호면 오버레이가 빈 팝업을 그린다. 맨 앞 글자가 없으면 `[]`.
+    func effectiveCandidates(filteringClosingBrackets: Bool) -> [String] {
+        let primary = effectivePrimary
+        guard !primary.isEmpty else { return [] }
+        var seen: Set<String> = [primary]
+        var result = [primary]
+        for raw in popupOutputs {
+            let item = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !item.isEmpty, !seen.contains(item) else { continue }
+            if filteringClosingBrackets && Self.closingBrackets.contains(item) { continue }
+            seen.insert(item)
+            result.append(item)
+        }
+        return result
+    }
+
+    /// 설정 화면 편집 결과. 롱프레스 출력·팝업 후보는 공백을 걷어 저장한다(앞뒤 공백이
+    /// 붙은 출력은 키보드에서 공백까지 들어간다). 힌트를 손대지 않았으면(= 예전 롱프레스
+    /// 출력과 같으면) 새 출력을 따라가게 한다 — 출력만 바꾸면 키에는 예전 글자가 남았다.
+    func applyingEdit(visibleHint: String, primaryOutput: String, popupText: String) -> SecondaryKeyAction {
+        let hint = visibleHint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let primary = primaryOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let oldPrimary = primaryLongPressOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        var updated = self
+        updated.visibleHint = (hint == oldPrimary) ? primary : hint
+        updated.primaryLongPressOutput = primary
+        updated.popupOutputs = popupText
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+        return updated
+    }
+
+    // MARK: - 일회성 이전 (이슈 #37)
+
+    /// 수정 전에는 손 뗄 때 `popupOutputs[0]` 이 들어갔으므로, 팝업 후보 순서를 바꿔
+    /// 결과를 고른 사용자가 있다. 출력이 들어가게 고치면 그 사용자의 결과가 바뀌므로
+    /// 한 번만 옮겨 준다: 롱프레스 출력이 **기본값 그대로**이고 첫 후보가 그와 다르면
+    /// 첫 후보를 롱프레스 출력으로 삼는다(힌트도 예전 출력과 같았으면 따라간다).
+    /// 기본 매핑(29개 모두 출력 == 첫 후보)과 출력을 직접 고친 항목은 그대로 둔다.
+    /// 결과에 다시 적용해도 바뀌지 않는다(첫 후보 == 출력이 되므로).
+    static func migratingReorderedPopupPrimaries(_ actions: [SecondaryKeyAction]) -> [SecondaryKeyAction] {
+        let defaultPrimaries = Dictionary(
+            defaults.map { ($0.keyId, $0.primaryLongPressOutput) }, uniquingKeysWith: { first, _ in first })
+        return actions.map { action in
+            guard let defaultPrimary = defaultPrimaries[action.keyId] else { return action }
+            let primary = action.primaryLongPressOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard primary == defaultPrimary,
+                  let firstPopup = action.popupOutputs.lazy
+                      .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                      .first(where: { !$0.isEmpty }),
+                  firstPopup != primary else { return action }
+            var migrated = action
+            if action.visibleHint.trimmingCharacters(in: .whitespacesAndNewlines) == primary {
+                migrated.visibleHint = firstPopup
+            }
+            migrated.primaryLongPressOutput = firstPopup
+            return migrated
+        }
+    }
 }

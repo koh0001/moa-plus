@@ -481,6 +481,9 @@ enum KeyboardMetrics {
     // Row 1: ㅂ=6, ㅈ=7, ㄷ=8, ㄱ=9, ㅅ=0
     // Row 2: ㅁ=,  ㄴ=.  ㅇ=?  ㄹ=!  ㅎ='
     // Row 3: ㅋ=:  ㅌ=@  ㅊ=₩  ㅍ=…
+    // 이 표는 "그 자리에 롱키가 있나" 를 정하는 문이자, 저장된 롱프레스 출력이 비었을 때의
+    // 대체값이다. 실제 글자는 사용자 설정(`SecondaryKeyAction.effectivePrimary`)이 우선한다
+    // — `KeyGridView.longPressBinding` (이슈 #37).
     static let longPressNumbers: [[String?]] = [
         [nil, "1", "2", "3", "4", "5", nil],   // row 0 (ㅃㅉㄸㄲㅆ)
         [nil, "6", "7", "8", "9", "0", nil],   // row 1 (ㅂㅈㄷㄱㅅ + backspace)

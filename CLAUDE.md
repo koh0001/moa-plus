@@ -158,6 +158,17 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 - iOS 키보드 익스텐션 메모리 한계 ~30MB
 - `KeyboardViewController`는 UIKit, 나머지는 SwiftUI
 - 롱프레스 팝업은 KeyboardView 최상위 ZStack에서 렌더링 (z-order 클리핑 방지)
+- **롱키 출력 (이슈 #37)**: 그대로 떼면 들어가는 글자 = `SecondaryKeyAction.effectivePrimary`
+  (설정의 롱프레스 출력, 공백 제거 — 비면 첫 후보). v2.2.5 까지는 `popupOutputs[0]` 이 들어가고 출력은
+  무시됐다. 팝업 후보는 **`effectiveCandidates(filteringClosingBrackets:)` 하나에서만** 만든다(맨 앞 =
+  출력, 나머지 공백·중복 제거) — 뷰모델·오버레이(`KeyboardView.popupDisplayCandidates`, 다시 거르지
+  않음)·전체 후보 힌트·설정 화면이 모두 이것을 쓴다. 괄호 자동 닫기의 닫는 괄호 필터
+  (`SecondaryKeyAction.closingBrackets`, 문자 모드만)는 **출력을 절대 빼지 않는다**. 그리드 트리거는
+  `KeyGridView.longPressBinding` — 한글은 자음 키 + 고정표(`KeyboardMetrics.longPressNumbers`)가 nil 이
+  아닌 자리만(고정표 = 문/대체값), 트리거 없는 칸은 힌트도 없다. 기존 사용자 일회성 이전:
+  `loadAll()` 의 `migrateLongPressPrimaryIfNeeded()`(플래그 `longPressPrimaryMigrated`) 가 출력이 기본값
+  그대로인데 첫 후보가 다른 키(= 후보 순서를 바꿔 결과를 고른 사용자)의 출력을 첫 후보로 옮긴다.
+  `resetAll()` 은 이 플래그를 되돌리지 않는다 (`KeyboardViewModelLongPressTests` / `LongPressPrimaryOutputTests`)
 - `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음
 - **햅틱은 키를 누르는 순간 울린다** (이슈 #23). 입력 확정(손 뗄 때)이 아니다 — 긋기 키보드는
   press→release 간격이 길어 확정 시점에 울리면 반응이 늦게 느껴진다. 그리드 키는

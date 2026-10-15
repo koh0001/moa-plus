@@ -71,57 +71,12 @@ struct KeyGridView: View {
                         let content: KeyContent? = layoutGrid[row][column]
                         let isActive = activeKey?.row == row && activeKey?.column == column
 
-                        // Determine the key ID used for secondaryAction lookup:
-                        // - Korean mode: use consonant's compatibilityCharacter (e.g. "ㄱ")
-                        // - English mode symbol keys: use the symbol string itself (e.g. "1")
-                        // - All other keys: no secondary action
-                        let secondaryKeyId: String = {
-                            switch content {
-                            case .consonant(let choseong):
-                                return String(choseong.compatibilityCharacter)
-                            case .symbol(let s):
-                                return s
-                            default:
-                                return ""
-                            }
-                        }()
-
-                        // Long-press trigger:
-                        // - Korean mode: use longPressNumbers table
-                        // - English mode: digit keys use their primaryLongPressOutput from secondaryAction
-                        // - Symbol mode: iOS-standard alt chars from KeyboardMetrics.symbolModeAlternates
-                        let longPressNumber: String? = {
-                            if mode == .korean {
-                                return KeyboardMetrics.longPressNumber(at: row, column: column, layout: layoutCustomization)
-                            }
-                            if mode == .english, case .symbol(let s) = content {
-                                if s.first?.isNumber == true {
-                                    return KeyboardSettings.shared.secondaryAction(forKey: s)?.primaryLongPressOutput
-                                }
-                                // 영문 letter 롱프레스 = 대문자. 숫자 행은 위에서
-                                // 이미 처리되므로 여기 오는 건 q~m 뿐이다.
-                                if s.count == 1, s.first?.isLetter == true,
-                                   KeyboardSettings.shared.englishLongPressUppercaseEnabled {
-                                    return s.uppercased()
-                                }
-                                return nil
-                            }
-                            if mode.isSymbol, case .symbol(let s) = content {
-                                return KeyboardMetrics.symbolModeAlternates[s]?.first
-                            }
-                            return nil
-                        }()
-
-                        // Secondary action for the popup candidate bar.
-                        // Symbol mode keys synthesize an inline action from
-                        // KeyboardMetrics.symbolModeAlternates since they
-                        // aren't part of the user-editable secondaryKeyActions.
-                        let resolvedSecondaryAction: SecondaryKeyAction? = {
-                            if mode.isSymbol, case .symbol(let s) = content {
-                                return KeyboardMetrics.symbolModeSecondaryAction(for: s)
-                            }
-                            return KeyboardSettings.shared.secondaryAction(forKey: secondaryKeyId)
-                        }()
+                        // 롱키 트리거와 힌트 액션 — 키마다 저장소 조회 1회 (`longPressBinding` 참조).
+                        let longPress = Self.longPressBinding(
+                            content: content, row: row, column: column, mode: mode,
+                            layout: layoutCustomization,
+                            englishLongPressUppercase: KeyboardSettings.shared.englishLongPressUppercaseEnabled,
+                            storedAction: { KeyboardSettings.shared.secondaryAction(forKey: $0) })
 
                         let width = cellWidth(content: content ?? .symbol(""), column: column, row: row)
 
@@ -162,8 +117,8 @@ struct KeyGridView: View {
                             keySize: CGSize(width: width, height: keyHeight),
                             isPressed: isActive,
                             previewVowel: isActive ? previewVowel : nil,
-                            longPressNumber: longPressNumber,
-                            secondaryAction: resolvedSecondaryAction,
+                            longPressNumber: longPress.trigger,
+                            secondaryAction: longPress.action,
                             showSecondaryHints: KeyboardSettings.shared.showSecondaryHints,
                             hintSize: KeyboardSettings.shared.hintSize,
                             // 키별 active 판정: 누른 키만 hint/라벨을 숨긴다.
@@ -215,6 +170,76 @@ struct KeyGridView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+}
+
+extension KeyGridView {
+    /// 키 하나의 롱키 설정. `trigger` 가 nil 이면 그 자리는 롱키가 없고 힌트도 그리지 않는다.
+    struct LongPressBinding: Equatable {
+        /// 누르고 있으면 팝업을 띄우는 글자(`onLongPress` 로 뷰모델에 넘어간다). 팝업 후보가 있으면
+        /// 손 뗄 때 들어가는 건 후보 맨 앞 = `effectivePrimary` 라 이 값과 같다.
+        let trigger: String?
+        /// 힌트·팝업 후보의 출처. 트리거가 있는 자리에만 준다.
+        let action: SecondaryKeyAction?
+    }
+
+    /// 그리드가 키마다 부르는 롱키 판정 — 테스트도 이 함수를 그대로 부른다.
+    ///
+    /// - 액션: 심볼 모드는 `KeyboardMetrics.symbolModeSecondaryAction` 으로 합성, 그 밖에는
+    ///   자음(호환 자모, 예 "ㄱ")이나 심볼 문자열(영문 숫자 "1")로 저장소를 **한 번** 조회한다.
+    /// - 트리거:
+    ///   - 한글: 자음 키이고 레이아웃 고정표(`KeyboardMetrics.longPressNumber(at:column:layout:)`)에
+    ///     값이 있는 자리만. 고정표는 롱키 유무를 정하는 문(門)이자, 저장된 출력이 비었을 때의
+    ///     대체값이다. 글자는 액션의 `effectivePrimary` 가 우선 (이슈 #37 의 부차 원인 — 예전에는
+    ///     고정표만 읽어 ㅈ 을 고쳐도 트리거가 7 이었다. 주 원인은 손 뗄 때 `popupOutputs[0]` 이
+    ///     들어가 롱프레스 출력을 무시한 것으로, `SecondaryKeyAction.effectiveCandidates` 가 고친다).
+    ///   - 영문: 숫자 키는 `effectivePrimary`, letter 키는 설정이 켜져 있으면 대문자.
+    ///   - 심볼: 대체 문자표의 첫 글자(`effectivePrimary`).
+    /// - 한글 모드 왼쪽 열 같은 심볼 칸은 글자가 우연히 저장된 keyId(예: slotC 를 "7"·"ㄱ" 로
+    ///   바꾼 칸)와 같아도 롱키가 없으므로 그 액션의 힌트를 그리지 않는다.
+    static func longPressBinding(
+        content: KeyContent?,
+        row: Int,
+        column: Int,
+        mode: KeyboardMode,
+        layout: LayoutCustomization,
+        englishLongPressUppercase: Bool,
+        storedAction: (String) -> SecondaryKeyAction?
+    ) -> LongPressBinding {
+        let action: SecondaryKeyAction? = {
+            switch content {
+            case .consonant(let choseong) where !mode.isSymbol:
+                return storedAction(String(choseong.compatibilityCharacter))
+            case .symbol(let s):
+                return mode.isSymbol ? KeyboardMetrics.symbolModeSecondaryAction(for: s) : storedAction(s)
+            default:
+                return nil
+            }
+        }()
+        let primary: String? = action.map(\.effectivePrimary).flatMap { $0.isEmpty ? nil : $0 }
+
+        let trigger: String? = {
+            switch mode {
+            case .korean:
+                guard case .consonant = content,
+                      let table = KeyboardMetrics.longPressNumber(at: row, column: column, layout: layout)
+                else { return nil }
+                return primary ?? table
+            case .english:
+                guard case .symbol(let s) = content else { return nil }
+                if s.first?.isNumber == true { return primary }
+                // 영문 letter 롱프레스 = 대문자. 숫자 행은 위에서 처리하므로 여기 오는 건 q~m 뿐이다.
+                if s.count == 1, s.first?.isLetter == true, englishLongPressUppercase {
+                    return s.uppercased()
+                }
+                return nil
+            case .symbolFromKorean, .symbolFromEnglish:
+                guard case .symbol = content else { return nil }
+                return primary
+            }
+        }()
+
+        return LongPressBinding(trigger: trigger, action: trigger == nil ? nil : action)
     }
 }
 

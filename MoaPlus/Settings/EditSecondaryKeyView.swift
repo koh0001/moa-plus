@@ -9,6 +9,17 @@ struct EditSecondaryKeyView: View {
     @State private var primaryOutput: String = ""
     @State private var popupText: String = ""  // space-separated
 
+    /// 저장될 모습 — 공백 제거·힌트 따라가기까지 반영 (`SecondaryKeyAction.applyingEdit`).
+    /// 미리보기와 저장이 같은 값을 쓴다.
+    private var draft: SecondaryKeyAction {
+        action.applyingEdit(visibleHint: visibleHint, primaryOutput: primaryOutput, popupText: popupText)
+    }
+
+    /// 앞뒤 공백을 뺀 롱프레스 출력. 공백만 넣으면 저장할 수 없다.
+    private var trimmedPrimary: String {
+        primaryOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -30,11 +41,13 @@ struct EditSecondaryKeyView: View {
                         TextField("예: 1", text: $visibleHint)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
                     }
                 } header: {
                     Text("표시")
                 } footer: {
-                    Text("키 우상단에 작게 표시되는 문자입니다.")
+                    Text("키 우상단에 작게 표시되는 문자입니다. 롱프레스 출력과 같게 두면 출력을 바꿀 때 함께 바뀝니다.")
                 }
 
                 Section {
@@ -44,15 +57,19 @@ struct EditSecondaryKeyView: View {
                         TextField("예: 1", text: $primaryOutput)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
                     }
                 } header: {
                     Text("롱프레스")
                 } footer: {
-                    Text("길게 누르면 입력되는 대표 문자입니다.")
+                    Text("길게 눌렀다 그대로 떼면 입력되는 문자입니다. 팝업에서도 맨 앞에 놓입니다.")
                 }
 
                 Section {
                     TextField("예: 1 ! ~", text: $popupText)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                 } header: {
                     Text("팝업 후보")
                 } footer: {
@@ -71,8 +88,8 @@ struct EditSecondaryKeyView: View {
                             Text(action.keyId)
                                 .font(.title2)
 
-                            if !visibleHint.isEmpty {
-                                Text(visibleHint)
+                            if !draft.visibleHint.isEmpty {
+                                Text(draft.visibleHint)
                                     .font(.system(size: 9))
                                     .foregroundColor(.secondary)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -85,9 +102,11 @@ struct EditSecondaryKeyView: View {
                             .foregroundColor(.secondary)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("롱프레스 → \(primaryOutput.isEmpty ? "-" : primaryOutput)")
+                            Text("롱프레스 → \(trimmedPrimary.isEmpty ? "-" : trimmedPrimary)")
                                 .font(.callout)
-                            Text("후보: \(popupText.isEmpty ? "없음" : popupText)")
+                            // 키보드 팝업과 같은 출처 — 롱프레스 출력이 맨 앞, 중복 제거.
+                            let candidates = draft.effectiveCandidates(filteringClosingBrackets: false)
+                            Text("후보: \(candidates.isEmpty ? "없음" : candidates.joined(separator: " "))")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -104,17 +123,10 @@ struct EditSecondaryKeyView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("저장") {
-                        let popupList = popupText
-                            .split(separator: " ")
-                            .map(String.init)
-                        var updated = action
-                        updated.visibleHint = visibleHint
-                        updated.primaryLongPressOutput = primaryOutput
-                        updated.popupOutputs = popupList
-                        onSave(updated)
+                        onSave(draft)
                         dismiss()
                     }
-                    .disabled(primaryOutput.isEmpty)
+                    .disabled(trimmedPrimary.isEmpty)
                 }
             }
             .onAppear {
