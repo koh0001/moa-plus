@@ -138,23 +138,31 @@ struct AppearanceSettingsView: View {
                 // 사진 맞춤 · 크기 (이슈 #39 — 앱스토어 리뷰 "키보드 배경 사진 크기 작게 안 됩니다")
                 // 사진이 있을 때만 의미가 있다. 위 미리보기가 실제 키보드와 같은 뷰라 바로 반영된다.
                 if settings.themeSettings.backgroundImageId != nil {
-                    Picker("사진 맞춤", selection: $settings.themeSettings.backgroundImageContentMode) {
-                        ForEach(BackgroundImageContentMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName).tag(mode)
+                    // 세그먼트 피커는 제목을 화면에 그리지 않는다 — 위에 따로 보이게 두고,
+                    // VoiceOver 에도 같은 이름을 준다.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("사진 맞춤")
+                        Picker("사진 맞춤", selection: $settings.themeSettings.backgroundImageContentMode) {
+                            ForEach(BackgroundImageContentMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .accessibilityLabel("사진 맞춤")
                     }
-                    .pickerStyle(.segmented)
 
                     HStack {
                         Text("사진 크기")
                         Spacer()
-                        // `Int(v * 100)` 은 0.65 → 64 처럼 내림 오차가 나서 반올림한다.
-                        Text("\(Int((settings.themeSettings.backgroundImageScale * 100).rounded()))%")
+                        Text("\(backgroundImageScalePercent)%")
                             .foregroundColor(.secondary)
                     }
-                    Slider(value: $settings.themeSettings.backgroundImageScale,
+                    Slider(value: backgroundImageScaleBinding,
                            in: ThemeSettings.backgroundImageScaleRange,
                            step: ThemeSettings.backgroundImageScaleStep)
+                        .accessibilityLabel("사진 크기")
+                        .accessibilityValue("\(backgroundImageScalePercent)%")
                 }
 
                 // Opacity slider
@@ -168,7 +176,11 @@ struct AppearanceSettingsView: View {
             } header: {
                 Text("배경 이미지")
             } footer: {
-                Text("선택한 이미지가 키보드 배경에 표시됩니다. ‘전체 보이기’를 고르거나 크기를 줄이면 사진이 덮지 않는 곳은 기본 배경색으로 보입니다. 투명도를 조절하여 키 가독성을 유지하세요.")
+                // 이슈 #39 리뷰: 자르기 화면은 사진을 **고정 비율 375:260** 으로 자른다(아래 `.sheet`).
+                // 실제 키보드 비율은 폰 폭(375~440pt)·높이 배율(85~135%)에 따라 달라서, 꽉 채우기는
+                // 그 차이만큼 가장자리를 더 자르고(440pt 폰 기본 높이에서 사진 높이의 ~15%) 전체 보이기는
+                // 그만큼을 되살린다. 자를 때 뺀 부분은 어떤 설정으로도 돌아오지 않는다 — 다시 골라야 한다.
+                Text("사진을 고를 때 자른 범위가 배경이 됩니다. 꽉 채우기는 키보드 폭·높이에 맞추느라 가장자리가 조금 더 잘릴 수 있고, ‘전체 보이기’는 자른 범위를 빠짐없이 보여 줍니다. 사진 크기를 줄이면 사진이 덮지 않는 곳은 기본 배경색으로 보입니다. 자를 때 뺀 부분을 쓰려면 사진을 다시 고르세요. 투명도를 조절하여 키 가독성을 유지하세요.")
             }
         }
         .navigationTitle("외형")
@@ -188,6 +200,20 @@ struct AppearanceSettingsView: View {
     }
 
     // MARK: - Helpers
+
+    /// "사진 크기 N%" — 그리는 크기와 같은 잘라 쓴 값 (`ThemeSettings.backgroundImageScalePercent`).
+    private var backgroundImageScalePercent: Int {
+        ThemeSettings.backgroundImageScalePercent(settings.themeSettings.backgroundImageScale)
+    }
+
+    /// 슬라이더도 그리는 크기와 같은 잘라 쓴 값을 보여 준다 — 범위 밖·NaN 저장값이어도
+    /// 슬라이더 위치와 % 표시, 실제 크기가 서로 어긋나지 않는다.
+    private var backgroundImageScaleBinding: Binding<Double> {
+        Binding(
+            get: { ThemeSettings.clampedBackgroundImageScale(settings.themeSettings.backgroundImageScale) },
+            set: { settings.themeSettings.backgroundImageScale = $0 }
+        )
+    }
 
     private func saveCroppedImage(_ image: UIImage) {
         let imageId = UUID().uuidString

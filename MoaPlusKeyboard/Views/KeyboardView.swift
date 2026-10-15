@@ -11,6 +11,13 @@ struct KeyboardView: View {
     /// set, forces the iPad split decision instead of reading UIDevice/UIScreen
     /// — host-less unit tests can't observe the real idiom, so snapshots use it.
     var layoutOverride: (isPad: Bool, isLandscape: Bool)? = nil
+    /// 테스트 seam (기본 nil = 프로덕션, 동작 변화 없음). 설정되면 `cachedBgImage` 대신 이 사진을
+    /// 배경으로 그린다. `cachedBgImage` 는 `.onAppear` 에서 채우는 `@State` 라 `ImageRenderer`
+    /// 한 번의 렌더에는 들어오지 않는다 — `KeyboardView` 단위 배경 렌더 테스트(이슈 #39 리뷰,
+    /// `BackgroundImageFitTests.test_keyboardView_*`)가 이 경로로 사진을 넣어, 테마의 맞춤 방식·
+    /// 크기·투명도·밑바탕과 한손 모드 본체 기준 배치가 실제 `keyboardBackground` 를 거쳐
+    /// 그려지는지 본다.
+    var backgroundImageOverride: UIImage? = nil
     private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
     @State private var cachedBgImage: UIImage?
     @State private var cachedBgImageId: String?
@@ -21,16 +28,22 @@ struct KeyboardView: View {
     /// 배경이 `systemGray6`, 호스팅 뷰가 `.clear` 라 반투명 사진은 늘 그 위에 합성됐다.
     /// 그래서 꽉 채우기·100%(기본)는 픽셀 단위로 예전과 같다. 메인 앱 미리보기만 사진 밑이
     /// 목록 셀 색에서 실제 키보드와 같은 색으로 바뀐다.
-    private var keyboardBackground: some View {
+    ///
+    /// - Parameter photoFocusInsets: 사진을 맞출 영역을 이 배경에서 뺄 폭. 한손 모드는 배경을
+    ///   띠까지 한 번에 그리므로(바깥 HStack) 띠 폭을 넘겨 사진을 **본체** 기준으로 놓는다 —
+    ///   안 넘기면 줄인 사진이 전체 폭 가운데에 놓여 띠 밑으로 밀린다. 규칙은
+    ///   `BackgroundImageLayout.displayRect`.
+    private func keyboardBackground(photoFocusInsets: EdgeInsets = EdgeInsets()) -> some View {
         ZStack {
             Color(.systemGray6)
-            if let image = cachedBgImage {
+            if let image = backgroundImageOverride ?? cachedBgImage {
                 let theme = settings.themeSettings
                 KeyboardBackgroundImageView(
                     image: image,
                     opacity: theme.backgroundOpacity,
                     contentMode: theme.backgroundImageContentMode,
-                    scale: theme.backgroundImageScale
+                    scale: theme.backgroundImageScale,
+                    focusInsets: photoFocusInsets
                 )
             }
         }
@@ -109,13 +122,19 @@ struct KeyboardView: View {
                 // 주어진 폭을 따른다), 빈쪽에 위치 전환 띠를 붙인다. 배경은 바깥에서 한 번만.
                 let width = KeyboardPlacement.keyboardWidth(
                     totalWidth: outer.size.width, ratio: settings.oneHandedWidthRatio)
+                // 띠 폭 — 배경 사진은 이만큼 뺀 본체 기준으로 놓는다 (이슈 #39 리뷰).
+                let stripWidth = max(0, outer.size.width - width)
                 HStack(spacing: 0) {
                     if side == .right { oneHandedStrip(side: side) }
                     keyboardContent(drawsBackground: false)
                         .frame(width: width)
                     if side == .left { oneHandedStrip(side: side) }
                 }
-                .background(keyboardBackground)
+                .background(keyboardBackground(photoFocusInsets: EdgeInsets(
+                    top: 0,
+                    leading: side == .right ? stripWidth : 0,
+                    bottom: 0,
+                    trailing: side == .left ? stripWidth : 0)))
             } else {
                 keyboardContent(drawsBackground: true)
             }
@@ -370,7 +389,7 @@ struct KeyboardView: View {
                         .allowsHitTesting(false)
                     }
                 }
-                .background(Group { if drawsBackground { keyboardBackground } })
+                .background(Group { if drawsBackground { keyboardBackground() } })
                 .onAppear { viewModel.setCenterKeyWidth(centerKeyWidth) }
                 .onChange(of: centerKeyWidth) { _, newValue in
                     viewModel.setCenterKeyWidth(newValue)
@@ -444,7 +463,8 @@ struct KeyboardView: View {
 
 // MARK: - 배경 사진 (이슈 #39)
 
-/// 키보드 배경 사진. 크기는 `BackgroundImageLayout.displaySize` 가 정하고 사진은 항상 가운데.
+/// 키보드 배경 사진. 크기·위치는 `BackgroundImageLayout.displayRect` 가 정한다 — 기본은 가운데,
+/// 한손 모드는 `focusInsets`(띠) 를 뺀 본체 기준.
 ///
 /// `image` 는 `KeyboardView.cachedBgImage` 가 들고 있는 다운샘플본(`BackgroundImageManager`
 /// 상한 1536px) 그대로다. 맞춤 방식·크기 슬라이더는 **프레임만** 바꾸고 다시 디코딩·리샘플하지
@@ -455,20 +475,29 @@ struct KeyboardBackgroundImageView: View {
     let opacity: Double
     let contentMode: BackgroundImageContentMode
     let scale: Double
+    /// 사진을 맞출 영역을 이 뷰에서 뺄 폭 (기본 0 = 뷰 전체). 한손 모드의 띠 폭.
+    var focusInsets: EdgeInsets = EdgeInsets()
 
     var body: some View {
         GeometryReader { geo in
-            let size = BackgroundImageLayout.displaySize(
+            // 폭·높이가 0 이하로 떨어지면 `displayRect` 가 뷰 전체 기준으로 돌아간다.
+            let focus = CGRect(
+                x: focusInsets.leading,
+                y: focusInsets.top,
+                width: max(0, geo.size.width - focusInsets.leading - focusInsets.trailing),
+                height: max(0, geo.size.height - focusInsets.top - focusInsets.bottom))
+            let rect = BackgroundImageLayout.displayRect(
                 imageSize: image.size,
                 containerSize: geo.size,
+                focus: focus,
                 contentMode: contentMode,
                 scale: scale
             )
             Image(uiImage: image)
                 .resizable()
-                .frame(width: size.width, height: size.height)
+                .frame(width: rect.width, height: rect.height)
                 .opacity(opacity)
-                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                .position(x: rect.midX, y: rect.midY)
         }
         .clipped()
     }

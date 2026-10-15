@@ -176,18 +176,27 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 - **키 눌림 표시 (리뷰 2026-09-28)**: 눌린 키는 투명도가 아니라 **반대쪽 키 색**(일반 키 → 기능키 색,
   기능키 → 일반 키 색)으로 바뀐다. 투명도만 낮추면 뒤 배경 `systemGray6` 이 키 색과 거의 같아 티가 안 난다.
   짧은 탭은 `KeyView.pressLinger` 로 뗀 뒤 0.08초 더 남긴다 — 연타 간격(~100ms)보다 길게 늘리지 말 것
-- **배경 사진 맞춤 · 크기 (이슈 #39 / 앱스토어 리뷰 "배경 사진 크기 작게 안 됩니다")**: 크기는
-  `BackgroundImageLayout.displaySize` 하나가 정한다 — 기준(꽉 채우기 = 덮는 최소 배율, 전체 보이기 = 들어가는
-  최대 배율) × `backgroundImageScale`(0.5~1.0 으로 잘라 씀), 종횡비 유지, 항상 가운데, 영역 밖은 잘림.
+- **배경 사진 맞춤 · 크기 (이슈 #39 / 앱스토어 리뷰 "배경 사진 크기 작게 안 됩니다")**: 크기·위치는
+  `BackgroundImageLayout.displayRect` 하나가 정한다 — 기준(꽉 채우기 = 덮는 최소 배율, 전체 보이기 = 들어가는
+  최대 배율) × `backgroundImageScale`(0.5~1.0 으로 잘라 씀), 종횡비 유지, 가운데, 영역 밖은 잘림.
   렌더는 `KeyboardBackgroundImageView`(KeyboardView.swift) 하나 — 익스텐션과 모든 앱 미리보기
   (`KeyboardPreviewView` → `KeyboardView`)가 같은 뷰다. 사진 밑에 `systemGray6` 를 깔아 덮지 않는 곳은 평소
   배경이 보인다 — 익스텐션은 컨트롤러 뷰가 원래 `systemGray6` 이라 꽉 채우기·100%(기본)는 예전과 같은 픽셀.
   맞춤·크기 변경은 **프레임만** 바꾼다: 이미지는 `cachedBgImage`(다운샘플본)를 `backgroundImageId` 가 바뀔 때만
-  다시 읽는다 — 슬라이더마다 디코딩·리샘플하면 익스텐션 메모리(~30MB)를 위협한다. 자르기 화면이 사진을
-  375:260 으로 고정하므로 세로 아이폰에서는 전체 보이기가 꽉 채우기와 거의 같다(실제 해법은 크기 슬라이더).
+  다시 읽는다 — 슬라이더마다 디코딩·리샘플하면 익스텐션 메모리(~30MB)를 위협한다.
+  **한손 모드**: 배경은 띠까지 바깥 HStack 에서 한 번 그리되 사진은 띠를 뺀 **본체 기준**(`photoFocusInsets`).
+  꽉 채우기는 크기를 표면 전체(띠 포함) 기준으로 두고 위치만 본체 쪽으로 민다 — 사진이 표면 이상이면 예전처럼
+  가운데(100% 기본 = 띠 밑까지 덮는 예전 픽셀), 작으면 본체 가운데(표면 밖으로는 안 나감). 전체 보이기는 크기부터
+  본체 기준이다 — 표면 기준이면 402pt·0.82(본체 329pt)에서 375pt 사진이 띠 밑으로 샌다.
+  **안내 문구의 함정**: 자르기 화면이 사진을 **고정 비율 375:260** 으로 자른다. 실제 키보드 비율은 폰 폭
+  (375~440pt)·높이 배율에 따라 달라 꽉 채우기는 그 차이만큼 더 자르고(440pt 폰 기본 높이 = 사진 높이 ~15%)
+  전체 보이기는 그것만 되살린다 — 자를 때 뺀 부분은 어떤 설정으로도 안 돌아온다(다시 골라야 함). 외형 푸터·
+  증상 라우터 문구를 이 사실과 맞출 것. "% 표시"는 `ThemeSettings.backgroundImageScalePercent`(잘라 쓴 값,
+  NaN 에서 `Int(_:)` 크래시 방지)로만.
   `ThemeSettings` 는 손으로 쓴 `init(from:)`(확장)에서 모든 키를 `decodeIfPresent` — 합성 디코딩은 키 하나만
   없어도 통째로 실패해 `loadAll()` 이 테마·배경 사진을 `.default` 로 날린다. 새 필드는 `CodingKeys` 에도 넣을 것
-  (`BackgroundImageFitTests`)
+  (`BackgroundImageFitTests` — `test_keyboardView_*` 는 실제 `KeyboardView` 를 사진 있음/없음으로 두 번 그려
+  달라진 픽셀 상자로 테마 배선·한손 배치를 본다)
 - **세로 라인별 보정 끄기 (리뷰 2026-09-16)**: `GestureSettings.columnCorrectionEnabled` = false 면 모든 열이
   중립값(회전 0°). 열별 `ColumnGestureOverride.isEnabled = false` 는 "기본 보정으로 복귀" 라 끄는 수단이
   아니다. 분석기는 열 보정을 `GestureSettings` 조회 함수로만 읽으므로 새 조회를 추가할 때도
@@ -328,7 +337,8 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
   팝업·오버레이는 주어진 폭을 따르므로 별도 분기가 없다
 - `.coordinateSpace(name: "keyboardPreview")` 는 **좁힌 본체 안쪽**에 둘 것 — 긋기 시작점·오버레이·팝업이 이
   좌표계라 바깥에 두면 띠 폭만큼 어긋난다. EarlyTouch 키 찾기는 `.global` 이라 무관
-- 배경은 한손 모드일 때 바깥에서 한 번만 그린다(`keyboardContent(drawsBackground:)`)
+- 배경은 한손 모드일 때 바깥에서 한 번만 그린다(`keyboardContent(drawsBackground:)`). 배경 사진은 띠 폭을
+  `keyboardBackground(photoFocusInsets:)` 로 넘겨 본체 기준으로 놓는다(이슈 #39 — 위 "배경 사진 맞춤 · 크기")
 - 폭 하한 0.70 = 375pt + 지구본 표시에서도 기능행이 맞는 선 (`OneHandedLayoutTests`). 하한을 내리면 이 테스트로 확인
 - 이름을 손이 아니라 **위치**로 붙였다 — 긋기 프리셋 "오른손용/왼손용/양손용" 과 혼동(이슈 #31)
 - 띠 버튼 변경은 전체 접근 OFF 면 App Group 에 못 써 다음 `loadAll()` 에서 원래 값으로 돌아온다

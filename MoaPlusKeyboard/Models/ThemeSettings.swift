@@ -236,6 +236,47 @@ enum BackgroundImageLayout {
         let ratio = base * CGFloat(ThemeSettings.clampedBackgroundImageScale(scale))
         return CGSize(width: imageSize.width * ratio, height: imageSize.height * ratio)
     }
+
+    /// 사진을 그릴 사각형 (`containerSize` 좌표계). `focus` 는 사진을 맞출 영역 — 한손 모드에서는
+    /// 띠를 뺀 키보드 본체, 그 밖에는 컨테이너 전체(nil).
+    ///
+    /// - 꽉 채우기: 크기는 **컨테이너 전체**(띠 포함) 기준. 표면 전체를 덮는 게 이 모드의 뜻이고,
+    ///   한손 모드 100%(기본)가 예전처럼 띠 밑까지 사진으로 덮이려면 기준이 바뀌면 안 된다.
+    /// - 전체 보이기: 크기는 **`focus`** 기준 — 사진 전체가 키 아래에 들어와야 한다. 컨테이너
+    ///   기준이면 402pt 폰 0.82 배(본체 329pt)에서 375pt 폭 사진이 본체에 안 들어가 띠 밑으로 샌다.
+    ///
+    /// 위치는 두 축 모두 `placedCenter` — `focus` 가운데를 원하되, 사진이 컨테이너보다 크면
+    /// 컨테이너 가운데(빈틈 없이 덮기 = 예전 위치), 작으면 컨테이너 밖으로 나가지 않게 민다.
+    /// `focus` 가 nil 이면 `displaySize` 를 컨테이너 가운데 둔 것과 같다(한손 모드가 아닐 때).
+    static func displayRect(
+        imageSize: CGSize,
+        containerSize: CGSize,
+        focus: CGRect? = nil,
+        contentMode: BackgroundImageContentMode,
+        scale: Double
+    ) -> CGRect {
+        let container = CGRect(origin: .zero, size: containerSize)
+        // 컨테이너 밖으로 삐져나간 focus 는 잘라 쓴다 — 비거나 어긋나면 컨테이너 전체.
+        var area = container
+        if let focus {
+            let clipped = focus.intersection(container)
+            if !clipped.isNull, clipped.width > 0, clipped.height > 0 { area = clipped }
+        }
+        let basis = contentMode == .fill ? containerSize : area.size
+        let size = displaySize(imageSize: imageSize, containerSize: basis,
+                               contentMode: contentMode, scale: scale)
+        let x = placedCenter(length: size.width, containerLength: containerSize.width, preferred: area.midX)
+        let y = placedCenter(length: size.height, containerLength: containerSize.height, preferred: area.midY)
+        return CGRect(x: x - size.width / 2, y: y - size.height / 2, width: size.width, height: size.height)
+    }
+
+    /// 한 축의 사진 중심. 사진이 컨테이너 이상이면 컨테이너 가운데(덮은 채 가운데 잘림 — 예전 동작),
+    /// 작으면 `preferred` 를 컨테이너 안에 들어오는 범위로 자른다. 사진 길이가 컨테이너 길이에
+    /// 다가가면 허용 범위가 가운데 한 점으로 줄어들어 두 경우가 끊김 없이 이어진다.
+    static func placedCenter(length: CGFloat, containerLength: CGFloat, preferred: CGFloat) -> CGFloat {
+        guard length < containerLength else { return containerLength / 2 }
+        return min(max(preferred, length / 2), containerLength - length / 2)
+    }
 }
 
 /// Complete theme settings
@@ -293,6 +334,13 @@ struct ThemeSettings: Codable, Equatable {
     static func clampedBackgroundImageScale(_ scale: Double) -> Double {
         guard scale.isFinite else { return 1.0 }
         return min(max(scale, backgroundImageScaleRange.lowerBound), backgroundImageScaleRange.upperBound)
+    }
+
+    /// 설정 화면의 "사진 크기 N%" — 그리는 크기와 같은 값(`clampedBackgroundImageScale`)을 보여 준다.
+    /// 저장값을 그대로 `Int(v * 100)` 하면 범위 밖 값은 실제와 다른 %가 나오고, NaN·무한대는
+    /// `Int(_:)` 에서 바로 크래시한다. `Int(v * 100)` 의 내림 오차(0.65 → 64)도 반올림으로 피한다.
+    static func backgroundImageScalePercent(_ scale: Double) -> Int {
+        Int((clampedBackgroundImageScale(scale) * 100).rounded())
     }
 
     // 저장된 모든 필드를 나열한다 — 빠진 키는 인코딩에서도 조용히 빠진다.
