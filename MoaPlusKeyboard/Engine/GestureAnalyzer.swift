@@ -122,10 +122,11 @@ class GestureAnalyzer {
 
     private var effectiveRotationOffset: Double {
         // Global axis rotation applies to every column (and to columnId 0);
-        // per-column rotationOffset is summed on top of it.
-        let global = settings.swipeProfile.axisRotation
-        guard columnId > 0 else { return global }
-        return global + settings.effectiveRotationOffset(forColumn: columnId)
+        // per-column rotationOffset is summed on top of it. 긋기 실시간 테스트와
+        // 같은 식(`GestureSettings.recognizerRotationOffset`) — 4방향 전용 모드에서는
+        // 전체 회전이 0 이고(이슈 #42) 열별 회전은 세로 라인별 보정 토글이 따로
+        // 다스린다. `cardinalSnap`(첫 획 재해석)도 이 값을 쓴다.
+        settings.recognizerRotationOffset(forColumn: columnId)
     }
 
     private let hasCustomDirectionChangeThreshold: Bool

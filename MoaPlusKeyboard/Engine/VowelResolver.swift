@@ -34,7 +34,7 @@ class VowelResolver {
         }
 
         let normalized = normalizeForMatching(directions)
-        let match = patternTrie.match(normalized)
+        let match = matchExcludingDisabledDiagonal(normalized, firstStroke: directions[0])
 
         if let alt = cardinalReinterpretation(directions, firstStrokeCardinal: firstStrokeCardinal) {
             let altMatch = patternTrie.match(alt)
@@ -73,8 +73,10 @@ class VowelResolver {
     /// Single-stroke direction → Jungseong, mirroring the first-stroke
     /// branch of `resolve(directions:)`. Cardinals map directly
     /// (←ㅓ →ㅏ ↑ㅗ ↓ㅜ); diagonals follow the active SwipeProfile's
-    /// DiagonalMapping. Used by slot-B vowel key (no multi-stroke compound).
-    /// Returns nil for `.disabled` mappings.
+    /// DiagonalMapping. Returns nil for `.disabled` mappings (정규화 폴백이
+    /// 끈 대각선을 ↗/↘ 로 돌려줘 `default` 로 떨어진다).
+    /// 슬롯 B 모음 키는 멀티 스트로크 파이프라인(`resolve`/`peekVowel`)으로 옮겨
+    /// 지금은 프로덕션 호출처가 없다 — 끈 대각선 가드(이슈 #42)도 그쪽에 있다.
     func resolveSingleStroke(direction: GestureDirection) -> Jungseong? {
         if let directVowel = resolveDirectDiagonal(direction) {
             return directVowel
@@ -120,22 +122,76 @@ class VowelResolver {
         }
 
         let normalized = normalizeForMatching(directions)
-        let match = patternTrie.match(normalized)
+        let match = matchExcludingDisabledDiagonal(normalized, firstStroke: directions[0])
         return match.vowel != nil || match.hasLongerMatch
+    }
+
+    // MARK: - Disabled diagonal guard (이슈 #42)
+
+    /// 트라이 매칭 + "비활성" 대각선 가드.
+    ///
+    /// 트라이에는 단독 `↗=ㅣ` / `↘=ㅡ` 가 들어 있다 — 매핑을 ㅣ/ㅡ 로 둔 대각선이
+    /// 멀티 스트로크에서 정규화돼 닿는 노드다(꼬리가 붙은 ↗↙ = ㅣ, ↖ 가 ↗ 로 접히는
+    /// 경로, ↘↖ = ㅢ). 단독 획은 `resolveDirectDiagonal` 이 트라이보다 먼저 처리한다.
+    /// "비활성" 매핑도 정규화(`normalizedDirection`)가 기본 매핑과 같은 노드(위 = ↗,
+    /// 아래 = ↘)로 보내므로, 그대로 두면 끈 대각선 단독 획이 ㅣ/ㅡ 가 된다(v2.2.5 까지
+    /// ↗/↘ 가 그랬다). 멀티 스트로크는 기본 매핑과 똑같이 맞는 것이 맞다 — 끈 ↙ 의
+    /// ↙↗ = ㅢ, 끈 ↘ 의 ↘↖ = ㅢ.
+    ///
+    /// 규칙: 첫 획이 끈 대각선이고 매칭이 **그 첫 노드에서 끝났으면**(= 그 대각선
+    /// 혼자 만든 모음) 그 첫 획을 **빼고 나머지 획만 다시 맞춘다**. 끈 대각선으로
+    /// 시작하는 멀티 스트로크(↘↖=ㅢ, ↘↑=ㅢ)는 둘째 노드 이상에서 끝나므로 그대로
+    /// 성립한다.
+    ///
+    /// 첫 획만 빼는 이유(리뷰 반영): 모음만 지우면 ↗ 노드는 자식이 없고 ↘ 노드는
+    /// ↖·↑ 뿐이라 뒤 획이 전부 버려져 제스처가 통째로 무입력이 된다(↗← = 무입력).
+    /// 첫 획을 빼면 뒤 획이 모음이 된다(↗← = ㅓ, ↘↓ = ㅜ) — 네 대각선이 같은 결과다.
+    /// 후속 획은 정규화에서 항상 카디널이 되고(앞 획이 대각선이면 어느 대각선이든 같은
+    /// 카디널), 그래서 다시 맞춘 결과가 ↗/↘ 단독 노드에 닿지 않는다.
+    ///
+    /// 첫 획 재해석(`cardinalReinterpretation`)은 첫 획을 카디널로 바꿔 따로 맞추므로
+    /// 이 가드를 거치지 않지만, `resolve` 에서 **비교 상대가 이 결과**다. 그래서 끈
+    /// 대각선은 네 방향 모두 재해석이 간선을 더 많이 따라갔거나 휘어진 한 획
+    /// 동률일 때만 이긴다 — ↗↙ 왕복(→ 스냅) = ㅐ 는 2 대 1 로 재해석, 가파른
+    /// ↗←(↑ 스냅) = ㅓ 는 1 대 1 동률이라 원래 해석(↖← 와 같음).
+    ///
+    /// 판정은 **원래 첫 획**의 매핑으로 한다. 정규화된 첫 획으로 보면 ↖(ㅣ) 이 ↗ 로
+    /// 접힌 경우를 끈 ↗ 로 오인한다.
+    private func matchExcludingDisabledDiagonal(_ normalized: [GestureDirection],
+                                                firstStroke: GestureDirection) -> PatternTrie.MatchResult {
+        let match = patternTrie.match(normalized)
+        guard match.vowel != nil,
+              match.consumedCount == 1,
+              isDisabledDiagonal(firstStroke) else { return match }
+        // `matchedCount` 는 건너뛴 획을 세지 않으므로 그대로 쓴다(↖ 건너뛰기와 같은 값).
+        // `consumedCount` 는 원래 시퀀스 기준 위치라 뺀 첫 획만큼 1 을 더한다.
+        let rest = patternTrie.match(Array(normalized.dropFirst()))
+        return PatternTrie.MatchResult(vowel: rest.vowel,
+                                       consumedCount: rest.vowel == nil ? 0 : rest.consumedCount + 1,
+                                       hasLongerMatch: rest.hasLongerMatch,
+                                       matchedCount: rest.matchedCount)
+    }
+
+    private func isDisabledDiagonal(_ direction: GestureDirection) -> Bool {
+        diagonalMapping(for: direction) == .disabled
+    }
+
+    /// 대각선의 사용자 매핑. 카디널이면 nil.
+    private func diagonalMapping(for direction: GestureDirection) -> DiagonalMapping? {
+        switch direction {
+        case .upLeft:    return swipeProfile.upLeftMapping
+        case .upRight:   return swipeProfile.upRightMapping
+        case .downLeft:  return swipeProfile.downLeftMapping
+        case .downRight: return swipeProfile.downRightMapping
+        case .up, .down, .left, .right: return nil
+        }
     }
 
     // MARK: - Direct diagonal vowel mapping
 
     /// Resolve a diagonal direction to a vowel based on SwipeProfile mapping
     private func resolveDirectDiagonal(_ direction: GestureDirection) -> Jungseong? {
-        let mapping: DiagonalMapping
-        switch direction {
-        case .upLeft:    mapping = swipeProfile.upLeftMapping
-        case .upRight:   mapping = swipeProfile.upRightMapping
-        case .downLeft:  mapping = swipeProfile.downLeftMapping
-        case .downRight: mapping = swipeProfile.downRightMapping
-        default: return nil
-        }
+        guard let mapping = diagonalMapping(for: direction) else { return nil }
 
         let vowel: Jungseong?
         switch mapping {
@@ -155,14 +211,7 @@ class VowelResolver {
 
     /// Get the normalized direction for a diagonal based on its mapping
     private func normalizedDirection(for direction: GestureDirection) -> GestureDirection {
-        let mapping: DiagonalMapping
-        switch direction {
-        case .upLeft:    mapping = swipeProfile.upLeftMapping
-        case .upRight:   mapping = swipeProfile.upRightMapping
-        case .downLeft:  mapping = swipeProfile.downLeftMapping
-        case .downRight: mapping = swipeProfile.downRightMapping
-        default: return direction
-        }
+        guard let mapping = diagonalMapping(for: direction) else { return direction }
 
         switch mapping {
         case .normalizeUp, .vowelO:    return .up
@@ -171,7 +220,11 @@ class VowelResolver {
         case .normalizeRight, .vowelA: return .right
         case .vowelI:  return .upRight   // Normalize to ↗ so pattern trie recognizes ㅣ patterns
         case .vowelEu: return .downRight // Normalize to ↘ so pattern trie recognizes ㅡ patterns
-        case .disabled: return direction
+        // 끈 대각선은 **기본 매핑(위 = ㅣ, 아래 = ㅡ)과 같은 노드**로 보낸다 (이슈 #42). 단독 획만
+        // `matchExcludingDisabledDiagonal` 이 걸러 내고, 멀티 스트로크는 기본 매핑과 똑같이 맞는다 —
+        // 원시 방향 그대로 넘기면 ↖/↙ 는 트라이 루트에 노드가 없어 건너뛰어져 끈 ↙ 의 ↙↗ = ㅢ 가 ㅗ 로
+        // 깨졌다(끈 ↘ 의 ↘↖ = ㅢ 는 성립 — 같은 설정이 대각선마다 달랐다).
+        case .disabled: return direction == .upLeft || direction == .upRight ? .upRight : .downRight
         }
     }
 
