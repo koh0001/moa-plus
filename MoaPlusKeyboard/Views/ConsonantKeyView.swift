@@ -48,8 +48,11 @@ struct KeyView: View {
             // Secondary hint label
             if let action = secondaryAction, showSecondaryHints {
                 if KeyboardSettings.shared.showDetailedHints {
-                    // Detailed: show all popup candidates
-                    Text(action.popupOutputs.joined(separator: " "))
+                    // 전체 후보: 롱키 팝업과 같은 출처·같은 필터 — 롱프레스 출력이 맨 앞 (이슈 #37)
+                    Text(action.effectiveCandidates(
+                        filteringClosingBrackets: SecondaryKeyAction.filtersClosingBrackets(
+                            autoBracketEnabled: KeyboardSettings.shared.autoBracketEnabled, mode: mode)
+                    ).joined(separator: " "))
                         .font(.system(size: max(hintFontSize - 2, 6)))
                         .foregroundColor(themedTextColor.opacity(0.55))
                         .lineLimit(1)

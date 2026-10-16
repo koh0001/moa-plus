@@ -62,13 +62,15 @@ struct LongPressSettingsView: View {
                             Text("→")
                                 .foregroundColor(.secondary)
 
-                            Text(action.primaryLongPressOutput)
+                            // 키보드와 같은 출처 — 그대로 떼면 들어가는 글자와 팝업 후보 (이슈 #37)
+                            Text(action.effectivePrimary)
                                 .font(.body)
                                 .foregroundColor(Color(.label))
 
-                            if !action.popupOutputs.isEmpty {
+                            let candidates = action.effectiveCandidates(filteringClosingBrackets: false)
+                            if !candidates.isEmpty {
                                 Spacer()
-                                Text(action.popupOutputs.joined(separator: " "))
+                                Text(candidates.joined(separator: " "))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

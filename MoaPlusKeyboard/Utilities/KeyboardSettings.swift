@@ -14,6 +14,7 @@ final class KeyboardSettings: ObservableObject {
         static let gestureSettings = "gestureSettings"
         static let themeSettings = "themeSettings"
         static let secondaryKeyActions = "secondaryKeyActions"
+        static let longPressPrimaryMigrated = "longPressPrimaryMigrated"
         static let shortcutExpansions = "shortcutExpansions"
         static let showGesturePreview = "showGesturePreview"
         static let showSecondaryHints = "showSecondaryHints"
@@ -118,9 +119,10 @@ final class KeyboardSettings: ObservableObject {
 
     /// `secondaryKeyActions` 의 keyId → 액션 인덱스.
     ///
-    /// 원래 조회가 29개 배열 선형 String 탐색이었다. `KeyGridView` 가 키마다 최대
-    /// 2회(영문 숫자 경로 + 일반 경로) 부르므로 그리드 렌더 1회에 최대 812회 String
-    /// 비교가 나갔다. 조회 자체는 O(1) 로 바꾸고 공개 API 시그니처는 그대로 뒀다.
+    /// 원래 조회가 29개 배열 선형 String 탐색이었다. 당시 `KeyGridView` 가 키마다 최대
+    /// 2회(영문 숫자 경로 + 일반 경로) 불러 그리드 렌더 1회에 최대 812회 String 비교가
+    /// 나갔다. 조회 자체는 O(1) 로 바꾸고 공개 API 시그니처는 그대로 뒀다. 지금 그리드는
+    /// 키마다 1회만 조회한다(`KeyGridView.longPressBinding`).
     private var secondaryActionIndex: [String: SecondaryKeyAction] = Dictionary(
         SecondaryKeyAction.defaults.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
 
@@ -128,6 +130,42 @@ final class KeyboardSettings: ObservableObject {
         // 같은 keyId 가 중복되면 앞선 항목을 남긴다 — `first(where:)` 의 기존 동작과 같다.
         secondaryActionIndex = Dictionary(
             secondaryKeyActions.map { ($0.keyId, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// 이슈 #37 일회성 이전(`migrateLongPressPrimaryIfNeeded`)을 마쳤는지. 설정이 아니라
+    /// 이전 기록이다 — 한 번 켜지면 다시 돌지 않아, 이후 사용자가 팝업 후보 순서를 바꿔도
+    /// 롱프레스 출력이 따라 바뀌지 않는다(이제 출력이 떼면 들어가는 글자다).
+    @Published var longPressPrimaryMigrated: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(longPressPrimaryMigrated, forKey: Keys.longPressPrimaryMigrated) }
+    }
+
+    /// 이슈 #37 이전: 수정 전에는 롱키를 그대로 떼면 (괄호 자동 닫기가 켜져 있으면 닫는 괄호를
+    /// 거른) 첫 후보가 들어가고 롱프레스 출력은 무시됐다. 팝업 후보 순서를 바꿔 결과를 고른 기존
+    /// 사용자가 업데이트 후에도 같은 글자를 받도록 그 글자를 롱프레스 출력으로 옮기고, 출력만
+    /// 고치고 힌트는 기본값 그대로인 사용자(제보자 상태)는 힌트를 새 출력으로 맞춘다
+    /// (`SecondaryKeyAction.migratingForPrimaryOutput`).
+    ///
+    /// 괄호 자동 닫기는 프로퍼티가 아니라 **저장소에서** 읽는다 — `loadAll()` 이 이 함수를
+    /// `autoBracketEnabled` 대입보다 먼저 부르므로, 첫 `init` 에서 프로퍼티는 아직 메모리 기본값
+    /// (true)이다. 끈 사용자를 켠 것으로 보면 닫는 괄호를 맨 앞에 둔 매핑(ㄱ `) 9 (`)의 결과가
+    /// 바뀐다. 키가 없으면(한 번도 바꾸지 않음) 기본값 true. 저장된 매핑은 한글·영문 문자 모드의
+    /// 롱키만 쓰므로 거를지 여부 = 이 설정이다.
+    ///
+    /// `loadAll()` 안(`isLoading` = true)에서 불리므로 `didSet` 은 인덱스만 재빌드하고 디스크에
+    /// 쓰지 않는다 — 바뀐 경우에만 여기서 **한 번** 직접 저장하고 기록을 남긴다. 크로스프로세스
+    /// 알림도 로딩 중이라 나가지 않는데, 앱과 익스텐션이 같은 공유 저장소를 보고 각자 같은 결과를
+    /// 내므로(결과에 다시 적용해도 무변화) 알릴 필요가 없다.
+    private func migrateLongPressPrimaryIfNeeded() {
+        guard !longPressPrimaryMigrated else { return }
+        let autoBracketOnDisk = defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true
+        let migrated = SecondaryKeyAction.migratingForPrimaryOutput(
+            secondaryKeyActions, filteringClosingBrackets: autoBracketOnDisk)
+        if migrated != secondaryKeyActions {
+            secondaryKeyActions = migrated
+            save(migrated, forKey: Keys.secondaryKeyActions)
+        }
+        longPressPrimaryMigrated = true
+        defaults.set(true, forKey: Keys.longPressPrimaryMigrated)
     }
 
     // MARK: - Shortcut Expansions
@@ -502,6 +540,8 @@ final class KeyboardSettings: ObservableObject {
         assign(\.gestureSettings, load(GestureSettings.self, forKey: Keys.gestureSettings) ?? .default)
         assign(\.themeSettings, load(ThemeSettings.self, forKey: Keys.themeSettings) ?? .default)
         assign(\.secondaryKeyActions, load([SecondaryKeyAction].self, forKey: Keys.secondaryKeyActions) ?? SecondaryKeyAction.defaults)
+        assign(\.longPressPrimaryMigrated, defaults.bool(forKey: Keys.longPressPrimaryMigrated))
+        migrateLongPressPrimaryIfNeeded()
         assign(\.shortcutExpansionStore, load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore())
         assign(\.abbreviationEnabled, defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true)
         assign(\.abbreviationUndoOnBackspaceEnabled, defaults.object(forKey: Keys.abbreviationUndoOnBackspace) as? Bool ?? true)
@@ -660,6 +700,9 @@ final class KeyboardSettings: ObservableObject {
         gestureSettings = .default
         themeSettings = .default
         secondaryKeyActions = SecondaryKeyAction.defaults
+        // `longPressPrimaryMigrated` 는 일부러 되돌리지 않는다 — 기본 매핑은 이미 새 의미
+        // (출력 == 첫 후보)라 이전이 필요 없고, false 로 돌리면 초기화 뒤 후보 순서만 바꾼
+        // 사용자의 출력을 다음 `loadAll()` 이 옛 규칙으로 덮어쓴다.
         shortcutExpansionStore = ShortcutExpansionStore()
         abbreviationEnabled = true
         abbreviationUndoOnBackspaceEnabled = true
