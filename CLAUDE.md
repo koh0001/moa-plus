@@ -242,7 +242,16 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   **누름 시작만** 먼저 한다(`.earlyPress`). 불변식: 시작은 한 번만(SwiftUI 쪽은 이미 눌린 상태면
   건너뜀 — 어기면 백스페이스·진동 두 번), 뗀 뒤 0.3초에도 SwiftUI 가 안 왔으면 입력 확정 없이
   정리(세대 번호로 연타 보호). **창 게이트의 `delaysTouchesBegan` 해제는 효과 없음**(실측으로 기각).
-  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`)
+  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`).
+  **상시 진단**은 리포트의 `조기 터치` 줄(`EarlyTouchDiagnostics`, 이슈 #35 "아래쪽 롱키 대부분 1초") —
+  조기 경로가 키를 찾으면 시작은 항상 SwiftUI 보다 먼저라, 그리드 `SwiftUI 먼저 (아래쪽 N)` > 0 = 놓친 누름.
+  그 누름을 인식기가 본 최근 터치(같은 y)와 짝지어 가른다: 터치 못 받음(인식기 상태·창 게이트) /
+  키 못 찾음(등록 누락 또는 좌표 어긋남 — `먼 곳` 어긋남 값과 등록 수) / 다른 키(낡은 키·좌표 한 칸 이하
+  어긋남) / 같은 키(찾았는데도 안 먹힘). `도착 최대` 가 크면 터치 자체가 늦게 온 것, `아래쪽 롱키 팝업` 은
+  터치부터의 실측(정상 ≈ 롱프레스 딜레이). 지연이 있었던 실행은 `조기 터치 (마지막 지연 기록)` 에 따로 남는다.
+  2행(ㅁ~ㅎ)은 지연 경계(높이 100% 실측 y≈130/260)를 가로지른다(100%: 108~156pt, 91%: 96~139pt).
+  제보(10/08): 3행도 늦고, 같은 2행에서 가장자리 ㅁ·ㅎ 는 늦고 가운데 ㄴㅇㄹ 은 가끔 빠름 — 시스템 지연
+  구역이 가로선이 아니라 가장자리 쪽이 넓은 모양으로 보인다
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수
@@ -565,9 +574,21 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
   (`firstStrokeCardinal`)이 **바로 다음 획과 같은 방향**이면 휘어진 한 획으로 보고, 간선 수 동률에서
   버린 획이 적은 재해석을 고른다 (↗→ = ㅏ, ↖← = ㅓ). 이 조건 없이 "버린 획 적은 쪽" 만 쓰면
   ↙↑→ = ㅢ 특성화가 ㅔ 로 깨진다(실측). 가드 `CurvedFirstStrokeTests`
+- **짧은 이어짐 (v2.2.6 / 같은 제보자 재제보)**: 재해석은 두 번째 조각이 키폭 0.6배 이상일 때만
+  켜진다(`reinterpretMinSecondStrokeRatio`, 손 떼는 꼬리 방지). 휜 획의 나머지가 짧으면(20~26pt)
+  꺼져 `↙30 ←26 →59 = ㅡ`(네→느), `↗37 →26 = ㅣ`(가→기)가 남았다. 두 번째 조각이 재해석 방향과
+  **같을 때만**, 첫 조각부터 꺾임 45° 이내로 이어진 조각들의 합벡터를 그 열 섹터로 다시 분류해
+  재해석 방향이 나오면 켠다(`isShortCurvedContinuation`). 결과 = 같은 궤적을 곧게 그은 판정
+  (ㅣ↔ㅗ, ㅡ↔ㅜ 경계도 같은 규칙). 이어진 조각을 **전부** 합칠 것 — 1·2번만 합치면 흔들려 그은
+  ↗ 가 → 로 넘어간다(`test_e2e_shortContinuation_sumsWholeRun_notFirstTwo`; 제보 로그의
+  `↗21 →28 ↗52` = "키" 는 1·2번 합 22° 도 1열 ↗ 안이라 이 가드가 못 된다). 다른 방향 꼬리(↙ 뒤 ↑→)는 0.6 기준 그대로.
+  곧은 조각으로는 이 분할이 재현되지 않아(첫 조각부터 → 로 잡힘) 테스트는 휘는 경로로 재생한다
+  (`CurvedFirstStrokeTests.test_e2e_report1006_*`)
 - 오타 후보 표시: 긋기 로그 직후 첫 입력이 백스페이스면 `GestureDebugLog.markLastLineDeleted()`
   가 줄 끝에 `✗지움`. 대기 플래그 `KeyboardViewModel.typoMarkPending` 은 다른 입력 메서드마다
-  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`)
+  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`).
+  ✗ 는 **첫 백스페이스 직전 줄**에 붙는다 — 여러 글자를 지웠으면 실제 틀린 줄은 그 앞이다.
+  판독은 지운 뒤 다시 친 줄과 비교할 것 (10/06 리포트에서 분석기 오타 2건 모두 ✗ 한 줄 앞)
 
 ### 긋기 노이즈 처리 (GestureAnalyzer)
 - `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다
