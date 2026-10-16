@@ -79,11 +79,270 @@ enum EarlyTouchRegistry {
 
     /// 창 좌표 `point` 를 담는 키. 겹치면(팝업 등) 가장 작은 프레임이 이긴다.
     static func target(atWindowPoint point: CGPoint) -> EarlyTouchTarget? {
-        targets.allObjects
-            .filter { !$0.windowFrame.isNull && $0.windowFrame.contains(point) }
-            .min { $0.windowFrame.width * $0.windowFrame.height
-                 < $1.windowFrame.width * $1.windowFrame.height }
+        lookup(atWindowPoint: point).target
     }
+
+    /// 키 찾기 결과 + 놓친 이유를 가를 단서 (`EarlyTouchDiagnostics`).
+    struct Lookup {
+        let target: EarlyTouchTarget?
+        /// `point` 를 담은 키 수. 화면의 키 프레임은 서로 겹치지 않으므로 2 이상이면 화면에서
+        /// 사라진 키가 남아 있을 수 있다 — 어느 쪽이 조기 시작을 받을지 정해져 있지 않다.
+        let containing: Int
+        let registered: Int
+        /// 못 찾았을 때 가장 가까운 키 프레임에서 터치까지의 어긋남(pt). 배치된 키가 없으면 nil.
+        let nearestOffset: CGVector?
+    }
+
+    static func lookup(atWindowPoint point: CGPoint) -> Lookup {
+        let all = targets.allObjects
+        let laidOut = all.filter { !$0.windowFrame.isNull }
+        let containing = laidOut.filter { $0.windowFrame.contains(point) }
+        let best = containing.min { $0.windowFrame.width * $0.windowFrame.height
+                                  < $1.windowFrame.width * $1.windowFrame.height }
+        // 타입을 단계마다 드러낸다 — 한 식으로 묶으면 CI 컴파일러(Xcode 26.3)가 타입 추론 시간 초과.
+        var nearest: CGVector? = .zero
+        if best == nil {
+            let offsets: [CGVector] = laidOut.map { offset(from: $0.windowFrame, to: point) }
+            nearest = offsets.min { lengthSquared($0) < lengthSquared($1) }
+        }
+        return Lookup(target: best, containing: containing.count, registered: all.count, nearestOffset: nearest)
+    }
+
+    private static func offset(from r: CGRect, to p: CGPoint) -> CGVector {
+        let nearestX: CGFloat = min(max(p.x, r.minX), r.maxX)
+        let nearestY: CGFloat = min(max(p.y, r.minY), r.maxY)
+        return CGVector(dx: p.x - nearestX, dy: p.y - nearestY)
+    }
+
+    static func lengthSquared(_ v: CGVector) -> CGFloat {
+        v.dx * v.dx + v.dy * v.dy
+    }
+}
+
+// MARK: - 진단 (개발자 리포트, 이슈 #35)
+
+/// 조기 시작이 실제로 먼저 누름을 시작했는지 — 개발자 리포트의 "조기 터치" 줄.
+///
+/// 조기 경로가 키를 찾으면 누름 시작은 SwiftUI(위쪽 ~80ms, 아래쪽 ~750ms)보다 항상 먼저다.
+/// 그러니 **SwiftUI 가 먼저 시작한 그리드 누름 = 조기 경로가 놓친 누름**이다. 그 누름을 인식기가
+/// 본 최근 터치와 짝지어(같은 y) 놓친 이유를 가른다:
+/// - 터치 못 받음: 짝이 없다 — 인식기가 그 터치를 받지 못했다(인식기 상태·창 게이트)
+/// - 키 못 찾음: 받았지만 키가 없었다 — 등록 누락(등록 0개) 또는 좌표 어긋남(먼 곳 어긋남 값)
+/// - 다른 키: 다른 키에 조기 시작을 줬다 — 낡은 키 잔존 또는 좌표 어긋남(키 하나 이하)
+/// - 같은 키: 맞는 키를 찾았는데도 SwiftUI 가 먼저 — 조기 시작이 먹히지 않았다
+/// 증상 자체는 아래쪽 롱키 팝업이 **터치부터** 몇 ms 에 떴는지로 잰다(정상 = 롱프레스 딜레이).
+/// 메모리 집계를 2초에 한 번(지연 사건은 즉시) App Group 에 쓴다. 아래쪽 SwiftUI 먼저가 있었던
+/// 기록은 따로 남겨, 다음 깨끗한 실행이 덮어쓰지 못하게 한다.
+enum EarlyTouchDiagnostics {
+    struct Late: Equatable {
+        var at: Date
+        /// 터치부터 SwiftUI 시작까지. 짝 터치가 없으면 nil.
+        var ms: Double?
+        var y: CGFloat
+        var height: CGFloat
+    }
+
+    struct FarMiss: Equatable {
+        var y: CGFloat
+        var height: CGFloat
+        var offset: CGVector?
+        var registered: Int
+    }
+
+    struct Counts: Equatable {
+        var lowerTouches = 0
+        var found = 0
+        /// 키 사이 틈(가장 가까운 키가 `gapDistance` 이내) — 정상.
+        var gap = 0
+        /// 가장 가까운 키도 멀거나 배치된 키가 없음 — 등록 누락·좌표 어긋남 의심.
+        var farMiss = 0
+        var overlapped = 0
+        var maxArrivalMs = 0.0
+        var swiftUIFirst = 0
+        var swiftUIFirstLower = 0
+        var lowerNotSeen = 0
+        var lowerMissed = 0
+        var lowerOtherKey = 0
+        var lowerSameKey = 0
+        var lastLower: Late?
+        var popupMaxMs = 0.0
+        var popupLastMs: Double?
+        var alreadyPressed = 0
+        var lastFarMiss: FarMiss?
+    }
+
+    /// 아래쪽 판정 비율(키보드 높이 대비). 2행(ㅁ~ㅎ)이 높이의 ~41% 에서 시작한다.
+    static let lowerRatio: CGFloat = 0.4
+    static let gapDistance: CGFloat = 6
+    /// SwiftUI 시작점과 같은 터치로 볼 y 차이. 같은 터치면 거의 같다.
+    static let matchTolerance: CGFloat = 12
+    static let writeInterval: TimeInterval = 2
+
+    /// 익스텐션(`KeyboardViewController`)만 켠다 — 메인 앱의 키보드 미리보기가 같은 App Group
+    /// 값을 앱 쪽 집계로 덮어쓰지 않게.
+    private(set) static var isRecording = false
+    /// SwiftUI 좌표의 아래쪽 판정 기준 높이. 컨트롤러가 레이아웃마다 갱신한다.
+    static var keyboardHeight: CGFloat = 0
+
+    static var now: () -> Date = Date.init
+    /// `UITouch.timestamp` 와 같은 시계(시스템 업타임, 초).
+    static var uptime: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    static var write: (String) -> Void = defaultWrite
+    static var writeDelayed: (String) -> Void = defaultWriteDelayed
+    /// 지연 사건 기록을 누름 처리 뒤로 미룬다 — 늦게 온 누름을 더 늦추지 않게.
+    static var schedule: (@escaping () -> Void) -> Void = { DispatchQueue.main.async(execute: $0) }
+
+    static let defaultWrite: (String) -> Void = { KeyboardSettings.shared.recordEarlyTouchDiagnostic($0) }
+    static let defaultWriteDelayed: (String) -> Void = {
+        KeyboardSettings.shared.recordEarlyTouchDelayedDiagnostic($0)
+    }
+
+    private(set) static var counts = Counts()
+    private(set) static var since = Date()
+    private static var lastWrite: Date?
+
+    private struct TouchRecord {
+        let uptime: TimeInterval
+        /// 호스팅 뷰 좌표 — `keyboardPreview` 와 y 원점이 같다.
+        let y: CGFloat
+        let foundPreviewFrame: CGRect?
+    }
+    private static var recent: [TouchRecord] = []
+    private static let recentLimit = 8
+
+    /// 익스텐션이 키보드 뷰를 만들 때 부른다. 집계 시작 시각은 프로세스당 한 번 잡는다.
+    static func startRecording() {
+        guard !isRecording else { return }
+        isRecording = true
+        since = now()
+    }
+
+    /// 인식기의 touchesBegan. 짝짓기용으로 모든 터치를 기억하고, 집계는 아래쪽 터치만 —
+    /// 위쪽은 조기 경로가 없어도 지연이 없다.
+    static func touchBegan(at location: CGPoint, height: CGFloat, timestamp: TimeInterval,
+                           lookup: EarlyTouchRegistry.Lookup) {
+        guard isRecording, height > 0 else { return }
+        recent.append(TouchRecord(uptime: timestamp, y: location.y,
+                                  foundPreviewFrame: lookup.target?.previewFrame))
+        if recent.count > recentLimit { recent.removeFirst(recent.count - recentLimit) }
+
+        guard location.y / height >= lowerRatio else { return }
+        counts.lowerTouches += 1
+        counts.maxArrivalMs = max(counts.maxArrivalMs, (uptime() - timestamp) * 1000)
+        if lookup.target != nil {
+            counts.found += 1
+            if lookup.containing > 1 { counts.overlapped += 1 }
+        } else if let o = lookup.nearestOffset,
+                  EarlyTouchRegistry.lengthSquared(o) <= gapDistance * gapDistance {
+            counts.gap += 1
+        } else {
+            counts.farMiss += 1
+            counts.lastFarMiss = FarMiss(y: location.y, height: height,
+                                         offset: lookup.nearestOffset, registered: lookup.registered)
+        }
+    }
+
+    /// 그리드 키의 SwiftUI 첫 `onChanged` 가 누름을 시작했다 = 조기 경로가 놓쳤다.
+    /// - Parameter point: 누른 지점(`keyboardPreview` 좌표).
+    static func swiftUIStartedFirst(at point: CGPoint) {
+        guard isRecording else { return }
+        counts.swiftUIFirst += 1
+        guard keyboardHeight > 0, point.y / keyboardHeight >= lowerRatio else { return }
+        counts.swiftUIFirstLower += 1
+        let match = matchingTouch(y: point.y, within: 1.5)
+        if let match {
+            if let frame = match.foundPreviewFrame {
+                if frame.contains(point) { counts.lowerSameKey += 1 } else { counts.lowerOtherKey += 1 }
+            } else {
+                counts.lowerMissed += 1
+            }
+        } else {
+            counts.lowerNotSeen += 1
+        }
+        let latencyMs: Double? = match.map { record in (uptime() - record.uptime) * 1000 }
+        counts.lastLower = Late(at: now(), ms: latencyMs, y: point.y, height: keyboardHeight)
+        schedule { flush(force: true) }
+    }
+
+    /// 아래쪽 키의 롱키 팝업이 떴다 — 터치부터 걸린 시간이 증상 그 자체다.
+    /// - Parameter previewY: 누름 시작점 y(`keyboardPreview` 좌표).
+    static func longPressPopupShown(previewY: CGFloat) {
+        guard isRecording, keyboardHeight > 0, previewY / keyboardHeight >= lowerRatio,
+              let match = matchingTouch(y: previewY, within: 3) else { return }
+        let ms = (uptime() - match.uptime) * 1000
+        counts.popupMaxMs = max(counts.popupMaxMs, ms)
+        counts.popupLastMs = ms
+        schedule { flush(force: true) }
+    }
+
+    /// 조기 시작이 왔는데 키가 이미 눌린 상태였다. 같은 키를 앞 누름의 SwiftUI 뗌 처리 전에 다시
+    /// 누른 경우(ㅎㅎ 연타)에도 생긴다 — 눌림 고착만 뜻하지는 않는다.
+    static func earlyPressWhileAlreadyPressed() {
+        guard isRecording else { return }
+        counts.alreadyPressed += 1
+        schedule { flush(force: true) }
+    }
+
+    static func flush(force: Bool = false) {
+        guard isRecording, counts != Counts() else { return }
+        let t = now()
+        if !force, let last = lastWrite, t.timeIntervalSince(last) < writeInterval { return }
+        lastWrite = t
+        let text = line()
+        write(text)
+        if counts.swiftUIFirstLower > 0 { writeDelayed(text) }
+    }
+
+    static func line() -> String {
+        let c = counts
+        func ms(_ v: Double) -> String { String(format: "%.0fms", v) }
+        let sinceText: String = formatter.string(from: since)
+        let arrival: String = ms(c.maxArrivalMs)
+        let popupMax: String = ms(c.popupMaxMs)
+        let popupLast: String = c.popupLastMs.map(ms) ?? "-"
+        var parts: [String] = []
+        parts.append("\(sinceText) 부터")
+        parts.append("아래쪽 터치 \(c.lowerTouches) (도착 최대 \(arrival), 키 찾음 \(c.found), 틈 \(c.gap), 먼 곳 \(c.farMiss), 겹침 \(c.overlapped))")
+        parts.append("SwiftUI 먼저 \(c.swiftUIFirst) (아래쪽 \(c.swiftUIFirstLower): 터치 못 받음 \(c.lowerNotSeen), 키 못 찾음 \(c.lowerMissed), 다른 키 \(c.lowerOtherKey), 같은 키 \(c.lowerSameKey))")
+        parts.append("아래쪽 롱키 팝업 최대 \(popupMax) 마지막 \(popupLast)")
+        parts.append("이미 눌림 \(c.alreadyPressed)")
+        if let l = c.lastLower {
+            parts.append(String(format: "마지막 SwiftUI 먼저 %@ 터치부터 %@ y %.0f/%.0fpt",
+                                formatter.string(from: l.at), l.ms.map(ms) ?? "?", l.y, l.height))
+        }
+        if let m = c.lastFarMiss {
+            let offset = m.offset.map { String(format: "(%.0f, %.0f)pt", $0.dx, $0.dy) } ?? "배치된 키 없음"
+            parts.append(String(format: "마지막 먼 곳 y %.0f/%.0fpt 어긋남 %@ 등록 %d개",
+                                m.y, m.height, offset, m.registered))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static func matchingTouch(y: CGFloat, within seconds: TimeInterval) -> TouchRecord? {
+        let t = uptime()
+        return recent.last { t - $0.uptime <= seconds && abs($0.y - y) <= matchTolerance }
+    }
+
+    /// 테스트용 — 집계와 바꿔 끼운 훅을 모두 되돌린다.
+    static func resetForTesting(recording: Bool) {
+        isRecording = recording
+        now = Date.init
+        uptime = { ProcessInfo.processInfo.systemUptime }
+        write = defaultWrite
+        writeDelayed = defaultWriteDelayed
+        schedule = { DispatchQueue.main.async(execute: $0) }
+        keyboardHeight = 0
+        counts = Counts()
+        since = now()
+        lastWrite = nil
+        recent = []
+    }
+
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm:ss"
+        return f
+    }()
 }
 
 /// 호스팅 뷰에 붙이는 조기 터치 인식기. 인식(.began)하지 않고 터치만 관찰한다.
@@ -108,7 +367,12 @@ final class EarlyTouchRecognizer: UIGestureRecognizer, UIGestureRecognizerDelega
         for touch in touches {
             TouchLatencyProbe.touchBegan(touch, in: view)
             let point = touch.location(in: nil)
-            guard let target = EarlyTouchRegistry.target(atWindowPoint: point) else { continue }
+            let lookup = EarlyTouchRegistry.lookup(atWindowPoint: point)
+            if let view {
+                EarlyTouchDiagnostics.touchBegan(at: touch.location(in: view), height: view.bounds.height,
+                                                 timestamp: touch.timestamp, lookup: lookup)
+            }
+            guard let target = lookup.target else { continue }
             tracked[ObjectIdentifier(touch)] = (target, point)
             target.press(atWindowPoint: point)
         }
@@ -134,7 +398,10 @@ final class EarlyTouchRecognizer: UIGestureRecognizer, UIGestureRecognizerDelega
         for touch in touches {
             tracked.removeValue(forKey: ObjectIdentifier(touch))?.target.release()
         }
-        if tracked.isEmpty { state = .failed }
+        if tracked.isEmpty {
+            state = .failed
+            EarlyTouchDiagnostics.flush()
+        }
     }
 
     override func reset() {

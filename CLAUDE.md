@@ -198,7 +198,16 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   **누름 시작만** 먼저 한다(`.earlyPress`). 불변식: 시작은 한 번만(SwiftUI 쪽은 이미 눌린 상태면
   건너뜀 — 어기면 백스페이스·진동 두 번), 뗀 뒤 0.3초에도 SwiftUI 가 안 왔으면 입력 확정 없이
   정리(세대 번호로 연타 보호). **창 게이트의 `delaysTouchesBegan` 해제는 효과 없음**(실측으로 기각).
-  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`)
+  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`).
+  **상시 진단**은 리포트의 `조기 터치` 줄(`EarlyTouchDiagnostics`, 이슈 #35 "아래쪽 롱키 대부분 1초") —
+  조기 경로가 키를 찾으면 시작은 항상 SwiftUI 보다 먼저라, 그리드 `SwiftUI 먼저 (아래쪽 N)` > 0 = 놓친 누름.
+  그 누름을 인식기가 본 최근 터치(같은 y)와 짝지어 가른다: 터치 못 받음(인식기 상태·창 게이트) /
+  키 못 찾음(등록 누락 또는 좌표 어긋남 — `먼 곳` 어긋남 값과 등록 수) / 다른 키(낡은 키·좌표 한 칸 이하
+  어긋남) / 같은 키(찾았는데도 안 먹힘). `도착 최대` 가 크면 터치 자체가 늦게 온 것, `아래쪽 롱키 팝업` 은
+  터치부터의 실측(정상 ≈ 롱프레스 딜레이). 지연이 있었던 실행은 `조기 터치 (마지막 지연 기록)` 에 따로 남는다.
+  2행(ㅁ~ㅎ)은 지연 경계(높이 100% 실측 y≈130/260)를 가로지른다(100%: 108~156pt, 91%: 96~139pt).
+  제보(10/08): 3행도 늦고, 같은 2행에서 가장자리 ㅁ·ㅎ 는 늦고 가운데 ㄴㅇㄹ 은 가끔 빠름 — 시스템 지연
+  구역이 가로선이 아니라 가장자리 쪽이 넓은 모양으로 보인다
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수

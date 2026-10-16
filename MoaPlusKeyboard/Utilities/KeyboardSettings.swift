@@ -23,6 +23,8 @@ final class KeyboardSettings: ObservableObject {
         static let keyboardAutoBottomInset = "keyboardAutoBottomInset"
         static let keyboardExtraBottomInset = "keyboardExtraBottomInset"
         static let keyboardGeometryDiagnostic = "keyboardGeometryDiagnostic"
+        static let earlyTouchDiagnostic = "earlyTouchDiagnostic"
+        static let earlyTouchDelayedDiagnostic = "earlyTouchDelayedDiagnostic"
         static let autoCapitalizeDiagnostic = "autoCapitalizeDiagnostic"
         static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
@@ -590,6 +592,26 @@ final class KeyboardSettings: ObservableObject {
 
     var keyboardGeometryDiagnostic: String? {
         defaults.string(forKey: Keys.keyboardGeometryDiagnostic)
+    }
+
+    /// 아래쪽 키 조기 시작이 실제로 먹었는지 (`EarlyTouchDiagnostics`, 이슈 #35). 지오메트리
+    /// 진단과 같은 이유로 `@Published` 밖의 기록이다.
+    func recordEarlyTouchDiagnostic(_ text: String) {
+        defaults.set(text, forKey: Keys.earlyTouchDiagnostic)
+    }
+
+    var earlyTouchDiagnostic: String? {
+        defaults.string(forKey: Keys.earlyTouchDiagnostic)
+    }
+
+    /// 아래쪽 누름을 SwiftUI 가 먼저 시작한(= 지연을 겪은) 마지막 실행의 기록. 다음 깨끗한
+    /// 실행이 위 기록을 덮어써도 이건 남는다.
+    func recordEarlyTouchDelayedDiagnostic(_ text: String) {
+        defaults.set(text, forKey: Keys.earlyTouchDelayedDiagnostic)
+    }
+
+    var earlyTouchDelayedDiagnostic: String? {
+        defaults.string(forKey: Keys.earlyTouchDelayedDiagnostic)
     }
 
     /// 영문 자동 대문자 판정의 마지막 입력값. 호스트가 캐럿 앞 문맥과 대문자화
