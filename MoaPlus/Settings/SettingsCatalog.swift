@@ -231,6 +231,15 @@ enum SettingsCatalog {
             keywords: ["테마", "색", "색상", "배경", "이미지", "사진", "다크", "밝기", "투명"]
         ),
         SettingsEntry(
+            title: "배경 사진 크기 · 맞춤",
+            icon: "photo",
+            destination: .appearance,
+            // "키보드 배경 사진 크기 작게 안 됩니다" — 앱스토어 리뷰 (이슈 #39).
+            // 크기는 줄이기만 한다(50~100%) — "확대" 같은 키우는 말은 넣지 않는다(리뷰 반영).
+            keywords: ["배경", "사진", "이미지", "크기", "작게", "작아", "줄이", "줄여", "축소",
+                       "잘림", "잘려", "자르기", "꽉", "채우기", "전체", "맞춤"]
+        ),
+        SettingsEntry(
             title: "소리 · 진동",
             icon: "waveform",
             destination: .feedback,
@@ -305,6 +314,16 @@ enum SettingsCatalog {
             remedy: "키보드 높이를 85%~135%로 조절할 수 있습니다",
             icon: "arrow.up.and.down",
             destination: .size
+        ),
+        SettingsSymptom(
+            // 앱스토어 리뷰 "키보드 배경 사진 크기 작게 안 됩니다" (이슈 #39).
+            // 리뷰 반영: 자르기 화면이 사진을 고정 비율 375:260 으로 자르므로 ‘전체 보이기’가 되살리는
+            // 건 키보드 폭·높이 차이로 **더** 잘린 가장자리뿐이다(키보드가 마침 375:260 이면 꽉 채우기와
+            // 같고, 440pt 폰 기본 높이면 사진 높이의 ~15%). 자를 때 뺀 부분은 사진을 다시 골라야 한다.
+            symptom: "배경 사진이 잘리거나 너무 크게 나와요",
+            remedy: "크면 ‘사진 크기’를 줄이고, 고를 때 자른 범위보다 더 잘리면 ‘전체 보이기’를 고르세요 — 자를 때 뺀 부분은 사진을 다시 골라야 보입니다",
+            icon: "photo",
+            destination: .appearance
         ),
         SettingsSymptom(
             symptom: "특수문자를 바꾸고 싶어요",

@@ -195,12 +195,101 @@ enum ButtonTheme: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// 배경 사진을 키보드에 맞추는 방식 (이슈 #39 — 앱스토어 리뷰 "키보드 배경 사진 크기 작게 안 됩니다").
+enum BackgroundImageContentMode: String, Codable, CaseIterable {
+    /// 키보드를 꽉 채운다 — 넘치는 부분은 잘린다. 이 설정이 생기기 전의 유일한 동작이자 기본값.
+    case fill
+    /// 사진 전체가 보이게 줄인다 — 남는 곳은 평소 키보드 배경이 보인다.
+    case fit
+
+    var displayName: String {
+        switch self {
+        case .fill: return "꽉 채우기"
+        case .fit:  return "전체 보이기"
+        }
+    }
+}
+
+/// 배경 사진을 그릴 크기 계산. 뷰와 분리해 둔 순수 함수라 단위 테스트로 고정한다.
+enum BackgroundImageLayout {
+    /// 사진을 `container` 안에 그릴 크기. 사진은 항상 가운데에 놓는다.
+    ///
+    /// 기준 크기는 맞춤 방식이 정하고(꽉 채우기 = 두 변 모두 덮는 최소 배율, 전체 보이기 =
+    /// 두 변 모두 들어가는 최대 배율) 거기에 `scale` 을 곱한다. 종횡비는 언제나 원본 그대로다.
+    /// `scale` 은 `ThemeSettings.backgroundImageScaleRange` 로 잘라 쓴다 — 저장값이 범위를
+    /// 벗어나도(손상·다른 버전) 그리는 크기는 범위 안이다.
+    static func displaySize(
+        imageSize: CGSize,
+        containerSize: CGSize,
+        contentMode: BackgroundImageContentMode,
+        scale: Double
+    ) -> CGSize {
+        guard imageSize.width > 0, imageSize.height > 0,
+              containerSize.width > 0, containerSize.height > 0 else { return .zero }
+        let widthRatio = containerSize.width / imageSize.width
+        let heightRatio = containerSize.height / imageSize.height
+        let base: CGFloat
+        switch contentMode {
+        case .fill: base = max(widthRatio, heightRatio)
+        case .fit:  base = min(widthRatio, heightRatio)
+        }
+        let ratio = base * CGFloat(ThemeSettings.clampedBackgroundImageScale(scale))
+        return CGSize(width: imageSize.width * ratio, height: imageSize.height * ratio)
+    }
+
+    /// 사진을 그릴 사각형 (`containerSize` 좌표계). `focus` 는 사진을 맞출 영역 — 한손 모드에서는
+    /// 띠를 뺀 키보드 본체, 그 밖에는 컨테이너 전체(nil).
+    ///
+    /// - 꽉 채우기: 크기는 **컨테이너 전체**(띠 포함) 기준. 표면 전체를 덮는 게 이 모드의 뜻이고,
+    ///   한손 모드 100%(기본)가 예전처럼 띠 밑까지 사진으로 덮이려면 기준이 바뀌면 안 된다.
+    /// - 전체 보이기: 크기는 **`focus`** 기준 — 사진 전체가 키 아래에 들어와야 한다. 컨테이너
+    ///   기준이면 402pt 폰 0.82 배(본체 329pt)에서 375pt 폭 사진이 본체에 안 들어가 띠 밑으로 샌다.
+    ///
+    /// 위치는 두 축 모두 `placedCenter` — `focus` 가운데를 원하되, 사진이 컨테이너보다 크면
+    /// 컨테이너 가운데(빈틈 없이 덮기 = 예전 위치), 작으면 컨테이너 밖으로 나가지 않게 민다.
+    /// `focus` 가 nil 이면 `displaySize` 를 컨테이너 가운데 둔 것과 같다(한손 모드가 아닐 때).
+    static func displayRect(
+        imageSize: CGSize,
+        containerSize: CGSize,
+        focus: CGRect? = nil,
+        contentMode: BackgroundImageContentMode,
+        scale: Double
+    ) -> CGRect {
+        let container = CGRect(origin: .zero, size: containerSize)
+        // 컨테이너 밖으로 삐져나간 focus 는 잘라 쓴다 — 비거나 어긋나면 컨테이너 전체.
+        var area = container
+        if let focus {
+            let clipped = focus.intersection(container)
+            if !clipped.isNull, clipped.width > 0, clipped.height > 0 { area = clipped }
+        }
+        let basis = contentMode == .fill ? containerSize : area.size
+        let size = displaySize(imageSize: imageSize, containerSize: basis,
+                               contentMode: contentMode, scale: scale)
+        let x = placedCenter(length: size.width, containerLength: containerSize.width, preferred: area.midX)
+        let y = placedCenter(length: size.height, containerLength: containerSize.height, preferred: area.midY)
+        return CGRect(x: x - size.width / 2, y: y - size.height / 2, width: size.width, height: size.height)
+    }
+
+    /// 한 축의 사진 중심. 사진이 컨테이너 이상이면 컨테이너 가운데(덮은 채 가운데 잘림 — 예전 동작),
+    /// 작으면 `preferred` 를 컨테이너 안에 들어오는 범위로 자른다. 사진 길이가 컨테이너 길이에
+    /// 다가가면 허용 범위가 가운데 한 점으로 줄어들어 두 경우가 끊김 없이 이어진다.
+    static func placedCenter(length: CGFloat, containerLength: CGFloat, preferred: CGFloat) -> CGFloat {
+        guard length < containerLength else { return containerLength / 2 }
+        return min(max(preferred, length / 2), containerLength - length / 2)
+    }
+}
+
 /// Complete theme settings
 struct ThemeSettings: Codable, Equatable {
     var appearanceMode: AppearanceMode = .system
     var buttonTheme: ButtonTheme = .defaultGray
     var backgroundImageId: String?
     var backgroundOpacity: Double = 0.3
+    /// 배경 사진 맞춤 방식 (이슈 #39). 기본 `.fill` = 기존 렌더링 그대로.
+    var backgroundImageContentMode: BackgroundImageContentMode = .fill
+    /// 배경 사진 크기 배율 — 맞춤 방식의 기준 크기에 곱한다 (이슈 #39).
+    /// 기본 1.0 = 기존 렌더링 그대로. 범위는 `backgroundImageScaleRange`.
+    var backgroundImageScale: Double = 1.0
     var hapticEnabled: Bool = true
     var hapticStrength: HapticStrength = .normal
     var clickSoundEnabled: Bool = false
@@ -234,4 +323,64 @@ struct ThemeSettings: Codable, Equatable {
     }
 
     static let `default` = ThemeSettings()
+
+    /// 배경 사진 크기 배율 범위 (이슈 #39). 줄이기만 한다 — 1.0 이 맞춤 방식의 기준 크기라
+    /// 키우면 꽉 채우기는 더 잘리고 전체 보이기는 이름과 어긋난다. 0.5 아래는 키 사이로
+    /// 사진이 거의 안 보여 의미가 없다. 설정 슬라이더는 5% 단위.
+    static let backgroundImageScaleRange: ClosedRange<Double> = 0.5...1.0
+    static let backgroundImageScaleStep: Double = 0.05
+
+    /// 범위 밖·비정상(NaN) 저장값을 그릴 수 있는 배율로. 비정상이면 기본 1.0.
+    static func clampedBackgroundImageScale(_ scale: Double) -> Double {
+        guard scale.isFinite else { return 1.0 }
+        return min(max(scale, backgroundImageScaleRange.lowerBound), backgroundImageScaleRange.upperBound)
+    }
+
+    /// 설정 화면의 "사진 크기 N%" — 그리는 크기와 같은 값(`clampedBackgroundImageScale`)을 보여 준다.
+    /// 저장값을 그대로 `Int(v * 100)` 하면 범위 밖 값은 실제와 다른 %가 나오고, NaN·무한대는
+    /// `Int(_:)` 에서 바로 크래시한다. `Int(v * 100)` 의 내림 오차(0.65 → 64)도 반올림으로 피한다.
+    static func backgroundImageScalePercent(_ scale: Double) -> Int {
+        Int((clampedBackgroundImageScale(scale) * 100).rounded())
+    }
+
+    // 저장된 모든 필드를 나열한다 — 빠진 키는 인코딩에서도 조용히 빠진다.
+    private enum CodingKeys: String, CodingKey {
+        case appearanceMode, buttonTheme, backgroundImageId, backgroundOpacity
+        case backgroundImageContentMode, backgroundImageScale
+        case hapticEnabled, hapticStrength, clickSoundEnabled
+        case customKeyBackground, customKeyText, customFunctionKeyBackground
+        case keyBackgroundOpacity, functionKeyBackgroundOpacity
+        case hapticOnTap, hapticOnLongPress, hapticOnLayerSwitch, hapticOnAbbreviationConfirm
+    }
+}
+
+extension ThemeSettings {
+    /// 키가 없으면 기본값으로 채운다. 합성 `Decodable` 은 키 하나만 없어도 `keyNotFound` 로
+    /// 통째로 실패하고, `KeyboardSettings.loadAll()` 은 그때 `.default` 로 떨어져 사용자의
+    /// 테마·배경 사진이 전부 초기화된다 — 새 필드(이슈 #39)가 없는 기존 저장값이 바로 그 경우다.
+    /// 확장(extension)에 둬야 `ThemeSettings()` 기본 생성자가 살아남는다.
+    init(from decoder: Decoder) throws {
+        self.init()
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        appearanceMode = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? appearanceMode
+        buttonTheme = try c.decodeIfPresent(ButtonTheme.self, forKey: .buttonTheme) ?? buttonTheme
+        backgroundImageId = try c.decodeIfPresent(String.self, forKey: .backgroundImageId)
+        backgroundOpacity = try c.decodeIfPresent(Double.self, forKey: .backgroundOpacity) ?? backgroundOpacity
+        // 새 필드는 모르는 값(다른 버전이 쓴 케이스 등)이어도 테마 전체를 잃지 않게 `try?` 로 받는다.
+        backgroundImageContentMode = (try? c.decodeIfPresent(BackgroundImageContentMode.self,
+                                                             forKey: .backgroundImageContentMode)) ?? backgroundImageContentMode
+        backgroundImageScale = (try? c.decodeIfPresent(Double.self, forKey: .backgroundImageScale)) ?? backgroundImageScale
+        hapticEnabled = try c.decodeIfPresent(Bool.self, forKey: .hapticEnabled) ?? hapticEnabled
+        hapticStrength = try c.decodeIfPresent(HapticStrength.self, forKey: .hapticStrength) ?? hapticStrength
+        clickSoundEnabled = try c.decodeIfPresent(Bool.self, forKey: .clickSoundEnabled) ?? clickSoundEnabled
+        customKeyBackground = try c.decodeIfPresent(CodableColor.self, forKey: .customKeyBackground) ?? customKeyBackground
+        customKeyText = try c.decodeIfPresent(CodableColor.self, forKey: .customKeyText) ?? customKeyText
+        customFunctionKeyBackground = try c.decodeIfPresent(CodableColor.self, forKey: .customFunctionKeyBackground) ?? customFunctionKeyBackground
+        keyBackgroundOpacity = try c.decodeIfPresent(Double.self, forKey: .keyBackgroundOpacity) ?? keyBackgroundOpacity
+        functionKeyBackgroundOpacity = try c.decodeIfPresent(Double.self, forKey: .functionKeyBackgroundOpacity) ?? functionKeyBackgroundOpacity
+        hapticOnTap = try c.decodeIfPresent(Bool.self, forKey: .hapticOnTap) ?? hapticOnTap
+        hapticOnLongPress = try c.decodeIfPresent(Bool.self, forKey: .hapticOnLongPress) ?? hapticOnLongPress
+        hapticOnLayerSwitch = try c.decodeIfPresent(Bool.self, forKey: .hapticOnLayerSwitch) ?? hapticOnLayerSwitch
+        hapticOnAbbreviationConfirm = try c.decodeIfPresent(Bool.self, forKey: .hapticOnAbbreviationConfirm) ?? hapticOnAbbreviationConfirm
+    }
 }
