@@ -85,7 +85,7 @@ final class KeyboardViewModelShiftTests: XCTestCase {
         // The exact coordinates don't matter for this test as long as the
         // gesture lifecycle is exercised correctly.
         vm.gestureStarted(row: 3, column: 0, at: .zero)
-        vm.lockShift()
+        vm.lockShift(row: 3, column: 0)   // 프로덕션 경로 (KeyboardView → 롱프레스 타이머, 이슈 #40)
         XCTAssertEqual(vm.shiftState, .locked, "long-press toggles caps lock on")
 
         vm.gestureEnded(row: 3, column: 0)
@@ -101,7 +101,7 @@ final class KeyboardViewModelShiftTests: XCTestCase {
         vm.shiftState = .locked
 
         vm.gestureStarted(row: 3, column: 0, at: .zero)
-        vm.lockShift()
+        vm.lockShift(row: 3, column: 0)   // 프로덕션 경로 (KeyboardView → 롱프레스 타이머, 이슈 #40)
         XCTAssertEqual(vm.shiftState, .off, "second long-press releases caps lock")
         vm.gestureEnded(row: 3, column: 0)
         XCTAssertEqual(vm.shiftState, .off, "released state survives gesture end")
@@ -286,18 +286,25 @@ final class KeyboardViewModelShiftTests: XCTestCase {
     /// 약어 버퍼에 문자를 흘려야 다음 탭이 연달아 대문자가 되지 않는다.
     func test_longPressUppercase_consumesPendingShift() {
         vm.shiftState = .on
-        vm.inputLongPressNumber("Q")
-        vm.confirmPopupSelection()
+        longPressAndReleaseQ()
         XCTAssertEqual(mockDelegate.insertedTexts.last, "Q")
         XCTAssertEqual(vm.shiftState, .off, "shift must not stay armed after a long-press capital")
     }
 
     func test_longPressUppercase_capsLockSurvives() {
         vm.shiftState = .locked
-        vm.inputLongPressNumber("Q")
-        vm.confirmPopupSelection()
+        longPressAndReleaseQ()
         XCTAssertEqual(mockDelegate.insertedTexts.last, "Q")
         XCTAssertEqual(vm.shiftState, .locked)
+    }
+
+    /// 영문 q (1,0) 를 길게 눌러 대문자 팝업을 띄우고 그대로 뗀다. 롱키 콜백은 지금 눌린 키의
+    /// 것만 받으므로(이슈 #40) 먼저 그 키를 누른다.
+    private func longPressAndReleaseQ() {
+        XCTAssertEqual(KeyboardMetrics.keyContent(at: 1, column: 0, mode: .english), .symbol("q"))
+        vm.gestureStarted(row: 1, column: 0, at: .zero)
+        XCTAssertTrue(vm.inputLongPressNumber("Q", row: 1, column: 0))
+        vm.confirmPopupSelection(row: 1, column: 0)
     }
 }
 

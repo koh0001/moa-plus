@@ -14,7 +14,10 @@ struct KeyView: View {
     var column: Int = 3  // Column index (0 and 6 = side keys)
     var shiftState: ShiftState = .off
     var mode: KeyboardMode = .korean
-    let onLongPress: ((String) -> Void)?
+    /// 롱키 타이머가 울렸을 때. 뷰모델이 팝업을 열었으면 `true` — 그때만 팝업 모드(드래그 =
+    /// 후보 고르기, 뗌 = `onPopupRelease`)로 간다. 롤오버로 먼저 확정됐거나 레이어가 바뀐 키는
+    /// `false` 를 받고 일반 제스처로 남아, 뗌이 `onGestureEnd` 로 가서 롤오버 기록을 지운다 (이슈 #40).
+    let onLongPress: ((String) -> Bool)?
     let onBackspacePressStart: (() -> Void)?
     let onBackspacePressEnd: (() -> Void)?
     let onGestureStart: (CGPoint) -> Void
@@ -407,11 +410,12 @@ struct KeyView: View {
                 onShiftLongPress?()
                 return
             }
-            TouchLatencyProbe.event("롱프레스 팝업")
-            EarlyTouchDiagnostics.longPressPopupShown(previewY: point.y)
-            showNumberPopup = true
-            if let number = longPressNumber {
-                onLongPress?(number)
+            // 뷰모델이 받은 경우에만 팝업 모드 — 먼저 플래그를 세우면 거절된 키의 뗌이
+            // `onPopupRelease` 로 빠져 `gestureEnded` 를 건너뛴다. 지연 기록도 실제로 뜬 팝업만.
+            if let number = longPressNumber, onLongPress?(number) == true {
+                TouchLatencyProbe.event("롱프레스 팝업")
+                EarlyTouchDiagnostics.longPressPopupShown(previewY: point.y)
+                showNumberPopup = true
             }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -439,7 +443,7 @@ typealias ConsonantKeyView = KeyView
             isPressed: false,
             previewVowel: nil,
             longPressNumber: "4",
-            onLongPress: { _ in },
+            onLongPress: { _ in true },
             onBackspacePressStart: nil,
             onBackspacePressEnd: nil,
             onGestureStart: { _ in },
@@ -453,7 +457,7 @@ typealias ConsonantKeyView = KeyView
             isPressed: true,
             previewVowel: .ㅏ,
             longPressNumber: "7",
-            onLongPress: { _ in },
+            onLongPress: { _ in true },
             onBackspacePressStart: nil,
             onBackspacePressEnd: nil,
             onGestureStart: { _ in },

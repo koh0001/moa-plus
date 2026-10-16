@@ -88,19 +88,25 @@ final class KeyboardViewModelLongPressTests: XCTestCase {
         ).trigger
     }
 
+    /// 마지막으로 길게 누른 키 — `release()` 가 같은 키의 뗌으로 보낸다.
+    private var pressedKey: (row: Int, column: Int)?
+
     /// 길게 눌러 팝업을 띄운다 (손은 아직 안 뗐다).
     private func longPress(row: Int, column: Int, file: StaticString = #filePath, line: UInt = #line) {
         viewModel.gestureStarted(row: row, column: column, at: .zero)
+        pressedKey = (row, column)
         guard let trigger = gridTrigger(row: row, column: column) else {
             return XCTFail("(\(row),\(column)) 에 롱키 트리거가 없다", file: file, line: line)
         }
-        viewModel.inputLongPressNumber(trigger)
+        XCTAssertTrue(viewModel.inputLongPressNumber(trigger, row: row, column: column),
+                      "지금 눌린 키의 롱키를 거절했다", file: file, line: line)
     }
 
     /// 팝업이 뜬 상태에서 손을 뗀다. 실제 키는 팝업이 떠 있으면 `onPopupRelease` 만 부르고
     /// 끝나므로(`gestureEnded` 없음) 여기서도 그렇게 한다. 롱키는 조합 중인 글자를 만들지 않는다.
     private func release(file: StaticString = #filePath, line: UInt = #line) {
-        viewModel.confirmPopupSelection()
+        guard let key = pressedKey else { return XCTFail("누른 키가 없다", file: file, line: line) }
+        viewModel.confirmPopupSelection(row: key.row, column: key.column)
         XCTAssertTrue(delegate.composingUpdates.isEmpty, "롱키 확정이 조합 글자를 건드렸다", file: file, line: line)
     }
 
@@ -204,7 +210,7 @@ final class KeyboardViewModelLongPressTests: XCTestCase {
         longPress(row: 1, column: 5)
         XCTAssertEqual(viewModel.longPressPopupCandidates, ["-", "0", "_", "+", "="])
         XCTAssertEqual(viewModel.longPressPopupSelectedIndex, 0)
-        viewModel.updatePopupSelection(translationX: -45)   // 오른쪽 끝은 왼쪽 드래그 = 다음 후보
+        viewModel.updatePopupSelection(row: 1, column: 5, translationX: -45)   // 오른쪽 끝은 왼쪽 드래그 = 다음 후보
         XCTAssertEqual(viewModel.longPressPopupSelectedIndex, 1)
         release()
         XCTAssertEqual(delegate.insertedTexts, ["0"])
@@ -258,8 +264,8 @@ final class KeyboardViewModelLongPressTests: XCTestCase {
         // the explicit longPressPopupText. Consonant keys (e.g. ㅂ) instead
         // surface popup candidates whose first entry is not "1".
         viewModel.gestureStarted(row: 0, column: 0, at: .zero)
-        viewModel.inputLongPressNumber("1")
-        viewModel.confirmPopupSelection()
+        viewModel.inputLongPressNumber("1", row: 0, column: 0)
+        viewModel.confirmPopupSelection(row: 0, column: 0)
         viewModel.gestureEnded(row: 0, column: 0)
 
         XCTAssertEqual(delegate.insertedTexts, ["1"])
@@ -278,8 +284,8 @@ final class KeyboardViewModelLongPressTests: XCTestCase {
         // First gesture uses the "~" symbol key (no popup candidates) so the
         // popup falls back to the explicit "1" longPressPopupText.
         viewModel.gestureStarted(row: 0, column: 0, at: .zero)
-        viewModel.inputLongPressNumber("1")
-        viewModel.confirmPopupSelection()
+        viewModel.inputLongPressNumber("1", row: 0, column: 0)
+        viewModel.confirmPopupSelection(row: 0, column: 0)
         viewModel.gestureEnded(row: 0, column: 0)
 
         viewModel.gestureStarted(row: 1, column: 2, at: .zero) // ㅈ key

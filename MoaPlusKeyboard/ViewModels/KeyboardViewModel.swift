@@ -102,6 +102,10 @@ class KeyboardViewModel: ObservableObject {
     /// 포인트마다 레이아웃 배열 전체가 재생성된다. 수명은 제스처 1회이며
     /// `resetGestureState`/`dismissPopup` 이 비운다.
     private var activeKeyContent: KeyContent?
+    /// 현재 제스처가 시작될 때의 모드. 롱키 후보는 이 값과 `activeKeyContent` 로 만든다 —
+    /// 타이머가 울리는 시점의 모드로 다시 찾으면 누른 키가 아닌 다른 레이어의 키로 해석된다
+    /// (이슈 #40). 수명은 `activeKeyContent` 와 같다.
+    private var activeKeyMode: KeyboardMode?
 
     private var previewGesturePoints: [CGPoint] = []
     /// Last column id fed to the gesture analyzer during a preview-mode
@@ -309,6 +313,7 @@ class KeyboardViewModel: ObservableObject {
 
     func toggleSymbolMode() {
         if previewMode { return }
+        supersedeHeldGridKey()
         stopBackspaceRepeat()
         commitCurrent()
         symbolPage = 0   // 심볼 진입/이탈 시 항상 page 0 에서 시작
@@ -319,11 +324,13 @@ class KeyboardViewModel: ObservableObject {
     /// currently in a symbol mode (the toggle key only renders there).
     func toggleSymbolPage() {
         guard keyboardMode.isSymbol else { return }
+        supersedeHeldGridKey()
         symbolPage = (symbolPage + 1) % KeyboardMetrics.symbolPageCount
     }
 
     func toggleLetterMode() {
         if previewMode { return }
+        supersedeHeldGridKey()
         stopBackspaceRepeat()
         commitCurrent()
         symbolPage = 0   // 심볼→문자 전환 시 페이지 상태 초기화
@@ -371,11 +378,20 @@ class KeyboardViewModel: ObservableObject {
     /// shift toggles the lock without needing a precise double-tap.
     /// Marks the gesture as long-press-handled so the tap fired when the
     /// finger lifts doesn't toggle the state right back off.
-    func lockShift() {
+    /// 바깥에서는 키 정체를 확인하는 `lockShift(row:column:)` 만 부른다 (이슈 #40).
+    private func lockShift() {
         guard keyboardMode == .english else { return }
         shiftState = (shiftState == .locked) ? .off : .locked
         lastShiftTapTimestamp = nil
         didHandleShiftLongPressInCurrentGesture = true
+    }
+
+    /// 그리드 시프트 키의 롱프레스 타이머 (이슈 #40). 롤오버로 먼저 확정한 키나 지금 눌린 키가
+    /// 아닌 키의 늦은 타이머는 버린다 — 받으면 `didHandleShiftLongPressInCurrentGesture` 가 새로
+    /// 눌린 키의 뗌을 삼킨다.
+    func lockShift(row: Int, column: Int) {
+        guard isActiveGridKey(row: row, column: column) else { return }
+        lockShift()
     }
 
     /// Re-evaluate English sentence-start auto-capitalization.
@@ -559,6 +575,11 @@ class KeyboardViewModel: ObservableObject {
     // 나머지 모음은 천지인 합성으로 쌓는다.
 
     func slotBVowelGestureStarted(at point: CGPoint) {
+        // 눌려 있던 그리드 키는 롤오버와 똑같이 먼저 정리한다 (이슈 #40 리뷰): 자기 획으로 확정하고
+        // (팝업이 떠 있었으면 확정 없이 닫고) 그 손가락의 이후 신호를 버린다. 아래에서 분석기를
+        // 초기화하고 `activeKey` 를 (-1,-1) 로 바꾸기 **전에** 불러야 한다 — 안 하면 그 키의 팝업
+        // 뗌이 `isActiveGridKey` 에 거절돼 팝업이 다음 키 위에 남고, 흔들림이 모음 키 분석기로 들어간다.
+        supersedeHeldGridKey()
         typoMarkPending = false
         keyPressFeedback()
         gestureAnalyzer.settings = KeyboardSettings.shared.gestureSettings
@@ -614,12 +635,19 @@ class KeyboardViewModel: ObservableObject {
             firstStrokeCardinal: gestureAnalyzer.currentFirstStrokeCardinal())
     }
 
+    /// 슬롯 B 를 뗄 때 `activeKey` 는 **아직 슬롯 B 의 것일 때만** 지운다 (이슈 #40 리뷰). 모음 키를
+    /// 누른 채 그리드 키를 누르면 그 키가 주인이 되는데, 여기서 지우면 그 키의 롱키 타이머·팝업
+    /// 드래그·팝업 뗌이 `isActiveGridKey` 에 거절돼 팝업이 닫히지 않고 다음 키 위에 남는다.
+    private func releaseSlotBActiveKey() {
+        if let active = activeKey, active.row < 0 { activeKey = nil }
+    }
+
     func slotBVowelGestureEnded() {
         if vowelKeyBehavior == .cheonjiin {
             let dx = slotBVowelLastPoint.x - slotBVowelStartPoint.x
             let primitive = cheonjiinPrimitive(dx: dx)
             gestureAnalyzer.reset()
-            activeKey = nil
+            releaseSlotBActiveKey()
             gestureStartPoint = nil
             gestureDirections = []
             previewVowel = nil
@@ -633,7 +661,7 @@ class KeyboardViewModel: ObservableObject {
         let (directions, firstStrokeCardinal) = gestureAnalyzer.finalizeGestureDetailed()
         gestureAnalyzer.reset()
         // Clear gestureState so the overlay disappears.
-        activeKey = nil
+        releaseSlotBActiveKey()
         gestureStartPoint = nil
         gestureDirections = []
         previewVowel = nil
@@ -726,54 +754,48 @@ class KeyboardViewModel: ObservableObject {
         return true
     }
 
-    func inputLongPressNumber(_ number: String) {
+    /// 롱키 타이머가 울렸다 — 팝업을 연다. 받았으면 `true` (키 뷰는 그때만 팝업 모드로 간다).
+    ///
+    /// **키 위치를 함께 받는다** (이슈 #40). 타이머는 키 뷰마다 따로 돌아서, 누른 뒤 다른 키가
+    /// 눌리거나(두 엄지 롤오버 — 앞 키는 `supersedeActiveGesture` 로 이미 확정됐다) 한/영·123 으로
+    /// 레이어가 바뀐 뒤에도 울린다. 예전에는 그 시점의 `activeKey`·`keyboardMode` 로 후보를 찾아
+    /// 새 키의 후보로 팝업을 열고(ㅈ 을 누른 채 ㄱ → ㅈ 을 떼면 "9", ㄱ 은 사라짐) 다른 레이어의
+    /// 같은 칸으로 해석했다(ㅈ 을 누른 채 123 → "$"). 지금 눌린 키가 아니면 버린다.
+    ///
+    /// 후보는 누를 때 잡아 둔 키 내용·모드(`activeKeyContent`/`activeKeyMode`)로 그리드와 **같은
+    /// 함수**(`KeyGridView.longPressBinding`)에서 만든다. 액션이 없는 자리(영문 letter 대문자,
+    /// 대체 문자 없는 심볼)는 넘겨받은 `number` 하나가 팝업 텍스트이자 결과다.
+    @discardableResult
+    func inputLongPressNumber(_ number: String, row: Int, column: Int) -> Bool {
+        guard isActiveGridKey(row: row, column: column) else { return false }
         didHandleLongPressNumberInCurrentGesture = true
 
-        // Load popup candidates from secondary action
-        if let activeRow = activeKey?.row, let activeCol = activeKey?.column {
-            let content = KeyboardMetrics.keyContent(at: activeRow, column: activeCol, mode: keyboardMode, layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage)
+        let settings = KeyboardSettings.shared
+        let mode = activeKeyMode ?? keyboardMode
+        let action = KeyGridView.longPressBinding(
+            content: activeKeyContent, row: row, column: column, mode: mode,
+            layout: settings.layoutCustomization,
+            englishLongPressUppercase: settings.englishLongPressUppercaseEnabled,
+            storedAction: { settings.secondaryAction(forKey: $0) }
+        ).action
 
-            let keyId: String? = {
-                switch content {
-                case .consonant(let choseong):
-                    return String(choseong.compatibilityCharacter)
-                case .symbol(let s) where keyboardMode == .english && s.first?.isNumber == true:
-                    return s
-                case .symbol(let s) where keyboardMode.isSymbol:
-                    return s
-                default:
-                    return nil
-                }
-            }()
-
-            // Symbol-mode keys aren't in the user-editable secondaryKeyActions
-            // store — fall back to the static iOS-standard alt table so the
-            // popup pipeline still gets candidates.
-            let action: SecondaryKeyAction? = {
-                guard let keyId else { return nil }
-                if let stored = KeyboardSettings.shared.secondaryAction(forKey: keyId) {
-                    return stored
-                }
-                if keyboardMode.isSymbol {
-                    return KeyboardMetrics.symbolModeSecondaryAction(for: keyId)
-                }
-                return nil
-            }()
-
-            if let action {
-                // 그대로 떼면 첫 후보가 들어가므로 후보는 `effectiveCandidates` 하나에서만 만든다
-                // (이슈 #37 — 예전에는 `popupOutputs[0]` 이 들어가 롱프레스 출력이 무시됐다).
-                // 괄호 자동 닫기의 닫는 괄호 필터는 문자 모드에서만, 그리고 맨 앞 글자(롱프레스
-                // 출력)는 빼지 않는다. 팝업 오버레이는 이 배열을 그대로 그린다.
-                let shouldFilter = SecondaryKeyAction.filtersClosingBrackets(
-                    autoBracketEnabled: KeyboardSettings.shared.autoBracketEnabled, mode: keyboardMode)
-                longPressPopupCandidates = action.effectiveCandidates(filteringClosingBrackets: shouldFilter)
-                longPressPopupSelectedIndex = 0
-            }
+        if let action {
+            // 그대로 떼면 첫 후보가 들어가므로 후보는 `effectiveCandidates` 하나에서만 만든다
+            // (이슈 #37 — 예전에는 `popupOutputs[0]` 이 들어가 롱프레스 출력이 무시됐다).
+            // 괄호 자동 닫기의 닫는 괄호 필터는 문자 모드에서만, 그리고 맨 앞 글자(롱프레스
+            // 출력)는 빼지 않는다. 팝업 오버레이는 이 배열을 그대로 그린다.
+            let shouldFilter = SecondaryKeyAction.filtersClosingBrackets(
+                autoBracketEnabled: settings.autoBracketEnabled, mode: mode)
+            longPressPopupCandidates = action.effectiveCandidates(filteringClosingBrackets: shouldFilter)
+            longPressPopupSelectedIndex = 0
         }
 
         longPressPopupText = number
+        // 팝업이 실제로 열린 순간 한 번 (이슈 #41 — 설정의 "롱프레스 팝업" 햅틱은 예전에 호출부가
+        // 없었다). 거른 타이머(위 guard)는 팝업을 열지 않으므로 울리지 않는다.
+        if !previewMode { delegate?.triggerLongPressFeedback() }
         // Don't input yet - wait for drag selection or release
+        return true
     }
 
     /// Whether the active key is on the right edge (column 5 or 6) — drag direction is reversed
@@ -782,8 +804,10 @@ class KeyboardViewModel: ObservableObject {
         return col >= 5
     }
 
-    /// Called when user drags over popup candidates
-    func updatePopupSelection(translationX: CGFloat) {
+    /// 팝업 후보 위를 끄는 중. 팝업을 연 키가 아닌 손가락(롤오버로 먼저 확정한 키 등)의 드래그는
+    /// 새 키의 선택을 움직이면 안 되므로 버린다 (이슈 #40).
+    func updatePopupSelection(row: Int, column: Int, translationX: CGFloat) {
+        guard isActiveGridKey(row: row, column: column) else { return }
         guard !longPressPopupCandidates.isEmpty else { return }
         let cellWidth: CGFloat = 40
         // Right-edge keys: left drag = next candidate (negate translationX)
@@ -796,8 +820,18 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
-    /// Called when user releases after long-press drag
-    func confirmPopupSelection() {
+    /// 팝업을 띄운 키에서 손을 뗐다 — 고른 후보를 넣는다.
+    ///
+    /// 팝업이 떠 있던 앞 키가 롤오버·레이어 전환으로 먼저 정리된 뒤 뒤늦게 떼는 경우가 있다.
+    /// 예전에는 그 뗌이 `dismissPopup()` 으로 **새로 눌린 키**의 `activeKey` 를 지워, 새 키의
+    /// 롱키가 팝업 없이 글자만 넣었다 (이슈 #40). 그런 키의 뗌은 롤오버 기록만 지우고 끝낸다.
+    func confirmPopupSelection(row: Int, column: Int) {
+        if let i = supersededKeys.firstIndex(where: { $0.row == row && $0.column == column }) {
+            supersededKeys.remove(at: i)
+            return
+        }
+        guard isActiveGridKey(row: row, column: column) else { return }
+        let mode = activeKeyMode ?? keyboardMode
         if !longPressPopupCandidates.isEmpty {
             let selected = longPressPopupCandidates[longPressPopupSelectedIndex]
             inputNumber(selected)
@@ -807,7 +841,7 @@ class KeyboardViewModel: ObservableObject {
             // consumes a pending `.on` shift. Without it, long-pressing the
             // first letter of a sentence would leave shift armed and turn the
             // NEXT tap uppercase too ("QUick").
-            if keyboardMode == .english, text.count == 1, text.first?.isLetter == true {
+            if mode == .english, text.count == 1, text.first?.isLetter == true {
                 inputSymbol(text, bypassAutoBracket: true)
             } else {
                 inputNumber(text)
@@ -823,6 +857,7 @@ class KeyboardViewModel: ObservableObject {
         // Reset gesture visual state so hints restore immediately after popup ends
         activeKey = nil
         activeKeyContent = nil
+        activeKeyMode = nil
         previewVowel = nil
         gestureDirections = []
         gestureStartPoint = nil
@@ -998,6 +1033,27 @@ class KeyboardViewModel: ObservableObject {
         supersededKeys.contains { $0.row == row && $0.column == column }
     }
 
+    /// 이 그리드 키가 지금 진행 중인 제스처의 주인인가 — 롱키·팝업 콜백의 문 (이슈 #40).
+    /// 롤오버로 먼저 확정한 키, 상태가 이미 정리된 키(레이어 전환·`resetGestureState`)의 늦은
+    /// 콜백은 여기서 걸러진다. 슬롯 B(`row == -1`)는 그리드 키가 아니므로 항상 거짓.
+    private func isActiveGridKey(row: Int, column: Int) -> Bool {
+        guard let active = activeKey, active.row >= 0 else { return false }
+        return active.row == row && active.column == column && !isSuperseded(row: row, column: column)
+    }
+
+    /// **다른** 그리드 키가 지금 제스처의 주인인가 — 이 키는 롤오버 기록에도 없는 낡은 키다
+    /// (그 사이 `resetGestureState` 로 상태가 정리된 뒤 새 키가 눌린 경우, 이슈 #40 리뷰). 그런 키의
+    /// 이동·뗌은 새 키의 분석기·억제 플래그·`activeKey` 를 건드리면 안 된다 — 뗌이 새 키의 분석기로
+    /// 이 키를 넣고 새 키의 상태를 지워 "ㅇㄴ" 이 되거나, 새 키의 팝업 플래그를 가져가 팝업과 결과를 지운다.
+    ///
+    /// 슬롯 B(`activeKey.row == -1`)는 **제외**한다: 그리드 키 → 모음 키 롤오버에서 그리드 키의 뗌을
+    /// 버리면 안 된다(그 키는 모음 키를 누를 때 롤오버로 확정되지만, 그 경로가 빠져도 글자가 사라지지
+    /// 않게). `cancelGesture` 의 문은 슬롯 B 도 막는다 — 취소는 입력을 만들지 않으므로.
+    private func isStaleGridKey(row: Int, column: Int) -> Bool {
+        guard let active = activeKey, active.row >= 0 else { return false }
+        return !(active.row == row && active.column == column)
+    }
+
     /// 두 엄지 롤오버 (이슈 #31/#32): 앞 키를 떼기 전에 다른 그리드 키가 눌리면, 앞 키를
     /// **그때까지 자기 손가락이 그은 만큼**으로 먼저 확정하고 그 손가락의 이후 신호는 버린다.
     ///
@@ -1006,8 +1062,22 @@ class KeyboardViewModel: ObservableObject {
     /// 긋기가 된다 — 제보 로그 `[ㄴ] raw ←225(178°) ⇒ ㅓ`, "는" → "너ㅡㄴ".
     /// 슬롯 B 모음 키(`activeKey.row == -1`)는 자체 파이프라인이라 건드리지 않는다.
     private func supersedeActiveGesture(byRow row: Int, column: Int) {
-        guard let prev = activeKey, prev.row >= 0,
-              !(prev.row == row && prev.column == column) else { return }
+        guard let prev = activeKey, !(prev.row == row && prev.column == column) else { return }
+        supersedeHeldGridKey()
+    }
+
+    /// 눌려 있는 그리드 키를 **지금 레이어·자기 획으로** 먼저 확정하고(팝업이 떠 있었으면 확정 없이
+    /// 닫는다) 롤오버 기록에 넣어 그 손가락의 이후 신호를 버린다. 부르는 곳은 셋이다.
+    /// - 롤오버(`supersedeActiveGesture(byRow:column:)`) — 같은 키 재누름만 거른 뒤.
+    /// - 레이어 전환(한/영·123·#+=, 이슈 #40): 안 하면 그 키의 롱키 타이머·뗌이 새 레이어의 같은
+    ///   칸으로 해석된다 — ㅈ 을 누른 채 123 을 누르면 "$"(심볼 (1,2) = 4 의 대체 문자), 롱키 없이
+    ///   떼도 "4". 떠 있던 팝업은 새 모드로 후보를 다시 걸러 빈 칸·엉뚱한 자리에 남았다. 모드·페이지를
+    ///   바꾸기 **전에** 불러야 한다.
+    /// - 슬롯 B 모음 키 누름(이슈 #40 리뷰): 슬롯 B 는 `activeKey` 를 (-1,-1) 로 바꾸므로, 안 하면 그
+    ///   키의 팝업 뗌이 거절돼 팝업이 다음 키 위에 남는다. 분석기를 초기화하기 **전에** 불러야 한다.
+    /// 슬롯 B 자신(`activeKey.row == -1`)은 그리드 키가 아니므로 건드리지 않는다.
+    private func supersedeHeldGridKey() {
+        guard let prev = activeKey, prev.row >= 0 else { return }
         if popupState.text != nil {
             // 롱프레스 팝업을 띄운 채 다른 키를 누른 경우 — 팝업 후보를 고른 게 아니므로 확정하지 않는다.
             resetGestureState()
@@ -1045,6 +1115,7 @@ class KeyboardViewModel: ObservableObject {
             at: row, column: column, mode: keyboardMode,
             layout: KeyboardSettings.shared.layoutCustomization, symbolPage: symbolPage)
         activeKeyContent = content
+        activeKeyMode = keyboardMode
         // Set columnId before reset() so per-column correction applies from the first touch point.
         // reset() does not clear columnId, but we set it here to prevent leaking the previous key's value.
         if keyboardMode == .korean, let content {
@@ -1084,19 +1155,23 @@ class KeyboardViewModel: ObservableObject {
         }
     }
 
-    /// 키별 이동. 롤오버로 먼저 확정한 키의 손가락 이동은 버린다.
+    /// 키별 이동. 롤오버로 먼저 확정한 키와 다른 키가 눌린 뒤의 낡은 키(`isStaleGridKey`)의
+    /// 손가락 이동은 버린다 — 새 키의 분석기에 들어가면 새 키가 긴 긋기로 읽힌다.
     func gestureMoved(row: Int, column: Int, to point: CGPoint) {
-        guard !isSuperseded(row: row, column: column) else { return }
+        guard !isSuperseded(row: row, column: column),
+              !isStaleGridKey(row: row, column: column) else { return }
         gestureMoved(to: point)
     }
 
     /// 입력 확정 없이 진행 중인 긋기를 걷는다 (EarlyTouch 미처리 뗌). 롤오버로 먼저 확정한
-    /// 키의 늦은 취소는 새 키의 긋기를 지우면 안 되므로 버린다.
+    /// 키의 늦은 취소는 새 키의 긋기를 지우면 안 되므로 버린다. 다른 키가 지금 눌려 있으면
+    /// (그 사이 상태가 정리돼 이 키가 롤오버 기록에도 없는 경우) 마찬가지로 건드리지 않는다.
     func cancelGesture(row: Int, column: Int) {
         if let i = supersededKeys.firstIndex(where: { $0.row == row && $0.column == column }) {
             supersededKeys.remove(at: i)
             return
         }
+        if let active = activeKey, !(active.row == row && active.column == column) { return }
         resetGestureState()
     }
 
@@ -1147,6 +1222,9 @@ class KeyboardViewModel: ObservableObject {
             supersededKeys.remove(at: i)
             return
         }
+        // 다른 그리드 키가 눌린 뒤의 낡은 뗌 — 아래 억제 플래그는 그 새 키의 것이므로 **그보다 먼저**
+        // 걸러야 한다. 롱키 타이머를 거절당한 키 뷰는 일반 제스처로 남아 뗌이 여기로 온다.
+        if isStaleGridKey(row: row, column: column) { return }
         if didHandleLongPressNumberInCurrentGesture {
             didHandleLongPressNumberInCurrentGesture = false
             resetGestureState()
@@ -1330,6 +1408,7 @@ class KeyboardViewModel: ObservableObject {
         dismissPopup()
         activeKey = nil
         activeKeyContent = nil
+        activeKeyMode = nil
         gestureStartPoint = nil
         gestureDirections = []
         previewVowel = nil
@@ -1589,6 +1668,15 @@ class KeyboardViewModel: ObservableObject {
         triggerHapticFeedback()
     }
 
+    /// 레이어 전환 키(한/영 · 123/한글 · 심볼 페이지 #+=/123)를 **누르는 순간**의 피드백 (이슈 #41).
+    /// 이 키들은 탭 햅틱 **대신** 레이어 전환 햅틱을 낸다(설정 "레이어 전환" — 꺼져 있으면 진동
+    /// 없음). 기능행 키가 환경 값 `layerSwitchPressFeedback` 으로 부른다 — `keyPressFeedback()` 과
+    /// 같은 자리(누름 시점, 키 하나에 한 번)이고, 입력 메서드(`toggleLetterMode` 등)는 울리지 않는다.
+    func layerSwitchPressFeedback() {
+        if previewMode { return }
+        delegate?.triggerLayerSwitchFeedback()
+    }
+
     private func startBackspaceRepeat() {
         backspaceDeleteCount = 0
         backspaceInitialDelayTimer?.invalidate()
@@ -1664,7 +1752,14 @@ protocol KeyboardViewModelDelegate: AnyObject {
     func deleteBackward()
     func updateComposingText(from previous: String, to current: String)
     func switchToNextKeyboard()
+    /// 키를 누른 순간의 탭 피드백(탭 햅틱 + 클릭 사운드).
     func triggerHapticFeedback()
+    /// 레이어 전환 키를 누른 순간 — 탭 햅틱 대신 레이어 전환 햅틱 + 클릭 사운드 (이슈 #41).
+    /// 프로토콜 요구사항으로 둬야 컨트롤러 구현이 동적으로 불린다(확장 기본값만 있으면 정적 디스패치로
+    /// 기본값이 불린다). 기본값은 아무것도 하지 않는다 — 테스트 스텁·호스트 앱 미리보기용.
+    func triggerLayerSwitchFeedback()
+    /// 롱키 팝업이 실제로 열린 순간 (이슈 #41). 기본값은 아무것도 하지 않는다.
+    func triggerLongPressFeedback()
     func moveCursor(by offset: Int)
     /// Text immediately before the caret, used for context-aware input
     /// automation (double-space → period). Returns nil when the host
@@ -1692,6 +1787,8 @@ protocol KeyboardViewModelDelegate: AnyObject {
 }
 
 extension KeyboardViewModelDelegate {
+    func triggerLayerSwitchFeedback() {}
+    func triggerLongPressFeedback() {}
     func textBeforeCursor() -> String? { nil }
     func textAfterCursor() -> String? { nil }
     func hostAllowsAutoCapitalization() -> Bool { true }

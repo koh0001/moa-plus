@@ -72,15 +72,74 @@ final class KeyboardViewModelHapticTimingTests: XCTestCase {
 
     /// 스페이스·엔터 같은 기능행 키는 뷰가 누름 시점에 `keyPressFeedback()` 을 부르고,
     /// 입력 메서드 자체는 더 이상 울리지 않는다. 뷰 없이 입력 메서드만 호출해 확인한다.
+    /// 레이어 전환 메서드도 마찬가지 — 레이어 전환 햅틱은 누름 시점의 `layerSwitchPressFeedback()` 만 낸다.
     func testFunctionKeys_inputMethodsDoNotBuzz() {
         viewModel.inputSpace()
         viewModel.inputReturn()
         viewModel.inputSymbol(".")
         viewModel.toggleLetterMode()
         viewModel.toggleSymbolMode()
+        viewModel.toggleSymbolPage()
 
         XCTAssertEqual(delegate.hapticCount, 0,
                        "입력 확정 경로에는 진동이 남아 있으면 안 된다 (누름 시점에서만 울린다)")
+        XCTAssertEqual(delegate.layerSwitchCount, 0, "레이어 전환 메서드가 직접 울리면 키 하나에 두 번이 된다")
+        XCTAssertEqual(delegate.longPressCount, 0)
+    }
+
+    // MARK: - 레이어 전환 키 (이슈 #41)
+
+    /// 한/영 · 123/한글 · #+=/123 은 누르는 순간 레이어 전환 햅틱 **하나**만 — 탭 햅틱 대신.
+    func testLayerSwitchKeyPress_buzzesLayerSwitchOnce_insteadOfTap() {
+        viewModel.layerSwitchPressFeedback()
+        XCTAssertEqual(delegate.layerSwitchCount, 1)
+        XCTAssertEqual(delegate.hapticCount, 0, "레이어 전환 키가 탭 햅틱까지 울렸다")
+    }
+
+    /// 실제 키 한 번 = 누름(피드백) + 뗌(토글). 토글이 더 울리지 않아 키 하나에 한 번.
+    func testLayerSwitchKeyPressAndRelease_oneFeedbackPerPress() {
+        viewModel.layerSwitchPressFeedback()
+        viewModel.toggleLetterMode()          // 한/영
+        viewModel.layerSwitchPressFeedback()
+        viewModel.toggleSymbolMode()          // 123
+        viewModel.layerSwitchPressFeedback()
+        viewModel.toggleSymbolPage()          // #+=
+        XCTAssertEqual(delegate.layerSwitchCount, 3)
+        XCTAssertEqual(delegate.hapticCount, 0)
+    }
+
+    func testLayerSwitchKeyPress_previewMode_doesNotBuzz() {
+        viewModel.previewMode = true
+        viewModel.layerSwitchPressFeedback()
+        XCTAssertEqual(delegate.layerSwitchCount, 0)
+    }
+
+    // MARK: - 롱키 팝업 (이슈 #41)
+
+    /// 팝업이 실제로 열린 순간 한 번 — 누름(탭)과 별개, 뗄 때는 다시 울리지 않는다.
+    func testLongPressPopup_buzzesOnceWhenItOpens() {
+        viewModel.gestureStarted(row: 1, column: 2, at: .zero)   // ㅈ
+        XCTAssertEqual(delegate.hapticCount, 1)
+        XCTAssertTrue(viewModel.inputLongPressNumber("7", row: 1, column: 2))
+        XCTAssertEqual(delegate.longPressCount, 1)
+        viewModel.confirmPopupSelection(row: 1, column: 2)
+        XCTAssertEqual(delegate.longPressCount, 1, "팝업 확정에서 다시 울렸다")
+        XCTAssertEqual(delegate.hapticCount, 1)
+    }
+
+    /// 거른 타이머(지금 눌린 키가 아님)는 팝업을 열지 않으므로 울리지 않는다.
+    func testLongPressPopup_rejectedTimer_doesNotBuzz() {
+        viewModel.gestureStarted(row: 1, column: 2, at: .zero)   // ㅈ
+        viewModel.gestureStarted(row: 1, column: 4, at: .zero)   // ㄱ — 롤오버
+        XCTAssertFalse(viewModel.inputLongPressNumber("7", row: 1, column: 2))
+        XCTAssertEqual(delegate.longPressCount, 0)
+    }
+
+    func testLongPressPopup_previewMode_doesNotBuzz() {
+        viewModel.previewMode = true
+        viewModel.gestureStarted(row: 1, column: 2, at: .zero)
+        viewModel.inputLongPressNumber("7", row: 1, column: 2)
+        XCTAssertEqual(delegate.longPressCount, 0)
     }
 }
 
@@ -88,6 +147,8 @@ final class KeyboardViewModelHapticTimingTests: XCTestCase {
 private final class HapticCountingDelegate: KeyboardViewModelDelegate {
     private(set) var text: String = ""
     private(set) var hapticCount = 0
+    private(set) var layerSwitchCount = 0
+    private(set) var longPressCount = 0
 
     func insertText(_ string: String) { text.append(string) }
     func deleteBackward() { if !text.isEmpty { text.removeLast() } }
@@ -99,6 +160,8 @@ private final class HapticCountingDelegate: KeyboardViewModelDelegate {
 
     func switchToNextKeyboard() {}
     func triggerHapticFeedback() { hapticCount += 1 }
+    func triggerLayerSwitchFeedback() { layerSwitchCount += 1 }
+    func triggerLongPressFeedback() { longPressCount += 1 }
     func moveCursor(by offset: Int) {}
     func textBeforeCursor() -> String? { text }
 }
