@@ -48,8 +48,11 @@ struct KeyView: View {
             // Secondary hint label
             if let action = secondaryAction, showSecondaryHints {
                 if KeyboardSettings.shared.showDetailedHints {
-                    // Detailed: show all popup candidates
-                    Text(action.popupOutputs.joined(separator: " "))
+                    // 전체 후보: 롱키 팝업과 같은 출처·같은 필터 — 롱프레스 출력이 맨 앞 (이슈 #37)
+                    Text(action.effectiveCandidates(
+                        filteringClosingBrackets: SecondaryKeyAction.filtersClosingBrackets(
+                            autoBracketEnabled: KeyboardSettings.shared.autoBracketEnabled, mode: mode)
+                    ).joined(separator: " "))
                         .font(.system(size: max(hintFontSize - 2, 6)))
                         .foregroundColor(themedTextColor.opacity(0.55))
                         .lineLimit(1)
@@ -92,6 +95,7 @@ struct KeyView: View {
                     // 건너뛴다(두 번 시작하면 백스페이스 두 번·진동 두 번).
                     if !isHighlighted {
                         beginPress(at: value.startLocation)
+                        EarlyTouchDiagnostics.swiftUIStartedFirst(at: value.startLocation)
                     }
 
                     guard !isBackspaceKey else { return }
@@ -137,7 +141,10 @@ struct KeyView: View {
         // (iOS 27 실측). 누름 시작만 UIKit 층에서 먼저 받는다 — `EarlyTouch.swift`.
         .earlyPress(
             onPress: { point in
-                guard !isHighlighted else { return }
+                guard !isHighlighted else {
+                    EarlyTouchDiagnostics.earlyPressWhileAlreadyPressed()
+                    return
+                }
                 TouchLatencyProbe.event("조기 시작")
                 beginPress(at: point)
             },
@@ -370,7 +377,7 @@ struct KeyView: View {
             onBackspacePressStart?()
         } else {
             onGestureStart(point)
-            startLongPressTimer()
+            startLongPressTimer(at: point)
         }
     }
 
@@ -387,7 +394,7 @@ struct KeyView: View {
         }
     }
 
-    private func startLongPressTimer() {
+    private func startLongPressTimer(at point: CGPoint) {
         let isShiftKey: Bool = {
             if case .functional(.shift) = content { return true }
             return false
@@ -401,6 +408,7 @@ struct KeyView: View {
                 return
             }
             TouchLatencyProbe.event("롱프레스 팝업")
+            EarlyTouchDiagnostics.longPressPopupShown(previewY: point.y)
             showNumberPopup = true
             if let number = longPressNumber {
                 onLongPress?(number)

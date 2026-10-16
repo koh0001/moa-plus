@@ -685,8 +685,6 @@ class KeyboardViewModel: ObservableObject {
         "「": "」", "『": "』", "《": "》", "【": "】", "〔": "〕"
     ]
 
-    private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
-
     func inputSymbol(_ symbol: String, bypassAutoBracket: Bool = false) {
         typoMarkPending = false
         if previewMode { return }
@@ -763,16 +761,13 @@ class KeyboardViewModel: ObservableObject {
             }()
 
             if let action {
-                // Auto-bracket filter applies only to letter-mode contexts
-                // where the user expects the keyboard to auto-pair brackets.
-                // Symbol mode is the explicit "give me this character"
-                // surface — filtering closing brackets there hides the
-                // long-press alts (e.g. ")" → "] } >").
-                let shouldFilter = KeyboardSettings.shared.autoBracketEnabled && !keyboardMode.isSymbol
-                let filtered = shouldFilter
-                    ? action.popupOutputs.filter { !Self.closingBrackets.contains($0) }
-                    : action.popupOutputs
-                longPressPopupCandidates = filtered
+                // 그대로 떼면 첫 후보가 들어가므로 후보는 `effectiveCandidates` 하나에서만 만든다
+                // (이슈 #37 — 예전에는 `popupOutputs[0]` 이 들어가 롱프레스 출력이 무시됐다).
+                // 괄호 자동 닫기의 닫는 괄호 필터는 문자 모드에서만, 그리고 맨 앞 글자(롱프레스
+                // 출력)는 빼지 않는다. 팝업 오버레이는 이 배열을 그대로 그린다.
+                let shouldFilter = SecondaryKeyAction.filtersClosingBrackets(
+                    autoBracketEnabled: KeyboardSettings.shared.autoBracketEnabled, mode: keyboardMode)
+                longPressPopupCandidates = action.effectiveCandidates(filteringClosingBrackets: shouldFilter)
                 longPressPopupSelectedIndex = 0
             }
         }

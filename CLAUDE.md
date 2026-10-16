@@ -158,6 +158,22 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 - iOS 키보드 익스텐션 메모리 한계 ~30MB
 - `KeyboardViewController`는 UIKit, 나머지는 SwiftUI
 - 롱프레스 팝업은 KeyboardView 최상위 ZStack에서 렌더링 (z-order 클리핑 방지)
+- **롱키 출력 (이슈 #37)**: 그대로 떼면 들어가는 글자 = `SecondaryKeyAction.effectivePrimary`
+  (설정의 롱프레스 출력, 공백 제거 — 비면 첫 후보). v2.2.5 까지는 (괄호 자동 닫기 ON 이면 닫는 괄호를
+  거른) 첫 후보가 들어가고 출력은 무시됐다. 팝업 후보는 **`effectiveCandidates(filteringClosingBrackets:)` 하나에서만** 만든다(맨 앞 =
+  출력, 나머지 공백·중복 제거) — 뷰모델·오버레이(`KeyboardView.popupDisplayCandidates`, 다시 거르지
+  않음)·전체 후보 힌트·설정 화면이 모두 이것을 쓴다. 괄호 자동 닫기의 닫는 괄호 필터
+  (`SecondaryKeyAction.closingBrackets`, 문자 모드만)는 **출력을 절대 빼지 않는다**. 그리드 트리거는
+  `KeyGridView.longPressBinding` — 한글은 자음 키 + 고정표(`KeyboardMetrics.longPressNumbers`)가 nil 이
+  아닌 자리만(고정표 = 문/대체값), 트리거 없는 칸은 힌트도 없다. 기존 사용자 일회성 이전:
+  `loadAll()` 의 `migrateLongPressPrimaryIfNeeded()`(플래그 `longPressPrimaryMigrated`) 가 출력이 기본값
+  그대로(또는 공백뿐)인데 예전에 들어가던 글자가 다른 키(= 후보 순서를 바꿔 결과를 고른 사용자)의 출력을
+  그 글자로 옮기고, 출력을 고쳤는데 힌트가 **기본값** 그대로인 키(= 제보자 상태: ㅈ 힌트 7 · 출력 @)의
+  힌트를 새 출력으로 맞춘다 (`SecondaryKeyAction.migratingForPrimaryOutput`). 편집 화면(`applyingEdit`)은
+  지금 저장된 출력과 비교해 힌트를 따라가게 하므로 이 둘째 경우는 이전에서만 고쳐진다. "예전에 들어가던
+  글자" = 비어 있지 않은 첫 후보이되 **저장된** 괄호 자동 닫기가 켜져 있으면 닫는 괄호를 건너뛴 것
+  (ㄴ `> . }` → `.` 유지), 남는 게 없으면 기본 출력 그대로. 이 설정은 프로퍼티가 아니라 저장소에서 읽는다
+  — 이전이 `autoBracketEnabled` 대입보다 먼저 돈다. `resetAll()` 은 이 플래그를 되돌리지 않는다 (`KeyboardViewModelLongPressTests` / `LongPressPrimaryOutputTests`)
 - `HapticManager`는 `KeyboardSettings.shared.themeSettings`를 computed property로 매번 읽음
 - **햅틱은 키를 누르는 순간 울린다** (이슈 #23). 입력 확정(손 뗄 때)이 아니다 — 긋기 키보드는
   press→release 간격이 길어 확정 시점에 울리면 반응이 늦게 느껴진다. 그리드 키는
@@ -219,7 +235,16 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
   **누름 시작만** 먼저 한다(`.earlyPress`). 불변식: 시작은 한 번만(SwiftUI 쪽은 이미 눌린 상태면
   건너뜀 — 어기면 백스페이스·진동 두 번), 뗀 뒤 0.3초에도 SwiftUI 가 안 왔으면 입력 확정 없이
   정리(세대 번호로 연타 보호). **창 게이트의 `delaysTouchesBegan` 해제는 효과 없음**(실측으로 기각).
-  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`)
+  재조사 시 `TouchLatencyProbe.isEnabled = true` 빌드 → 개발자 리포트 `[터치지연]` 줄 (`EarlyTouchTests`).
+  **상시 진단**은 리포트의 `조기 터치` 줄(`EarlyTouchDiagnostics`, 이슈 #35 "아래쪽 롱키 대부분 1초") —
+  조기 경로가 키를 찾으면 시작은 항상 SwiftUI 보다 먼저라, 그리드 `SwiftUI 먼저 (아래쪽 N)` > 0 = 놓친 누름.
+  그 누름을 인식기가 본 최근 터치(같은 y)와 짝지어 가른다: 터치 못 받음(인식기 상태·창 게이트) /
+  키 못 찾음(등록 누락 또는 좌표 어긋남 — `먼 곳` 어긋남 값과 등록 수) / 다른 키(낡은 키·좌표 한 칸 이하
+  어긋남) / 같은 키(찾았는데도 안 먹힘). `도착 최대` 가 크면 터치 자체가 늦게 온 것, `아래쪽 롱키 팝업` 은
+  터치부터의 실측(정상 ≈ 롱프레스 딜레이). 지연이 있었던 실행은 `조기 터치 (마지막 지연 기록)` 에 따로 남는다.
+  2행(ㅁ~ㅎ)은 지연 경계(높이 100% 실측 y≈130/260)를 가로지른다(100%: 108~156pt, 91%: 96~139pt).
+  제보(10/08): 3행도 늦고, 같은 2행에서 가장자리 ㅁ·ㅎ 는 늦고 가운데 ㄴㅇㄹ 은 가끔 빠름 — 시스템 지연
+  구역이 가로선이 아니라 가장자리 쪽이 넓은 모양으로 보인다
 - Timer는 `[weak self]` + `RunLoop.main.add(forMode: .common)` 필수 (UI scroll lockup 방지)
 - Combine sink (GestureTestModel 등)는 `[weak self]` 필수
 - iOS 키보드 익스텐션 marked text 미지원 → `updateComposingText`가 delete+insert로 시뮬레이션. 커서 이동 전 `commitCurrent()` 필수
@@ -542,9 +567,21 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
   (`firstStrokeCardinal`)이 **바로 다음 획과 같은 방향**이면 휘어진 한 획으로 보고, 간선 수 동률에서
   버린 획이 적은 재해석을 고른다 (↗→ = ㅏ, ↖← = ㅓ). 이 조건 없이 "버린 획 적은 쪽" 만 쓰면
   ↙↑→ = ㅢ 특성화가 ㅔ 로 깨진다(실측). 가드 `CurvedFirstStrokeTests`
+- **짧은 이어짐 (v2.2.6 / 같은 제보자 재제보)**: 재해석은 두 번째 조각이 키폭 0.6배 이상일 때만
+  켜진다(`reinterpretMinSecondStrokeRatio`, 손 떼는 꼬리 방지). 휜 획의 나머지가 짧으면(20~26pt)
+  꺼져 `↙30 ←26 →59 = ㅡ`(네→느), `↗37 →26 = ㅣ`(가→기)가 남았다. 두 번째 조각이 재해석 방향과
+  **같을 때만**, 첫 조각부터 꺾임 45° 이내로 이어진 조각들의 합벡터를 그 열 섹터로 다시 분류해
+  재해석 방향이 나오면 켠다(`isShortCurvedContinuation`). 결과 = 같은 궤적을 곧게 그은 판정
+  (ㅣ↔ㅗ, ㅡ↔ㅜ 경계도 같은 규칙). 이어진 조각을 **전부** 합칠 것 — 1·2번만 합치면 흔들려 그은
+  ↗ 가 → 로 넘어간다(`test_e2e_shortContinuation_sumsWholeRun_notFirstTwo`; 제보 로그의
+  `↗21 →28 ↗52` = "키" 는 1·2번 합 22° 도 1열 ↗ 안이라 이 가드가 못 된다). 다른 방향 꼬리(↙ 뒤 ↑→)는 0.6 기준 그대로.
+  곧은 조각으로는 이 분할이 재현되지 않아(첫 조각부터 → 로 잡힘) 테스트는 휘는 경로로 재생한다
+  (`CurvedFirstStrokeTests.test_e2e_report1006_*`)
 - 오타 후보 표시: 긋기 로그 직후 첫 입력이 백스페이스면 `GestureDebugLog.markLastLineDeleted()`
   가 줄 끝에 `✗지움`. 대기 플래그 `KeyboardViewModel.typoMarkPending` 은 다른 입력 메서드마다
-  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`)
+  해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`).
+  ✗ 는 **첫 백스페이스 직전 줄**에 붙는다 — 여러 글자를 지웠으면 실제 틀린 줄은 그 앞이다.
+  판독은 지운 뒤 다시 친 줄과 비교할 것 (10/06 리포트에서 분석기 오타 2건 모두 ✗ 한 줄 앞)
 
 ### 긋기 노이즈 처리 (GestureAnalyzer)
 - `directionMagnitudes`는 획이 이어지는 동안 **실제 길이로 갱신**된다(`strokeOriginPoint` 기준). 등록 시점 변위만 담으면 모든 비율 판정이 임계값을 "직전 획 길이"로 착각한다

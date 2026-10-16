@@ -18,7 +18,6 @@ struct KeyboardView: View {
     /// 크기·투명도·밑바탕과 한손 모드 본체 기준 배치가 실제 `keyboardBackground` 를 거쳐
     /// 그려지는지 본다.
     var backgroundImageOverride: UIImage? = nil
-    private static let closingBrackets: Set<String> = [")", "]", "}", ">", "」", "』", "》", "】", "〕"]
     @State private var cachedBgImage: UIImage?
     @State private var cachedBgImageId: String?
 
@@ -326,23 +325,10 @@ struct KeyboardView: View {
                         let y = candidateBarFootprint
                             + CGFloat(activeRow) * (keyHeight + sp) + sp + keyHeight / 2
                         let popupY = activeRow == 0 ? y + keyHeight * 0.9 : y - keyHeight * 0.9
-                        // 후보가 없는 키(영문 letter 롱프레스 대문자, 대체문자
-                        // 없는 심볼 키)는 팝업 텍스트 자체를 유일한 후보로 그린다.
-                        // 빈 배열로 두면 패딩과 그림자만 남아 키보드 위에 정체를
-                        // 알 수 없는 검은 점이 뜬다.
-                        let rawCandidates = popupState.candidates.isEmpty
-                            ? [popupState.text].compactMap { $0 }
-                            : popupState.candidates
+                        let candidates = Self.popupDisplayCandidates(
+                            candidates: popupState.candidates, text: popupState.text)
                         let selectedIdx = popupState.selectedIndex
                         let isRightEdge = activeCol >= 5
-                        // Auto-bracket hides standalone closing brackets in
-                        // letter modes (where the keyboard auto-pairs). In
-                        // symbol mode the user is explicitly picking the
-                        // character, so the filter must not run.
-                        let shouldFilterClosers = KeyboardSettings.shared.autoBracketEnabled && !viewModel.keyboardMode.isSymbol
-                        let candidates = shouldFilterClosers
-                            ? rawCandidates.filter { !Self.closingBrackets.contains($0) }
-                            : rawCandidates
                         // Right-edge: reverse display so leftward drag matches visual order
                         let displayCandidates = isRightEdge ? Array(candidates.reversed()) : candidates
                         let displaySelectedIdx = isRightEdge ? (candidates.count - 1 - min(selectedIdx, candidates.count - 1)) : min(selectedIdx, candidates.count - 1)
@@ -443,6 +429,18 @@ struct KeyboardView: View {
             x += w + spacing
         }
         return totalWidth / 2 // fallback: center
+    }
+
+    /// 롱키 팝업에 그릴 후보. 뷰모델이 `SecondaryKeyAction.effectiveCandidates` 로 이미 닫는
+    /// 괄호 필터까지 마친 배열을 **그대로** 그린다 — 여기서 한 번 더 거르면 손 뗄 때 들어가는
+    /// 글자(뷰모델 배열의 선택 칸)와 화면이 어긋나고, 후보가 전부 닫는 괄호면 빈 팝업이 뜬다
+    /// (이슈 #37 리뷰).
+    ///
+    /// 후보가 없는 키(영문 letter 롱프레스 대문자, 대체문자 없는 심볼 키)는 팝업 텍스트
+    /// 자체를 유일한 후보로 그린다. 빈 배열로 두면 패딩과 그림자만 남아 키보드 위에 정체를
+    /// 알 수 없는 검은 점이 뜬다.
+    static func popupDisplayCandidates(candidates: [String], text: String?) -> [String] {
+        candidates.isEmpty ? [text].compactMap { $0 } : candidates
     }
 
     /// Returns "( )" style label if the character is an opening bracket, nil otherwise
