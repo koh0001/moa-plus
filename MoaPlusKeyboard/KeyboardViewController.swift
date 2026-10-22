@@ -496,6 +496,10 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
         advanceToNextInputMode()
     }
 
+    func hideKeyboard() {
+        dismissKeyboard()
+    }
+
     func triggerHapticFeedback() {
         HapticManager.shared.playTap()
         playClickSoundIfEnabled()

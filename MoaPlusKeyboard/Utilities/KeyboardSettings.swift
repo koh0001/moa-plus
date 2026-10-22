@@ -30,6 +30,7 @@ final class KeyboardSettings: ObservableObject {
         static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
+        static let showDismissKeyboardKey = "showDismissKeyboardKey"
         static let keyboardPlacement = "keyboardPlacement"
         static let oneHandedWidthRatio = "oneHandedWidthRatio"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
@@ -273,6 +274,16 @@ final class KeyboardSettings: ObservableObject {
     /// 설치와의 호환을 위해 남겨 둔다.
     @Published var showGlobeKey: Bool = false {
         didSet { guard !isLoading else { return }; writePrimitive(showGlobeKey, forKey: Keys.showGlobeKey) }
+    }
+
+    /// 키보드 내림 키 (이슈 #51). 기본값은 기기마다 다르다 — 아이패드 순정 키보드처럼 아이패드는 켜짐,
+    /// 아이폰은 꺼짐(기능행이 좁다). 전체 접근이 꺼진 사용자는 App Group 을 못 읽어 이 기본값을 쓴다.
+    @Published var showDismissKeyboardKey: Bool = KeyboardSettings.defaultShowDismissKeyboardKey {
+        didSet { guard !isLoading else { return }; writePrimitive(showDismissKeyboardKey, forKey: Keys.showDismissKeyboardKey) }
+    }
+
+    static var defaultShowDismissKeyboardKey: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
     }
 
     /// 한손 모드 위치 (기본 `.full` = 꺼짐). 키보드의 띠 버튼으로도 바뀐다 — 전체 접근이
@@ -557,6 +568,8 @@ final class KeyboardSettings: ObservableObject {
         assign(\.keyboardAutoBottomInsetEnabled, defaults.object(forKey: Keys.keyboardAutoBottomInset) as? Bool ?? true)
         assign(\.keyboardExtraBottomInset, defaults.object(forKey: Keys.keyboardExtraBottomInset) as? Double ?? KeyboardMetrics.defaultExtraBottomInset)
         assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
+        assign(\.showDismissKeyboardKey, defaults.object(forKey: Keys.showDismissKeyboardKey) as? Bool
+               ?? Self.defaultShowDismissKeyboardKey)
         assign(\.keyboardPlacement,
                (defaults.object(forKey: Keys.keyboardPlacement) as? String)
                    .flatMap(KeyboardPlacement.init(rawValue:)) ?? .full)
@@ -719,6 +732,7 @@ final class KeyboardSettings: ObservableObject {
         keyboardAutoBottomInsetEnabled = true
         keyboardExtraBottomInset = KeyboardMetrics.defaultExtraBottomInset
         showGlobeKey = false
+        showDismissKeyboardKey = Self.defaultShowDismissKeyboardKey
         keyboardPlacement = .full
         oneHandedWidthRatio = KeyboardPlacement.defaultWidthRatio
         consonantDiagonalDerivationEnabled = false

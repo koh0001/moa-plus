@@ -152,6 +152,13 @@ struct KeyboardSizeSettingsView: View {
             } header: {
                 Text("키보드 전환")
             }
+
+            Section {
+                Toggle("키보드 내림 키", isOn: $settings.showDismissKeyboardKey)
+            } footer: {
+                // 이슈 #51 — 기본값은 기기마다 다르다(KeyboardSettings.defaultShowDismissKeyboardKey).
+                Text("기능 행 맨 오른쪽(⏎ 옆)에 키보드를 내리는 키를 둡니다. 스페이스바는 그만큼 좁아집니다. 한손 모드에서는 키보드 빈쪽의 화살표 버튼 아래에 나타납니다.\n\n아이패드는 처음부터 켜져 있고, 아이폰은 꺼져 있습니다.")
+            }
         }
         .navigationTitle("크기 · 전환 키")
         .navigationBarTitleDisplayMode(.inline)

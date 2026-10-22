@@ -978,6 +978,15 @@ class KeyboardViewModel: ObservableObject {
         delegate?.switchToNextKeyboard()
     }
 
+    /// 키보드 내림 키 (이슈 #51). 지구본과 같이 조합 중인 글자를 먼저 확정한다 — 키보드를 다시
+    /// 띄웠을 때 조합 상태가 남아 있으면 다음 입력이 지워진 글자를 되살린다.
+    func dismissKeyboard() {
+        typoMarkPending = false
+        stopBackspaceRepeat()
+        commitCurrent()
+        delegate?.hideKeyboard()
+    }
+
     /// Move cursor by character offset.
     /// Treats the currently composing character as committed (frozen at old cursor position),
     /// resets composer + abbreviation buffer, then asks delegate to adjust proxy cursor.
@@ -1783,6 +1792,9 @@ protocol KeyboardViewModelDelegate: AnyObject {
     func deleteBackward()
     func updateComposingText(from previous: String, to current: String)
     func switchToNextKeyboard()
+    /// 키보드 내림 키 (이슈 #51). `dismissKeyboard()` 와 이름을 달리 둔다 — 같으면 컨트롤러가 물려받은
+    /// `UIInputViewController.dismissKeyboard()` 와 확장 기본값 중 무엇이 불릴지 읽는 사람이 헷갈린다.
+    func hideKeyboard()
     /// 키를 누른 순간의 탭 피드백(탭 햅틱 + 클릭 사운드).
     func triggerHapticFeedback()
     /// 레이어 전환 키를 누른 순간 — 탭 햅틱 대신 레이어 전환 햅틱 + 클릭 사운드 (이슈 #41).
@@ -1818,6 +1830,7 @@ protocol KeyboardViewModelDelegate: AnyObject {
 }
 
 extension KeyboardViewModelDelegate {
+    func hideKeyboard() {}
     func triggerLayerSwitchFeedback() {}
     func triggerLongPressFeedback() {}
     func textBeforeCursor() -> String? { nil }
