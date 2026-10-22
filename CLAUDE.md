@@ -369,6 +369,12 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
   밀어넣고(세션 중 변화 반영), 호스트 앱 미리보기는 `DeviceSafeArea.likelyNeedsGlobeKey`(아이패드 또는 앱 창
   하단 안전영역 0) 추정. 탭 → `KeyboardViewModel.switchKeyboard()` → `advanceToNextInputMode()`
 - 기능행 4개 바디(default/longSpace/symbol/bimanual) 모두 자식 폭 합 == `effectiveTotalWidth` 여야 ⏎ 가 안 잘림. 자식 추가 시 간격 수도 함께 증가 — 지구본은 `globeReservedWidth`(폭+간격)를 **스페이스바에서만** 차감. 불변식은 `FunctionRowWidthTests` 가드
+- 키보드 내림 키 (이슈 #51, v2.2.6): ⏎ **오른쪽** 맨 끝, 설정 `showDismissKeyboardKey`(기본값 = 아이패드 ON / 아이폰 OFF,
+  `KeyboardSettings.defaultShowDismissKeyboardKey` 하나를 loadAll·resetAll·프로퍼티가 같이 씀). 폭 `dismissWidth` = 지구본의
+  **0.8배** — 같은 폭이면 375pt + 지구본(홈 버튼 아이폰)에서 스페이스바가 한/영보다 좁아진다. 지구본처럼 **스페이스바에서만** 차감.
+  한손 모드에서는 기능행 대신 빈쪽 띠의 세 번째 버튼(`keyboardContent(dismissKeyInRow: false)`). 탭 → `viewModel.dismissKeyboard()`
+  (조합 확정) → 델리게이트 `hideKeyboard()` → `UIInputViewController.dismissKeyboard()` — 델리게이트 이름을 `dismissKeyboard` 로
+  두지 말 것(상속 메서드와 혼동)
 - 긋기 펑크: tap=`.`, ←=`?`, →=`!`, ↑=`,`, ↓=`.`
 - Space 드래그: 8pt 임계값, 12pt/step → `moveCursor(by:)` (commitCurrent + abbreviation reset 후 proxy 커서 이동)
 - Space 드래그 auto-repeat: 손가락이 바 폭의 **양끝 15%**(`edgeZoneFraction`, `value.location.x` 기준 — 절대 pt 아님, 작은 폰 대응) 구역에 들어가면 `SpaceCursorRepeater`(Timer, `[weak self]`+`RunLoop.common`) 가 그 방향으로 연속 이동. 가속 램프는 `KeyboardSettings.cursorRepeatSpeed`(0/1/2)→`cursorRepeatInterval`. 커서 상하(↑↓) 이동은 iOS 익스텐션 API 부재로 미지원(`adjustTextPosition(byCharacterOffset:)` = 가로 전용)

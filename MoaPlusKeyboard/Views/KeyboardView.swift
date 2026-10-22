@@ -97,7 +97,7 @@ struct KeyboardView: View {
     }
 
     @ViewBuilder
-    private func functionRow(totalWidth: CGFloat) -> some View {
+    private func functionRow(totalWidth: CGFloat, showsDismissKey: Bool) -> some View {
         FunctionRowView(
             totalWidth: totalWidth,
             mode: viewModel.keyboardMode,
@@ -111,6 +111,8 @@ struct KeyboardView: View {
             onSymbolPagePressed: { viewModel.toggleSymbolPage() },
             onLanguageSwitchPressed: { viewModel.switchKeyboard() },
             showGlobeKey: viewModel.canSwitchInputMode,
+            showDismissKey: showsDismissKey,
+            onDismissKeyboardPressed: { viewModel.dismissKeyboard() },
             layoutCustomization: settings.layoutCustomization,
             onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },
             onSlotBVowelGestureMove: { viewModel.slotBVowelGestureMoved(to: $0) },
@@ -129,7 +131,8 @@ struct KeyboardView: View {
                 let stripWidth = max(0, outer.size.width - width)
                 HStack(spacing: 0) {
                     if side == .right { oneHandedStrip(side: side) }
-                    keyboardContent(drawsBackground: false)
+                    // 내림 키는 기능행 대신 띠로 — 375pt × 0.70 에 지구본까지 뜨면 행에 넣을 폭이 없다.
+                    keyboardContent(drawsBackground: false, dismissKeyInRow: false)
                         .frame(width: width)
                     if side == .left { oneHandedStrip(side: side) }
                 }
@@ -139,7 +142,7 @@ struct KeyboardView: View {
                     bottom: 0,
                     trailing: side == .left ? stripWidth : 0)))
             } else {
-                keyboardContent(drawsBackground: true)
+                keyboardContent(drawsBackground: true, dismissKeyInRow: true)
             }
         }
         // 기능행 키들이 누르는 순간 울릴 수 있게 주입 (이슈 #23).
@@ -186,6 +189,12 @@ struct KeyboardView: View {
                             size: 17, label: "키보드 전체 폭") {
                 settings.keyboardPlacement = .full
             }
+            if settings.showDismissKeyboardKey {
+                oneHandedButton(systemName: "keyboard.chevron.compact.down",
+                                size: 17, label: "키보드 내리기") {
+                    viewModel.dismissKeyboard()
+                }
+            }
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -214,7 +223,7 @@ struct KeyboardView: View {
         .accessibilityLabel(label)
     }
 
-    private func keyboardContent(drawsBackground: Bool) -> some View {
+    private func keyboardContent(drawsBackground: Bool, dismissKeyInRow: Bool) -> some View {
         GeometryReader { geometry in
             let centerKeyWidth = KeyboardMetrics.centerKeyWidth(
                 for: geometry.size.width,
@@ -291,10 +300,12 @@ struct KeyboardView: View {
                                         .frame(width: numpadWidth)
                                 }
                             }
-                            functionRow(totalWidth: geometry.size.width)
+                            functionRow(totalWidth: geometry.size.width,
+                                        showsDismissKey: dismissKeyInRow && settings.showDismissKeyboardKey)
                         } else {
                             keyGrid(centerKeyWidth: centerKeyWidth, keyHeight: keyHeight, totalWidth: geometry.size.width)
-                            functionRow(totalWidth: geometry.size.width)
+                            functionRow(totalWidth: geometry.size.width,
+                                        showsDismissKey: dismissKeyInRow && settings.showDismissKeyboardKey)
                         }
                     }
                     .padding(KeyboardMetrics.keySpacing)

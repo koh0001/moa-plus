@@ -21,6 +21,9 @@ struct FunctionRowView: View {
     /// switch target exists. Defaults to `false` so previews and any caller
     /// that predates the key keep the original 5-key geometry.
     var showGlobeKey: Bool = false
+    /// 행 맨 오른쪽(⏎ 옆)의 키보드 내림 키 (이슈 #51). 지구본과 같이 폭은 스페이스바에서만 뺀다.
+    var showDismissKey: Bool = false
+    var onDismissKeyboardPressed: (() -> Void)? = nil
     var useBimanualLayout: Bool = false
     var layoutCustomization: LayoutCustomization = LayoutCustomization()
     var onSlotBVowelGestureStart: ((CGPoint) -> Void)? = nil
@@ -117,6 +120,8 @@ struct FunctionRowView: View {
                 height: height,
                 action: onReturnPressed
             )
+
+            dismissKeyIfEnabled
         }
     }
 
@@ -150,6 +155,36 @@ struct FunctionRowView: View {
     /// both states without branching.
     var globeReservedWidth: CGFloat {
         showGlobeKey ? globeWidth + spacing : 0
+    }
+
+    // MARK: - Dismiss key (키보드 내림, 이슈 #51)
+
+    /// 행 맨 끝의 키보드 내림 키.
+    @ViewBuilder
+    private var dismissKeyIfEnabled: some View {
+        if showDismissKey {
+            FunctionKeyView(
+                content: AnyView(
+                    Image(systemName: "keyboard.chevron.compact.down")
+                        .font(.system(size: 17))
+                ),
+                width: dismissWidth,
+                height: height,
+                action: onDismissKeyboardPressed ?? {}
+            )
+            .accessibilityLabel("키보드 내리기")
+        }
+    }
+
+    /// 지구본의 0.8배 — 같은 폭이면 홈 버튼 아이폰(375pt, 지구본 표시)에서 스페이스바가 한/영 키보다
+    /// 좁아진다(45pt < 50pt). `FunctionRowWidthTests.test_dismissKeyShrinksOnlyTheSpaceBar`
+    var dismissWidth: CGFloat {
+        globeWidth * 0.8
+    }
+
+    /// 내림 키가 스페이스바에서 가져가는 폭(앞 간격 포함). 숨기면 0.
+    var dismissReservedWidth: CGFloat {
+        showDismissKey ? dismissWidth + spacing : 0
     }
 
     // MARK: - Layer keys (레이어 전환 키)
@@ -229,6 +264,8 @@ struct FunctionRowView: View {
                 height: height,
                 action: onReturnPressed
             )
+
+            dismissKeyIfEnabled
         }
     }
 
@@ -271,6 +308,8 @@ struct FunctionRowView: View {
                 height: height,
                 action: onReturnPressed
             )
+
+            dismissKeyIfEnabled
         }
     }
 
@@ -353,6 +392,8 @@ struct FunctionRowView: View {
                 height: height,
                 action: onReturnPressed
             )
+
+            dismissKeyIfEnabled
         }
     }
 
@@ -366,6 +407,8 @@ struct FunctionRowView: View {
     /// `FunctionRowWidthTests` locks it for every body × globe on/off.
     var occupiedWidth: CGFloat {
         let globeChild: CGFloat = showGlobeKey ? 1 : 0
+        let dismissChild: CGFloat = showDismissKey ? 1 : 0
+        let dismissContent: CGFloat = showDismissKey ? dismissWidth : 0
         let children: CGFloat
         let content: CGFloat
         switch activeBodyKind {
@@ -389,7 +432,8 @@ struct FunctionRowView: View {
                 + symbolToggleWidth + letterToggleWidth
                 + spaceWidth + punctuationWidth + returnWidth
         }
-        return content + spacing * (children - 1)
+        let allChildren = children + dismissChild
+        return content + dismissContent + spacing * (allChildren - 1)
     }
 
     /// Exposed alongside `occupiedWidth` so tests can assert the two match.
@@ -445,7 +489,7 @@ struct FunctionRowView: View {
         // 5 children → 4 internal gaps; the optional globe key adds a 6th child
         // and a 5th gap, both folded into `globeReservedWidth`. The space bar
         // alone absorbs it so the punctuation key keeps its size either way.
-        let consumedByOthers = globeReservedWidth + symbolToggleWidth
+        let consumedByOthers = globeReservedWidth + dismissReservedWidth + symbolToggleWidth
             + letterToggleWidth + punctuationWidth + returnWidth
         return max(0, effectiveTotalWidth - consumedByOthers - spacing * 4)
     }
@@ -472,7 +516,7 @@ struct FunctionRowView: View {
         // → 5 internal gaps, or 5 children / 4 gaps when the globe is hidden.
         // Uses effectiveTotalWidth to compensate for parent padding.
         let globeReserved = showGlobeKey ? bimanualGlobeWidth + spacing : 0
-        let fixedWidths = globeReserved + bimanualToggleWidth
+        let fixedWidths = globeReserved + dismissReservedWidth + bimanualToggleWidth
             + bimanualPunctuationWidth * 2 + returnWidth
         return max(0, effectiveTotalWidth - fixedWidths - spacing * 4)
     }

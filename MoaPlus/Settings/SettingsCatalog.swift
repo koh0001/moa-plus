@@ -146,6 +146,13 @@ enum SettingsCatalog {
             keywords: ["지구본", "지구봉", "전환", "키보드바꾸", "다른키보드", "영어키보드", "globe"]
         ),
         SettingsEntry(
+            title: "키보드 내림 키",
+            icon: "keyboard.chevron.compact.down",
+            destination: .size,
+            // 이슈 #51 — 아이패드 제보 "키보드를 내릴 수가 없어요".
+            keywords: ["내림", "내리", "내려", "숨기", "숨김", "닫기", "닫아", "감추", "dismiss", "아이패드"]
+        ),
+        SettingsEntry(
             title: "좌우 끝 키 폭",
             icon: "arrow.left.and.right",
             destination: .layout,
@@ -336,6 +343,13 @@ enum SettingsCatalog {
             remedy: "긋기 테스트에서 실시간으로 볼 수 있습니다",
             icon: "hand.draw",
             destination: .gestureTest
+        ),
+        SettingsSymptom(
+            // 이슈 #51. 목록 끝에 둔다 — UI 테스트의 tap 헬퍼는 스크롤하지 않아 중간에 넣으면 아래 항목이 화면 밖으로 밀린다.
+            symptom: "키보드를 내릴 수 없어요",
+            remedy: "‘키보드 내림 키’를 켜면 기능 행 맨 오른쪽에 내리는 키가 생깁니다",
+            icon: "keyboard.chevron.compact.down",
+            destination: .size
         ),
     ]
 

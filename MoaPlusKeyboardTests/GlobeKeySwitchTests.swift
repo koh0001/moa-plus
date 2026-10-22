@@ -49,6 +49,41 @@ final class GlobeKeySwitchTests: XCTestCase {
     func test_canSwitchInputMode_defaultsFalse() {
         XCTAssertFalse(KeyboardViewModel().canSwitchInputMode)
     }
+
+    // MARK: - 키보드 내림 키 (이슈 #51)
+
+    /// 지구본과 같은 규칙 — 내리기 전에 조합을 확정한다.
+    func test_dismissKeyboard_reachesDelegate_andCommitsComposition() {
+        viewModel.inputConsonant(.ㄱ)
+        viewModel.dismissKeyboard()
+        XCTAssertEqual(delegate.hideKeyboardCount, 1)
+
+        delegate.composingUpdates.removeAll()
+        viewModel.inputConsonant(.ㄴ)
+        XCTAssertEqual(delegate.composingUpdates.first?.previous, "",
+                       "내릴 때 조합이 확정되지 않아 ㄱ 이 되살아남")
+    }
+
+    /// 저장값이 없으면 아이패드 켜짐 / 아이폰 꺼짐.
+    func test_dismissKeySetting_defaultsByIdiom() {
+        let s = KeyboardSettings.shared
+        let original = s.showDismissKeyboardKey
+        defer { s.showDismissKeyboardKey = original }
+        UserDefaults(suiteName: KeyboardSettings.appGroupId)?.removeObject(forKey: "showDismissKeyboardKey")
+        s.loadAll()
+        XCTAssertEqual(s.showDismissKeyboardKey, UIDevice.current.userInterfaceIdiom == .pad)
+    }
+
+    func test_dismissKeySetting_roundTripsThroughLoadAll() {
+        let s = KeyboardSettings.shared
+        let original = s.showDismissKeyboardKey
+        defer { s.showDismissKeyboardKey = original }
+        for value in [true, false] {
+            s.showDismissKeyboardKey = value
+            s.loadAll()
+            XCTAssertEqual(s.showDismissKeyboardKey, value)
+        }
+    }
 }
 
 private final class MockSwitchDelegate: KeyboardViewModelDelegate {
@@ -58,6 +93,7 @@ private final class MockSwitchDelegate: KeyboardViewModelDelegate {
     }
 
     var switchKeyboardCount = 0
+    var hideKeyboardCount = 0
     var insertedTexts: [String] = []
     var composingUpdates: [ComposingUpdate] = []
 
@@ -67,6 +103,7 @@ private final class MockSwitchDelegate: KeyboardViewModelDelegate {
         composingUpdates.append(.init(previous: previous, current: current))
     }
     func switchToNextKeyboard() { switchKeyboardCount += 1 }
+    func hideKeyboard() { hideKeyboardCount += 1 }
     func triggerHapticFeedback() {}
     func moveCursor(by offset: Int) {}
 }
