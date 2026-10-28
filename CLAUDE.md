@@ -142,6 +142,17 @@ CI 는 유닛 → UI 순서로 분리해 이 문제를 피한다. 로컬에서 �
 
 실기기: `Cmd + R` → 아이폰에서 설정 → 키보드 → 새 키보드 추가 → 모아+
 
+**시뮬레이터에서 키보드 익스텐션 E2E (2026-10-22 확인, iPad Pro 13 · iPad mini / iOS 26.5)**: `simctl` 만으로는
+서드파티 키보드를 못 띄우지만, UI 테스트가 설정 앱을 조작하면 된다 — 실기기가 없는 기기(아이패드) 확인용.
+갓 설치한 직후엔 익스텐션이 아직 등록되지 않아 추가 목록에 모아+ 가 없다 — 앱을 한 번 띄웠다 닫고 시작할 것.
+`XCUIApplication(bundleIdentifier: "com.apple.Preferences")` 로 일반 › 키보드 › `cells["KEYBOARDS"]`
+(같은 이름의 화면 제목과 헷갈리므로 식별자로, 화면 전환이 끝난 뒤 `isHittable`) › "새로운 키보드 추가" › 모아+ 셀을 직접 탭
+→ 앱 검색창 포커스 → 처음 추가하면 키보드 자리에 뜨는 "Quickly Change Keyboards" 안내는 접근성 트리에 없으니
+좌표(하단 가운데)로 Continue → 지구본(없으면 `keyboards.buttons["emoji"]`)을 **길게 눌러** 목록에서 모아+ 선택
+(짧게 누르면 최근 두 키보드만 오간다). 익스텐션 키의 `accessibilityLabel` 이 보이고 탭도 된다. 시뮬레이터 언어는 한국어. 스크린샷은 `-resultBundlePath` 후
+`xcrun xcresulttool export attachments`. `hasKeyboardFocus` 는 키보드를 내린 뒤에도 true 로 남으니 판정에 쓰지 말 것.
+임시 테스트는 커밋하지 않고, 끝나면 시뮬레이터를 erase. 실기기 고유값(안전영역·호스트별 신호)은 여전히 실기기 리포트로
+
 CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 GitHub Hosted Runner(`macos-15`)에서 위 명령을 자동 실행한다. 시뮬레이터는 iPhone 17 Pro → 17 → 16 Pro → 16 순서로 폴백 선택한다.
 
 ## 주의사항
@@ -281,8 +292,8 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 ### 영문 자동 대문자 — 호스트 신호의 함정 (v2.2.0 build 22 / 사용자 메일 제보)
 `englishAutoCapitalizeEnabled`(기본 OFF). iOS 는 호스트 필드의 대문자화 의사를
 서드파티 키보드로 **전달하지 않으므로** 직접 판정한다. 실기기 왕복으로 판정 근거를
-세 번 갈아탔다 — 시뮬레이터는 서드파티 키보드를 못 띄우므로
-([[simulator-cannot-enable-custom-keyboard]]) 아래 셋은 실측으로만 얻어지는 사실이다.
+세 번 갈아탔다 — 아래 셋은 실기기 호스트 앱에서 실측한 사실이다(당시엔 시뮬레이터에 키보드를 못 띄운다고 봤다.
+지금은 UI 테스트로 띄울 수 있지만 — 위 "시뮬레이터에서 키보드 익스텐션 E2E" — 호스트별 신호는 실기기 기준).
 **같은 함정을 다시 밟지 말 것.**
 - **`textDocumentProxy.autocapitalizationType` 은 판정에 쓸 수 없다.** 평범한 빈
   입력창에서도 `.none` 이 온다(실측 `allows=false`, `kbType=0 autoCap=0`). 이걸 가드로
@@ -421,8 +432,8 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
   더했다면 필요 없는 빈 공간이 생겼을 것이다. 리뷰어의 구버전 iOS 에서는 안전영역이
   0 이 아니어야 자동이 먹는다(미확인). 안 먹으면 추가 여백 슬라이더가 확실한 해법
 - **⚠️ 실측 판정 대기 중 (2026-08-21 기준).** 시뮬레이터에서는 서드파티 키보드를
-  UI 조작 없이 띄울 수 없다([[simulator-cannot-enable-custom-keyboard]] 메모).
-  판정에 필요한 값은
+  UI 조작 없이 띄울 수 없다(UI 테스트로는 가능 — "시뮬레이터에서 키보드 익스텐션 E2E"). 이 판정은 제보자 기기·iOS 의
+  실측값이 필요하다. 판정에 필요한 값은
   `설정 › 입력 기록 › 개발자 리포트`의 "키보드 실측" 줄
   (`KeyboardViewController.recordGeometryDiagnostic`)에 남는다:
   - `bounds.h == constraint` → 요청한 높이가 곧 실제 프레임. **현재 구현이 맞다**
@@ -579,7 +590,10 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 판독 전문(`docs/MOAKEY_VIDEO_FINDINGS.md`)과 작업 핸드오프(`docs/HANDOFF.md`)는 **로컬 보관
 문서로 저장소에 추적되지 않는다** — 클론한 머신에는 없을 수 있다. 아래 요약이 실질적 기준이다.
 - 자음 8방향 단독: `↑=ㅗ ↓=ㅜ →=ㅏ ←=ㅓ`, `↖↗=ㅣ`, `↙↘=ㅡ` (17회 예외 없음)
-- 복합모음 **방향 조합**: `ㅘ=↑→` `ㅝ=↓←` `ㅚ=↑↓` `ㅟ=↓↑` `ㅐ=→←` `ㅔ=←→` `ㅛ=↑↓↑` `ㅠ=↓↑↓` `ㅑ=→←→` `ㅕ=←→←` `ㅙ=↑→←` `ㅞ=↓←→` + **자음 키에서도 `ㅒ=→←→←` `ㅖ=←→←→` 성립** + **세로 체인 `ㅘ=↑↓→` `ㅙ=↑↓→←` `ㅠ=↑↓↑↓`** (팝업 체인 고→괴→과→괘 실측)
+- 복합모음 **방향 조합**: `ㅘ=↑→` `ㅝ=↓←` `ㅚ=↑↓` `ㅟ=↓↑` `ㅐ=→←` `ㅔ=←→` `ㅛ=↑↓↑` `ㅠ=↓↑↓` `ㅑ=→←→` `ㅕ=←→←` `ㅙ=↑→←` `ㅞ=↓←→` + **자음 키에서도 `ㅒ=→←→←` `ㅖ=←→←→` 성립** + **세로 체인 `ㅘ=↑↓→` `ㅙ=↑↓→←`** (팝업 체인 고→괴→과→괘 실측). **ㅛ(↑↓↑)·ㅠ(↓↑↓) 뒤 왕복은 몇 번이든 무시**
+  — v2.2.5 까지 있던 `ㅠ=↑↓↑↓` 는 근거 팝업 "뵤→뷰" 를 확인한 녹화(A8~A13·D3·E1·E2·R7)에서 찾지 못했고(A9 ㅂ ↑↓↑ = 뵤) 갤럭시 사용자 메일 제보
+  (2026-10-28, "위아래 여러 번 왕복해도 요 유지")와 어긋나 v2.2.6 에서 뺐다. 갤럭시 adb 재측정 없이 되살리지 말 것
+  (`MoakeyVideoVerifiedSpecTests.testVerticalChain_repeatedRoundTripsAfterYo_staysYo`, `DeviceMeasuredTailRegressionTests.test_repeatedVerticalRoundTrips_keepYoAndYu`)
 - **첫 획 재해석 (v1.8.x 도입)**: 순정은 첫 대각선 획을 8방향 잠정 분류 후 **후속 획이 오면 실제 각도의 4방향으로 재해석**한다 — ↗ 왕복=ㅐ(리뷰 "ㅐ 방향 다름"의 원인이었음), ↖↘=ㅔ, ↙↑↓=ㅠ. 단 ↙↗/↘↖ 반전은 천지인 ㅡ+ㅣ=ㅢ 우선. 구현: `finalizeGestureDetailed()`의 firstStrokeCardinal + `VowelResolver` 2-pass(간선 수 비교, 동률=기존 해석). `MoakeyVideoVerifiedSpecTests` 가드 — **변경 시 순정 이탈 주의**
 - 판정 모델(실측): 단일 획 방향 = net 변위 벡터(꼬리 레버리지 없음), 최소 획 길이 문턱(키폭의 ~0.3~0.45), turn ≥60° 분리 / ≤55° 흡수, 속도 무관(뗄 때까지 획 누적·즉시 재판정), 트라이 밖 획은 유효 최장 접두사로 무시
 - **adb 정밀 측정 (2026-08-14, 갤럭시 S22+ 터치 주입)**: 되돌림 등록 하한 = **42px = 키 너비 150px의 28%** (41px 미등록/42px 등록, 진입 150/300px 무관 = 절대 임계 → `reversalThresholdRatio` 0.70), ㅓ/ㅣ 경계 = 22°/23° 사이(22.5° 정합), 첫 획 4방향 재해석 = 45° 옥탄트 정합(55~65° 정밀 입력은 수직 — S3 영상의 60°=수평은 수기 오차), ↘↖ 반전 = ㅢ 우선(50~65° 전부), ㅐ↔ㅒ·ㅔ↔ㅖ ㆍ토글 확증

@@ -158,11 +158,23 @@ final class DeviceMeasuredTailRegressionTests: XCTestCase {
         XCTAssertEqual(run(path), "와", "↓→ 코너의 ↘ 스침은 다음 획에 흡수돼야 함")
     }
 
-    /// 의도적 ↑↓↑↓(ㅠ) 체인은 획 크기가 비슷해 흡수 대상이 아니다.
-    func test_verticalChainYu_notCollapsedByBounceGuard() {
+    /// 비슷한 크기의 세로 왕복 체인은 흡수 대상이 아니다 — 3획째(↑50)가 흡수되면 "외".
+    func test_verticalChain_notCollapsedByBounceGuard() {
         let path = [CGVector(dx: 0, dy: -55), CGVector(dx: 0, dy: 55),
                     CGVector(dx: 0, dy: -50), CGVector(dx: 0, dy: 50)]
-        XCTAssertEqual(run(path), "유", "비슷한 크기의 체인 획은 흡수되면 안 됨")
+        XCTAssertEqual(run(path), "요", "비슷한 크기의 체인 획은 흡수되면 안 됨")
+    }
+
+    /// 메일 제보(2026-10-28): 갤럭시 습관대로 ㅇ 에서 위아래를 여러 번 왕복해도 "요".
+    /// v2.2.5 까지는 4획째 ↓ 에서 "유" 로 바뀌고 돌아오지 않았다. ㅠ 도 같은 규칙(왕복을 이어도 "유").
+    func test_repeatedVerticalRoundTrips_keepYoAndYu() {
+        let up = CGVector(dx: 0, dy: -55), down = CGVector(dx: 0, dy: 55)
+        for count in 3...8 {
+            let yo = (0..<count).map { $0.isMultiple(of: 2) ? up : down }
+            let yu = (0..<count).map { $0.isMultiple(of: 2) ? down : up }
+            XCTAssertEqual(run(yo), "요", "↑ 로 시작한 \(count)획 왕복은 '요'")
+            XCTAssertEqual(run(yu), "유", "↓ 로 시작한 \(count)획 왕복은 '유'")
+        }
     }
 
     // MARK: - 회귀 가드: 의도적 입력은 그대로 살아야 한다
