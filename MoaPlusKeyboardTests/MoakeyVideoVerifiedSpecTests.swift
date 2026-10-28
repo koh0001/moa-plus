@@ -33,14 +33,18 @@ final class MoakeyVideoVerifiedSpecTests: XCTestCase {
         XCTAssertEqual(resolver.resolve(directions: [.up, .right, .left]).vowel, .ㅙ)
     }
 
-    /// 팝업 체인 보→뵈→뵤→뷰 실측: ㅛ(↑↓↑) 뒤 ↓는 ㅠ.
-    func testVerticalChain_upDownUpDown_isYu() {
-        XCTAssertEqual(resolver.resolve(directions: [.up, .down, .up, .down]).vowel, .ㅠ)
+    /// ㅛ(↑↓↑) 뒤 왕복은 무시된다 — 몇 번을 이어도 ㅛ 유지 (메일 제보 2026-10-28, 갤럭시 습관).
+    /// v2.2.5 까지는 ↑↓↑↓ = ㅠ 였다 — 근거로 적은 팝업 "뵤→뷰" 를 확인한 녹화(A8~A13·D3·E1·E2·R7)에서 찾지 못했다(A9 ㅂ ↑↓↑ = 뵤).
+    func testVerticalChain_repeatedRoundTripsAfterYo_staysYo() {
+        XCTAssertEqual(resolver.resolve(directions: [.up, .down, .up, .down]).vowel, .ㅛ)
+        XCTAssertEqual(resolver.resolve(directions: [.up, .down, .up, .down, .up]).vowel, .ㅛ)
+        XCTAssertEqual(resolver.resolve(directions: [.up, .down, .up, .down, .up, .down, .up, .down]).vowel, .ㅛ)
     }
 
-    /// 역방향 4획째(↓↑↓↑)는 순정에서 무시된다 — ㅠ 유지.
+    /// 역방향도 같은 규칙 — ㅠ(↓↑↓) 뒤 왕복은 무시, ㅠ 유지.
     func testDownUpDownUp_staysYu() {
         XCTAssertEqual(resolver.resolve(directions: [.down, .up, .down, .up]).vowel, .ㅠ)
+        XCTAssertEqual(resolver.resolve(directions: [.down, .up, .down, .up, .down, .up, .down]).vowel, .ㅠ)
     }
 
     /// 세로 체인 ← 갈래 (영상 R7: ↑↓←→=ㅖ 5/5, ↓↑←→=ㅞ. 팝업 체인
