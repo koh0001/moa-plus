@@ -142,6 +142,17 @@ CI 는 유닛 → UI 순서로 분리해 이 문제를 피한다. 로컬에서 �
 
 실기기: `Cmd + R` → 아이폰에서 설정 → 키보드 → 새 키보드 추가 → 모아+
 
+**시뮬레이터에서 키보드 익스텐션 E2E (2026-10-22 확인, iPad Pro 13 · iPad mini / iOS 26.5)**: `simctl` 만으로는
+서드파티 키보드를 못 띄우지만, UI 테스트가 설정 앱을 조작하면 된다 — 실기기가 없는 기기(아이패드) 확인용.
+갓 설치한 직후엔 익스텐션이 아직 등록되지 않아 추가 목록에 모아+ 가 없다 — 앱을 한 번 띄웠다 닫고 시작할 것.
+`XCUIApplication(bundleIdentifier: "com.apple.Preferences")` 로 일반 › 키보드 › `cells["KEYBOARDS"]`
+(같은 이름의 화면 제목과 헷갈리므로 식별자로, 화면 전환이 끝난 뒤 `isHittable`) › "새로운 키보드 추가" › 모아+ 셀을 직접 탭
+→ 앱 검색창 포커스 → 처음 추가하면 키보드 자리에 뜨는 "Quickly Change Keyboards" 안내는 접근성 트리에 없으니
+좌표(하단 가운데)로 Continue → 지구본(없으면 `keyboards.buttons["emoji"]`)을 **길게 눌러** 목록에서 모아+ 선택
+(짧게 누르면 최근 두 키보드만 오간다). 익스텐션 키의 `accessibilityLabel` 이 보이고 탭도 된다. 시뮬레이터 언어는 한국어. 스크린샷은 `-resultBundlePath` 후
+`xcrun xcresulttool export attachments`. `hasKeyboardFocus` 는 키보드를 내린 뒤에도 true 로 남으니 판정에 쓰지 말 것.
+임시 테스트는 커밋하지 않고, 끝나면 시뮬레이터를 erase. 실기기 고유값(안전영역·호스트별 신호)은 여전히 실기기 리포트로
+
 CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 GitHub Hosted Runner(`macos-15`)에서 위 명령을 자동 실행한다. 시뮬레이터는 iPhone 17 Pro → 17 → 16 Pro → 16 순서로 폴백 선택한다.
 
 ## 주의사항
@@ -281,8 +292,8 @@ CI: `.github/workflows/ci.yml`이 main 브랜치 push/PR/수동 트리거 시 Gi
 ### 영문 자동 대문자 — 호스트 신호의 함정 (v2.2.0 build 22 / 사용자 메일 제보)
 `englishAutoCapitalizeEnabled`(기본 OFF). iOS 는 호스트 필드의 대문자화 의사를
 서드파티 키보드로 **전달하지 않으므로** 직접 판정한다. 실기기 왕복으로 판정 근거를
-세 번 갈아탔다 — 시뮬레이터는 서드파티 키보드를 못 띄우므로
-([[simulator-cannot-enable-custom-keyboard]]) 아래 셋은 실측으로만 얻어지는 사실이다.
+세 번 갈아탔다 — 아래 셋은 실기기 호스트 앱에서 실측한 사실이다(당시엔 시뮬레이터에 키보드를 못 띄운다고 봤다.
+지금은 UI 테스트로 띄울 수 있지만 — 위 "시뮬레이터에서 키보드 익스텐션 E2E" — 호스트별 신호는 실기기 기준).
 **같은 함정을 다시 밟지 말 것.**
 - **`textDocumentProxy.autocapitalizationType` 은 판정에 쓸 수 없다.** 평범한 빈
   입력창에서도 `.none` 이 온다(실측 `allows=false`, `kbType=0 autoCap=0`). 이걸 가드로
@@ -421,8 +432,8 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
   더했다면 필요 없는 빈 공간이 생겼을 것이다. 리뷰어의 구버전 iOS 에서는 안전영역이
   0 이 아니어야 자동이 먹는다(미확인). 안 먹으면 추가 여백 슬라이더가 확실한 해법
 - **⚠️ 실측 판정 대기 중 (2026-08-21 기준).** 시뮬레이터에서는 서드파티 키보드를
-  UI 조작 없이 띄울 수 없다([[simulator-cannot-enable-custom-keyboard]] 메모).
-  판정에 필요한 값은
+  UI 조작 없이 띄울 수 없다(UI 테스트로는 가능 — "시뮬레이터에서 키보드 익스텐션 E2E"). 이 판정은 제보자 기기·iOS 의
+  실측값이 필요하다. 판정에 필요한 값은
   `설정 › 입력 기록 › 개발자 리포트`의 "키보드 실측" 줄
   (`KeyboardViewController.recordGeometryDiagnostic`)에 남는다:
   - `bounds.h == constraint` → 요청한 높이가 곧 실제 프레임. **현재 구현이 맞다**
