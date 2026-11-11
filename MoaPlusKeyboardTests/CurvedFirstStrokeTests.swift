@@ -92,7 +92,8 @@ final class CurvedFirstStrokeTests: XCTestCase {
     /// 조각마다 진행 방향이 `from`→`to` 로 선형 회전하는 경로를 3pt 간격으로 넣는다.
     private func replay(_ pieces: [(len: CGFloat, from: Double, to: Double)],
                         column: Int) -> (strokes: [GestureDirection], magnitudes: [CGFloat],
-                                         vowel: Jungseong?, preview: Jungseong?) {
+                                         vowel: Jungseong?, preview: Jungseong?,
+                                         raw: [GestureDirection]) {
         let settings = GestureSettings.default
         let analyzer = GestureAnalyzer(settings: settings, columnId: column)
         analyzer.keyWidth = 54
@@ -116,7 +117,8 @@ final class CurvedFirstStrokeTests: XCTestCase {
         let detail = analyzer.finalizeGestureDetailed()
         let vowel = resolver.resolve(directions: detail.directions,
                                      firstStrokeCardinal: detail.firstStrokeCardinal).vowel
-        return (strokes.map(\.direction), strokes.map(\.magnitude), vowel, preview)
+        return (strokes.map(\.direction), strokes.map(\.magnitude), vowel, preview,
+                analyzer.currentStrokeInfos().map(\.direction))
     }
 
     /// `[ㄴ] ↙30(199°) ←26(194°) →59(1°) ⇒ ㅡ` — 지우고 `←→ ⇒ ㅔ` 로 다시 침 ("네요" 가 "느요").
@@ -164,5 +166,52 @@ final class CurvedFirstStrokeTests: XCTestCase {
         XCTAssertLessThan(r.magnitudes[1], 54 * 0.6)
         XCTAssertEqual(r.vowel, .ㅣ)
         XCTAssertEqual(r.preview, .ㅣ)
+    }
+
+    // MARK: - 세로로 시작해 대각선으로 휜 한 획 (메일 제보 2026-11, "대각선 ㅣ 가 와로")
+    //
+    // 가파르게 시작한 ↗ 가 `↑ + ↗` 로 나뉘고 리졸버가 ↑ 뒤 ↗ 를 → 로 접어 ↑→ = ㅘ 가 됐다.
+    // 실제 꺾임은 16~30° 뿐이다(순정은 ≤55° 를 한 획으로 본다). 꺾은 모서리(이슈 #29 궤적 38~42°,
+    // `GestureAnalyzerTests.testPronouncedDiagonalTurnIsPreserved` 45°)는 그대로 — `CompoundVowelPathTests`.
+
+    /// 85°→35° 로 휘는 ↗ — 수정 전 3·5열에서 ㅘ ("기" 가 "과").
+    func test_e2e_steepStartUpRightArc_isI_notWa() {
+        for column in [3, 5] {
+            for pieces in [[(len: CGFloat(70), from: 85.0, to: 35.0)],
+                           [(len: CGFloat(25), from: 75.0, to: 75.0), (len: CGFloat(45), from: 45.0, to: 45.0)]] {
+                let r = replay(pieces, column: column)
+                XCTAssertEqual(r.raw, [.up, .upRight], "열 \(column): 분할이 있어야 이 경로를 검증한다")
+                XCTAssertEqual(r.vowel, .ㅣ, "열 \(column)")
+                XCTAssertEqual(r.preview, .ㅣ, "열 \(column): 미리보기도 확정과 같아야 한다")
+            }
+        }
+    }
+
+    /// 같은 경로의 나머지 세 대각선 — 수정 전 ↖ = ㅗ, ↘ = ㅜ, ↙ = ㅝ ("으" 가 "워").
+    func test_e2e_steepStartOtherDiagonalArcs_keepDiagonalVowel() {
+        let cases: [(pieces: [(len: CGFloat, from: Double, to: Double)], columns: [Int], vowel: Jungseong)] = [
+            ([(70, 95, 145)], [1, 3], .ㅣ),
+            ([(70, 275, 320)], [1, 3, 5], .ㅡ),
+            ([(70, 265, 220)], [1, 3, 5], .ㅡ),
+        ]
+        for c in cases {
+            for column in c.columns {
+                let r = replay(c.pieces, column: column)
+                XCTAssertEqual(r.raw.count, 2, "열 \(column) \(c.pieces): 분할이 있어야 이 경로를 검증한다")
+                XCTAssertEqual(r.vowel, c.vowel, "열 \(column) \(c.pieces)")
+                XCTAssertEqual(r.preview, c.vowel, "열 \(column) \(c.pieces)")
+            }
+        }
+    }
+
+    /// 반례 — 일부러 꺾은 ㅘ 는 그대로. → 를 40° 까지 들어 그어도(꺾임 ≈46~50°) ㅘ.
+    func test_e2e_intentionalRightAngleWa_staysWa() {
+        for column in [1, 3, 5] {
+            for rightDeg in [0.0, 25.0, 40.0] {
+                let r = replay([(40, 90, 90), (40, rightDeg, rightDeg)], column: column)
+                XCTAssertEqual(r.vowel, .ㅘ, "열 \(column), → \(rightDeg)°")
+                XCTAssertEqual(r.preview, .ㅘ, "열 \(column), → \(rightDeg)°")
+            }
+        }
     }
 }

@@ -164,8 +164,9 @@ class GestureAnalyzer {
         analyzeLatestMovement()
     }
 
+    /// 진행 중 방향 — 미리보기·오버레이용. 확정(`finalizeGestureDetailed`)과 같은 휘어진 획 병합을 거친다.
     func getDirections() -> [GestureDirection] {
-        return directions
+        mergingCurvedVerticalStart(rawSegments).map(\.direction)
     }
 
     func getStartPoint() -> CGPoint? {
@@ -396,7 +397,7 @@ class GestureAnalyzer {
     /// finalize 의 노이즈 트림 전 원시 첫 획을 쓰므로 최종값과 미세하게 다를 수
     /// 있지만, 미리보기는 어차피 획마다 갱신되므로 허용한다.
     func currentFirstStrokeCardinal() -> GestureDirection? {
-        firstStrokeCardinal(of: rawSegments)
+        firstStrokeCardinal(of: mergingCurvedVerticalStart(rawSegments))
     }
 
     private func firstStrokeCardinal(of segments: [DirectionSegment]) -> GestureDirection? {
@@ -429,19 +430,50 @@ class GestureAnalyzer {
             net.dy += segment.vector.dy
             previous = segment.vector
         }
-        return GestureDirection.from(
-            vector: net,
+        return sectorDirection(of: net) == cardinal
+    }
+
+    /// 세로로 시작해 옆 대각선으로 휘어 그은 한 획 (메일 제보 2026-11, "대각선 ㅣ 가 와로").
+    ///
+    /// 위 재해석의 반대쪽이다 — 가파르게 시작한 ↗ 가 구역 경계를 넘으며 `↑ + ↗` 로 나뉘면 리졸버가
+    /// ↑ 뒤 ↗ 를 → 로 접어 ↑→ = ㅘ 가 된다(같은 경로로 ↖ = ㅗ, ↘ = ㅜ, ↙ = ㅝ). 순정 판정 모델(꺾임이
+    /// 작으면 한 획, 방향은 합벡터)대로, **두 조각이 전부**이고 실제 꺾임이 `curvedVerticalStartMaxTurn`
+    /// 이내면 합벡터 한 획으로 다시 분류한다. 꺾은 모서리(↑ 뒤 곧은 ↗, 이슈 #29 궤적)와 세 조각 이상
+    /// (↑↗→ 둥근 모서리, 큰 갈고리 ↑↗←)은 그대로 둔다 (`CurvedFirstStrokeTests`). 수평 시작(→↗)은 이미
+    /// → 로 접혀 대상 아님.
+    private func mergingCurvedVerticalStart(_ segments: [DirectionSegment]) -> [DirectionSegment] {
+        guard segments.count == 2,
+              segments[0].direction == .up || segments[0].direction == .down,
+              segments[1].direction.isAdjacentTo(segments[0].direction),
+              Self.turnDegrees(from: segments[0].vector, to: segments[1].vector) <= Self.curvedVerticalStartMaxTurn
+        else { return segments }
+        let net = CGVector(dx: segments[0].vector.dx + segments[1].vector.dx,
+                           dy: segments[0].vector.dy + segments[1].vector.dy)
+        guard let direction = sectorDirection(of: net) else { return segments }
+        return [DirectionSegment(direction: direction, magnitude: sqrt(net.dx * net.dx + net.dy * net.dy),
+                                 vector: net)]
+    }
+
+    /// 벡터를 이 열의 섹터(8방향)로 분류한다 — 등록 때와 같은 섹터·회전·모드.
+    private func sectorDirection(of vector: CGVector) -> GestureDirection? {
+        GestureDirection.from(
+            vector: vector,
             sectors: effectiveSectors,
             rotationOffset: effectiveRotationOffset,
             threshold: 1,
             fourWay: settings.swipeProfile.fourWayMode || forceCardinalOnly,
             fillGap: settings.swipeProfile.gapFillNearest
-        ) == cardinal
+        )
     }
 
     /// 한 획으로 볼 이웃 조각 간 최대 꺾임. 순정 실측은 ≤55° 흡수 / ≥60° 분리인데, 획 단위
     /// 순 변위 벡터끼리 비교하는 근사라 여유를 두고 45°.
     private static let curvedRunMaxTurn: Double = 45
+
+    /// 세로 시작 병합의 최대 꺾임. 휘어 그은 호는 두 조각 순 변위 사이가 16~30° 였고(재현 궤적), 꺾은
+    /// 모서리는 38° 이상이다(이슈 #29 `↑42 ↗88` 38~42°, `testPronouncedDiagonalTurnIsPreserved` 45°).
+    /// 여기서 합치면 스펙 패턴 ↑→ = ㅘ 를 지우므로 `curvedRunMaxTurn` 보다 좁게 둔다.
+    private static let curvedVerticalStartMaxTurn: Double = 35
 
     private static func turnDegrees(from a: CGVector, to b: CGVector) -> Double {
         let diff = (atan2(Double(b.dy), Double(b.dx)) - atan2(Double(a.dy), Double(a.dx))) * 180 / .pi
@@ -471,7 +503,7 @@ class GestureAnalyzer {
         collapsed = collapseTinyOscillations(collapsed)
         collapsed = collapseCornerBounces(collapsed)
         collapsed = trimTinyLeadingAndTrailingNoise(collapsed)
-        return collapsed
+        return mergingCurvedVerticalStart(collapsed)
     }
 
     /// 모서리 튕김 흡수 — v2.0 실기기 실측(build 17 이후 잔여 오타) 대응.

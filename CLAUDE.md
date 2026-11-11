@@ -630,6 +630,17 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
   `↗21 →28 ↗52` = "키" 는 1·2번 합 22° 도 1열 ↗ 안이라 이 가드가 못 된다). 다른 방향 꼬리(↙ 뒤 ↑→)는 0.6 기준 그대로.
   곧은 조각으로는 이 분할이 재현되지 않아(첫 조각부터 → 로 잡힘) 테스트는 휘는 경로로 재생한다
   (`CurvedFirstStrokeTests.test_e2e_report1006_*`)
+- **세로 시작 휘어진 획 (메일 제보 2026-11, "대각선 ㅣ 가 와로")**: 위 재해석의 반대쪽. 가파르게 시작한 ↗ 가
+  `↑ + ↗` 로 나뉘면 `normalizeTrailingStroke` 가 ↗ 를 → 로 접어 ↑→ = ㅘ 였다(↖ = ㅗ, ↘ = ㅜ, ↙ = ㅝ 도 같은 경로).
+  분석기 `mergingCurvedVerticalStart` 가 **조각이 둘뿐**이고 첫 조각이 ↑/↓, 둘째가 그 옆 대각선, 실제 꺾임 ≤
+  `curvedVerticalStartMaxTurn`(35°)이면 합벡터 한 획으로 열 섹터에 다시 분류한다. 확정(`normalizeSegments` 끝)과 미리보기
+  (`getDirections`·`currentFirstStrokeCardinal`) 둘 다 거친다 — 한쪽만 넣으면 그리는 동안 "와" 였다가 "이" 로 확정된다.
+  35° 는 휜 호(16~30°)와 꺾은 모서리(이슈 #29 `↑42 ↗88` 38~42° — 합치면 1열에서 "모" 가 아니라 "미",
+  `testPronouncedDiagonalTurnIsPreserved` 45°) 사이다. `curvedRunMaxTurn`(45°)을 재사용하지 말 것.
+  세 조각 이상(↑↗→ 둥근 모서리, 큰 갈고리 ↑↗←)도 대상 아님. 일반 인접 병합으로 넓히지 말 것 — ↑↓ 뒤 아래로
+  처진 →(↘)가 ↓ 에 합쳐져 ↑↓→ = ㅘ 가 ㅚ 로 깨질 수 있다(추론, 미실측) (`CurvedFirstStrokeTests.test_e2e_steepStart*`).
+  35° 는 합성 궤적으로 맞추고 실기기에서 확인했다(iPhone 16 Pro, 2026-11-11: ↗↖ = ㅣ, ↘↙ = ㅡ, ↑→ = ㅘ 유지).
+  제보에서 와 가 남으면 긋기 테스트 획별 각도로 다시 잴 것
 - 오타 후보 표시: 긋기 로그 직후 첫 입력이 백스페이스면 `GestureDebugLog.markLastLineDeleted()`
   가 줄 끝에 `✗지움`. 대기 플래그 `KeyboardViewModel.typoMarkPending` 은 다른 입력 메서드마다
   해제한다 — 새 입력 메서드를 추가하면 해제 줄도 넣을 것 (`KeyboardViewModelTypoMarkTests`).
