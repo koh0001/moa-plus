@@ -285,6 +285,13 @@ enum SettingsCatalog {
             destination: .abbreviation,
             keywords: ["단축어", "약어", "자동완성", "확장", "등록"]
         ),
+        SettingsEntry(
+            title: "iOS 텍스트 대치도 사용",
+            icon: "text.insert",
+            destination: .abbreviation,
+            // 앱스토어 리뷰 "텍스트 대치를 연동하거나 불러올 수 있으면" (2026-10).
+            keywords: ["텍스트 대치", "텍스트대치", "대치", "단축키", "iOS", "아이폰 설정", "불러오기", "연동"]
+        ),
     ]
 
     /// 증상 라우터. 리뷰에서 실제로 관찰된 불만을 그대로 항목화했다.

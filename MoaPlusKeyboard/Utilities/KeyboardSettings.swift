@@ -52,6 +52,7 @@ final class KeyboardSettings: ObservableObject {
         static let cursorRepeatSpeed = "cursorRepeatSpeed"
         static let periodOnDoubleSpace = "periodOnDoubleSpace"
         static let abbreviationEnabled = "abbreviationEnabled"
+        static let systemTextReplacementEnabled = "systemTextReplacementEnabled"
         static let abbreviationUndoOnBackspace = "abbreviationUndoOnBackspace"
         static let abbreviationKeepConfirmSpace = "abbreviationKeepConfirmSpace"
         static let abbreviationTriggerPolicy = "abbreviationTriggerPolicy"
@@ -183,6 +184,12 @@ final class KeyboardSettings: ObservableObject {
     /// user can opt out without losing their data.
     @Published var abbreviationEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(abbreviationEnabled, forKey: Keys.abbreviationEnabled) }
+    }
+
+    /// iOS 텍스트 대치(설정 › 일반 › 키보드 › 텍스트 대치)도 단축어로 펼친다 (앱스토어 리뷰 2026-10). 기본 OFF.
+    /// 목록은 키보드만 받을 수 있다(`requestSupplementaryLexicon`) — 앱 화면에는 없다.
+    @Published var systemTextReplacementEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(systemTextReplacementEnabled, forKey: Keys.systemTextReplacementEnabled) }
     }
 
     /// 확장 직후 백스페이스 한 번으로 원래 트리거를 되살릴지 (iOS 텍스트 대치와 동일한 undo).
@@ -573,6 +580,7 @@ final class KeyboardSettings: ObservableObject {
         migrateLongPressPrimaryIfNeeded()
         assign(\.shortcutExpansionStore, load(ShortcutExpansionStore.self, forKey: Keys.shortcutExpansions) ?? ShortcutExpansionStore())
         assign(\.abbreviationEnabled, defaults.object(forKey: Keys.abbreviationEnabled) as? Bool ?? true)
+        assign(\.systemTextReplacementEnabled, defaults.bool(forKey: Keys.systemTextReplacementEnabled))
         assign(\.abbreviationUndoOnBackspaceEnabled, defaults.object(forKey: Keys.abbreviationUndoOnBackspace) as? Bool ?? true)
         assign(\.abbreviationKeepConfirmSpaceEnabled, defaults.object(forKey: Keys.abbreviationKeepConfirmSpace) as? Bool ?? true)
         assign(\.abbreviationTriggerPolicy,
@@ -739,6 +747,7 @@ final class KeyboardSettings: ObservableObject {
         // 사용자의 출력을 다음 `loadAll()` 이 옛 규칙으로 덮어쓴다.
         shortcutExpansionStore = ShortcutExpansionStore()
         abbreviationEnabled = true
+        systemTextReplacementEnabled = false
         abbreviationUndoOnBackspaceEnabled = true
         abbreviationKeepConfirmSpaceEnabled = true
         abbreviationTriggerPolicy = .safe

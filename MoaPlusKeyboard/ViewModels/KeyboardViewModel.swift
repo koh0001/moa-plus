@@ -297,9 +297,44 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func applyExpansionStore(_ store: ShortcutExpansionStore) {
-        guard store != lastLoadedExpansionStore else { return }
-        lastLoadedExpansionStore = store
-        abbreviationEngine.loadExpansions(store)
+        // 비교는 합친 결과로 — 텍스트 대치가 늦게 도착하거나 토글만 바뀌어도 트라이를 다시 만든다.
+        let merged = Self.mergedExpansionStore(
+            store,
+            systemReplacements: KeyboardSettings.shared.systemTextReplacementEnabled ? systemTextReplacements : [])
+        guard merged != lastLoadedExpansionStore else { return }
+        lastLoadedExpansionStore = merged
+        abbreviationEngine.loadExpansions(merged)
+    }
+
+    /// iOS 텍스트 대치 (설정 `systemTextReplacementEnabled`). 컨트롤러가 `requestSupplementaryLexicon` 으로 받아
+    /// 메인 스레드에서 넣는다. 한 번 만들어 둔 값을 계속 쓴다 — 매번 만들면 UUID 가 달라 위 비교가 매 키 실패한다.
+    private var systemTextReplacements: [ShortcutExpansion] = []
+
+    func setSystemTextReplacements(_ pairs: [(userInput: String, documentText: String)]) {
+        systemTextReplacements = Self.textReplacementExpansions(from: pairs)
+        applyExpansionStore(KeyboardSettings.shared.shortcutExpansionStore)
+    }
+
+    /// 렉시콘 항목 → 단축어. 연락처 이름(입력 = 결과)·빈 값·공백 든 단축키(엔진 규칙상 트리거에 공백 불가)는 뺀다.
+    static func textReplacementExpansions(from pairs: [(userInput: String, documentText: String)]) -> [ShortcutExpansion] {
+        var seen = Set<String>()
+        return pairs.compactMap { pair in
+            guard !pair.userInput.isEmpty, !pair.documentText.isEmpty, pair.userInput != pair.documentText,
+                  !pair.userInput.contains(where: \.isWhitespace),
+                  seen.insert(AbbreviationEngine.foldCase(pair.userInput)).inserted else { return nil }
+            return ShortcutExpansion(trigger: pair.userInput, replacement: pair.documentText)
+        }
+    }
+
+    /// 사용자 단축어가 이긴다 — 같은 트리거(대소문자 무시)가 둘이면 트라이 한 노드에 두 개가 걸려 자동 확장 대신
+    /// 후보 고르기가 된다. 사용자가 꺼 둔 단축어의 트리거도 텍스트 대치로 되살리지 않는다.
+    static func mergedExpansionStore(_ store: ShortcutExpansionStore,
+                                     systemReplacements: [ShortcutExpansion]) -> ShortcutExpansionStore {
+        guard !systemReplacements.isEmpty else { return store }
+        let userTriggers = Set(store.expansions.map { AbbreviationEngine.foldCase($0.trigger) })
+        var merged = store
+        merged.expansions += systemReplacements.filter { !userTriggers.contains(AbbreviationEngine.foldCase($0.trigger)) }
+        return merged
     }
 
     /// 스토어가 바뀌면 다음 키를 기다리지 않고 바로 트라이를 다시 만든다.

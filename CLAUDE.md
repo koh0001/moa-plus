@@ -758,6 +758,12 @@ v2.2.5 까지 ↗/↘ 를 꺼도 ㅣ/ㅡ 가 들어갔다 — `normalizedDirecti
   입력을 삼키는 셈이다. 이 설정을 끄면 되돌리기 삭제 길이도 `replacement.count` 로 줄어야
   한다 — 안 넣은 구분자를 넣은 것으로 계산하면 앞 글자를 한 자 더 먹는다
   (`testBackspace_afterExpansionWithoutConfirmSpace_restoresTrigger` 가드)
+- **iOS 텍스트 대치 (`systemTextReplacementEnabled`, 기본 OFF — 앱스토어 리뷰 2026-10)**: 키보드가 `requestSupplementaryLexicon` 으로
+  받은 항목을 엔진에 합친다(`viewWillAppear` 마다, 완료는 메인으로 넘김). 앱은 이 목록을 읽을 방법이 없다 — 화면에 안 나온다.
+  연락처 이름(입력 = 결과)·공백 든 단축키·대소문자 중복은 뺀다. **사용자 단축어가 이긴다**(꺼 둔 것 포함, 대소문자 무시) —
+  같은 트리거가 트라이 한 노드에 둘이면 자동 확장이 후보 고르기가 된다. `applyExpansionStore` 의 같음 비교는 **합친 결과**로 —
+  스토어만 비교하면 늦게 온 렉시콘·토글 변경이 트라이에 안 닿는다. 변환 항목은 받을 때 한 번만 만든다(매번 만들면 UUID 가
+  달라 그 비교가 매 키 실패). 단축어 마스터 토글이 꺼지면 같이 꺼진다 (`KeyboardViewModelTextReplacementTests`)
 - 등록 제한(`abbreviationTriggerPolicy`)은 **메인 앱 UI 전용**이다. 엔진에 길이 필터를 넣으면
   이미 등록된 1글자 단축어가 죽는다(소급 적용 없음)
 

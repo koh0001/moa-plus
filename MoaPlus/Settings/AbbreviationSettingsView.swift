@@ -23,6 +23,12 @@ struct AbbreviationSettingsView: View {
             }
 
             Section {
+                Toggle("iOS 텍스트 대치도 사용", isOn: $settings.systemTextReplacementEnabled)
+            } footer: {
+                Text("설정 › 일반 › 키보드 › 텍스트 대치에 등록한 단축키도 모아+에서 펼칩니다. ‘단축어 사용’이 켜져 있어야 하고, 같은 단축키가 아래 목록에도 있으면 모아+ 단축어가 먼저입니다. 텍스트 대치 목록은 키보드만 읽을 수 있어 이 화면에는 나오지 않습니다. 띄어쓰기가 든 단축키는 쓸 수 없습니다.")
+            }
+
+            Section {
                 Toggle("변환 후 띄어쓰기 유지", isOn: $settings.abbreviationKeepConfirmSpaceEnabled)
                 Toggle("백스페이스로 되돌리기", isOn: $settings.abbreviationUndoOnBackspaceEnabled)
             } footer: {

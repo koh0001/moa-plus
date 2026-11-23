@@ -122,8 +122,19 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         viewModel.updateWordSuggestionBarVisibility()
         heightConstraint?.constant = computedKeyboardHeight()
         viewModel.canSwitchInputMode = needsInputModeSwitchKey
+        loadSystemTextReplacementsIfEnabled()
         // 빈 필드로 새로 열렸을 때는 textDidChange 가 아직 한 번도 불리지 않는다.
         viewModel.refreshAutoCapitalization()
+    }
+
+    /// iOS 텍스트 대치를 단축어 엔진에 넣는다 (설정 `systemTextReplacementEnabled`). 사용자가 설정 앱에서 목록을
+    /// 고쳤을 수 있어 등장할 때마다 다시 받는다. 완료 스레드가 문서에 없어 메인으로 넘긴다.
+    private func loadSystemTextReplacementsIfEnabled() {
+        guard KeyboardSettings.shared.systemTextReplacementEnabled else { return }
+        requestSupplementaryLexicon { [weak self] lexicon in
+            let pairs = lexicon.entries.map { (userInput: $0.userInput, documentText: $0.documentText) }
+            DispatchQueue.main.async { self?.viewModel.setSystemTextReplacements(pairs) }
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
