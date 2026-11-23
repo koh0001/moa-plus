@@ -27,6 +27,7 @@ final class KeyboardSettings: ObservableObject {
         static let earlyTouchDiagnostic = "earlyTouchDiagnostic"
         static let earlyTouchDelayedDiagnostic = "earlyTouchDelayedDiagnostic"
         static let autoCapitalizeDiagnostic = "autoCapitalizeDiagnostic"
+        static let wordSuggestionEnabled = "wordSuggestionEnabled"
         static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
@@ -363,6 +364,11 @@ final class KeyboardSettings: ObservableObject {
         didSet { guard !isLoading else { return }; writePrimitive(periodOnDoubleSpaceEnabled, forKey: Keys.periodOnDoubleSpace) }
     }
 
+    /// 단어 추천 바 (기본 OFF — 켜면 키보드가 후보 줄만큼 높아져 기존 사용자 화면이 바뀐다).
+    @Published var wordSuggestionEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(wordSuggestionEnabled, forKey: Keys.wordSuggestionEnabled) }
+    }
+
     /// Capitalize the first letter of a sentence in English mode (default OFF).
     /// iOS never forwards its own auto-capitalization to custom keyboards, so
     /// we arm `shiftState = .on` ourselves at sentence starts.
@@ -587,6 +593,7 @@ final class KeyboardSettings: ObservableObject {
         assign(\.cursorMoveBySpaceDragEnabled, defaults.object(forKey: Keys.cursorMoveBySpaceDragEnabled) as? Bool ?? true)
         assign(\.cursorRepeatSpeed, defaults.object(forKey: Keys.cursorRepeatSpeed) as? Int ?? 1)
         assign(\.periodOnDoubleSpaceEnabled, defaults.object(forKey: Keys.periodOnDoubleSpace) as? Bool ?? true)
+        assign(\.wordSuggestionEnabled, defaults.object(forKey: Keys.wordSuggestionEnabled) as? Bool ?? false)
         assign(\.englishAutoCapitalizeEnabled, defaults.object(forKey: Keys.englishAutoCapitalize) as? Bool ?? false)
         assign(\.englishLongPressUppercaseEnabled, defaults.object(forKey: Keys.englishLongPressUppercase) as? Bool ?? true)
         assign(\.layoutCustomization, load(LayoutCustomization.self, forKey: Keys.layoutCustomization) ?? LayoutCustomization())
@@ -745,6 +752,7 @@ final class KeyboardSettings: ObservableObject {
         cursorMoveBySpaceDragEnabled = true
         cursorRepeatSpeed = 1
         periodOnDoubleSpaceEnabled = true
+        wordSuggestionEnabled = false
         englishAutoCapitalizeEnabled = false
         englishLongPressUppercaseEnabled = true
         layoutCustomization = LayoutCustomization()

@@ -234,7 +234,7 @@ struct KeyboardView: View {
             // `keyHeight(for:)` 는 주어진 높이를 그리드 행에 전부 나눠주므로, 컨테이너만
             // 키워 두면 늘어난 높이를 키들이 그대로 흡수해 버리고 후보 바는 여전히
             // 아래로 넘쳐 기능행이 잘린다(실기기 확인).
-            let candidateBarFootprint: CGFloat = viewModel.isAbbreviationCandidateVisible
+            let candidateBarFootprint: CGFloat = viewModel.isCandidateBarVisible
                 ? KeyboardMetrics.abbreviationCandidateBarFootprint
                 : 0
             let screen = UIScreen.main.bounds
@@ -274,9 +274,9 @@ struct KeyboardView: View {
                 ZStack {
                     VStack(spacing: KeyboardMetrics.keySpacing) {
                         // Abbreviation candidate bar.
-                        // 표시 조건은 `isAbbreviationCandidateVisible` **하나만** 본다 —
-                        // KeyboardViewController 의 높이 보정이 같은 플래그를 구독하므로,
-                        // 여기에 조건을 더 붙이면 둘이 어긋나 높이가 안 맞는다.
+                        // 줄 자리는 `isCandidateBarVisible`(약어 후보 ∨ 단어 추천) **하나만** 본다 —
+                        // KeyboardViewController 의 높이 보정이 같은 조건을 구독하므로,
+                        // 여기에 조건을 더 붙이면 둘이 어긋나 높이가 안 맞는다. 둘 다면 약어가 우선.
                         if viewModel.isAbbreviationCandidateVisible {
                             AbbreviationCandidateView(
                                 trigger: viewModel.abbreviationCandidates.first?.trigger ?? "",
@@ -284,6 +284,10 @@ struct KeyboardView: View {
                                 onConfirm: { expansion in viewModel.confirmAbbreviation(expansion) },
                                 onDismiss: { viewModel.dismissAbbreviation() }
                             )
+                        } else if viewModel.isWordSuggestionBarVisible {
+                            WordSuggestionBarView(words: viewModel.wordSuggestions) { word in
+                                viewModel.acceptWordSuggestion(word)
+                            }
                         }
 
                         if useSplit {
