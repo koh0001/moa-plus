@@ -195,9 +195,10 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         let bounds = UIScreen.main.bounds
         let screenShort = min(bounds.width, bounds.height)
         let screenLong = max(bounds.width, bounds.height)
-        let isPad = traitCollection.userInterfaceIdiom == .pad
         // 키보드 폭 = 현재 화면 폭. 레이아웃 전이면 UIScreen 폭으로 폴백.
         let width = view.bounds.width > 0 ? view.bounds.width : bounds.width
+        let isPad = KeyboardMetrics.usesPadMetrics(
+            isPad: traitCollection.userInterfaceIdiom == .pad, keyboardWidth: width)
         let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
             keyboardWidth: width, screenShort: screenShort, screenLong: screenLong)
         return KeyboardMetrics.keyboardHeight(
@@ -247,9 +248,19 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// 아직 자기 잠정 높이로 잡아 둔 것이라 실제와 다르다(위 999 우선순위 주석 참조).
     /// 레이아웃이 정착한 뒤 값이 바뀔 때마다 덮어써야 기록이 실제를 가리킨다.
     private var lastDiagnosticBoundsHeight: CGFloat = -1
+    /// 높이를 마지막으로 다시 잡은 폭 (`viewDidLayoutSubviews` — 아이패드 플로팅 전환).
+    private var lastLayoutWidth: CGFloat = 0
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // 아이패드 플로팅 전환은 viewWillTransition 을 거치지 않을 수 있어, 폭이 실제로 바뀌면 높이를 다시 잡는다.
+        // 같은 폭이면 건너뛰고 상수가 같으면 안 건드린다 — 제약 변경이 레이아웃을 다시 부르는 고리를 막는다.
+        // 아이패드만 — 아이폰은 기존 세 지점(viewWillAppear · viewWillTransition · 후보 줄 구독)이 그대로 맡는다.
+        if traitCollection.userInterfaceIdiom == .pad, view.bounds.width > 0, view.bounds.width != lastLayoutWidth {
+            lastLayoutWidth = view.bounds.width
+            let height = computedKeyboardHeight()
+            if let constraint = heightConstraint, constraint.constant != height { constraint.constant = height }
+        }
         EarlyTouchDiagnostics.keyboardHeight = view.bounds.height
         guard view.bounds.height != lastDiagnosticBoundsHeight else { return }
         recordGeometryDiagnostic(measured: view.safeAreaInsets.bottom)
@@ -385,7 +396,8 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             let bounds = UIScreen.main.bounds
             let screenShort = min(bounds.width, bounds.height)
             let screenLong = max(bounds.width, bounds.height)
-            let isPad = self.traitCollection.userInterfaceIdiom == .pad
+            let isPad = KeyboardMetrics.usesPadMetrics(
+                isPad: self.traitCollection.userInterfaceIdiom == .pad, keyboardWidth: size.width)
             let isLandscape = KeyboardMetrics.isLandscapeKeyboard(
                 keyboardWidth: size.width, screenShort: screenShort, screenLong: screenLong)
             self.heightConstraint?.constant = KeyboardMetrics.keyboardHeight(

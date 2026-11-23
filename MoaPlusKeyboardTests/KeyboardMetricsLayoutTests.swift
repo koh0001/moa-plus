@@ -399,4 +399,17 @@ final class KeyboardMetricsLayoutTests: XCTestCase {
         XCTAssertEqual(KeyboardMetrics.numberPadKeys[0], ["1", "2", "3"])
         XCTAssertEqual(KeyboardMetrics.numberPadKeys[3], [".", "0", KeyboardMetrics.numberPadBackspaceLabel])
     }
+
+    /// 아이패드 플로팅 키보드(~320pt)는 아이폰 높이·분할 없음 (앱스토어 리뷰 2026-11 "플로팅 키보드 버튼이 홀쭉").
+    /// 가장 좁은 아이패드 세로(744pt)·폭 미정(0)은 아이패드 그대로.
+    func testFloatingIPadKeyboard_usesPhoneMetrics() {
+        XCTAssertFalse(KeyboardMetrics.usesPadMetrics(isPad: true, keyboardWidth: 320))
+        XCTAssertTrue(KeyboardMetrics.usesPadMetrics(isPad: true, keyboardWidth: 744))
+        XCTAssertTrue(KeyboardMetrics.usesPadMetrics(isPad: true, keyboardWidth: 0))
+        XCTAssertFalse(KeyboardMetrics.usesPadMetrics(isPad: false, keyboardWidth: 1024))
+        let floating = KeyboardMetrics.usesPadMetrics(isPad: true, keyboardWidth: 320)
+        XCTAssertEqual(KeyboardMetrics.keyboardHeight(isPad: floating, isLandscape: false, screenShort: 1024, screenLong: 1366),
+                       KeyboardMetrics.keyboardHeight, accuracy: 0.01)
+        XCTAssertFalse(KeyboardMetrics.usesIPadSplit(isPad: floating, isLandscape: false, portraitSplitEnabled: true))
+    }
 }

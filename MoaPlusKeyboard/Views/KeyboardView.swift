@@ -252,7 +252,9 @@ struct KeyboardView: View {
             let screen = UIScreen.main.bounds
             let screenShort = min(screen.width, screen.height)
             let screenLong = max(screen.width, screen.height)
-            let isPad = layoutOverride?.isPad ?? (UIDevice.current.userInterfaceIdiom == .pad)
+            // 플로팅(좁은 아이패드 키보드)이면 분할하지 않는다 — 컨트롤러 높이 계산과 같은 규칙.
+            let isPad = layoutOverride?.isPad ?? KeyboardMetrics.usesPadMetrics(
+                isPad: UIDevice.current.userInterfaceIdiom == .pad, keyboardWidth: geometry.size.width)
             let isLandscape = layoutOverride?.isLandscape ?? KeyboardMetrics.isLandscapeKeyboard(
                 keyboardWidth: geometry.size.width, screenShort: screenShort, screenLong: screenLong)
             // 하단 여백(홈 인디케이터 회피). 근거는 실측 안전영역 하나뿐이다 —

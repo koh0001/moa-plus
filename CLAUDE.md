@@ -461,6 +461,10 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
   동일한 실패 모드). 가드 `KeyboardBottomInsetTests`
 - 높이 계산 지점이 셋이다 — `computedKeyboardHeight()`, `viewWillTransition`(인라인
   중복), `KeyboardView`. 하나라도 빠지면 회전/후보 바에서 어긋난다
+- **아이패드 플로팅 키보드(폭 < 500pt)는 아이폰 기준**(`KeyboardMetrics.usesPadMetrics`, 앱스토어 리뷰 2026-11 "버튼이 홀쭉") —
+  아이패드 높이를 쓰면 320pt 폭에 키가 길쭉해지고, 세로 분할을 켜 뒀으면 320pt 를 쪼갠다. 위 세 지점 + 분할 판정이 같은 함수를
+  쓴다(한손 모드 판정은 실제 기기 종류 그대로 — 플로팅에서 한손이 켜지면 너무 좁다). 플로팅 전환은 `viewWillTransition` 을
+  안 거칠 수 있어 `viewDidLayoutSubviews` 가 **폭이 바뀔 때만** 높이를 다시 잡는다. ⚠️ 실기기 미확인
 - `extraBottomInsetRange` 상한 34pt 는 자동이 무동작일 때 **수동만으로** 홈 제스처
   구역을 전부 비울 수 있게 하는 탈출구다. 좁히지 말 것
 
