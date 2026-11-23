@@ -165,6 +165,21 @@ class KeyboardViewModel: ObservableObject {
     @Published var abbreviationCandidate: ShortcutExpansion?
     @Published var abbreviationCandidates: [ShortcutExpansion] = []
 
+    /// 단어 추천 바 자리. 설정이 켜져 있으면 후보가 없어도 **유지**한다 — 후보 유무로 바를 여닫으면
+    /// 거의 매 키마다 키보드 높이가 출렁인다.
+    @Published var isWordSuggestionBarVisible: Bool = false
+    @Published var wordSuggestions: [String] = []
+    private lazy var textChecker = UITextChecker()
+    private var warmedUpSuggestionLanguages: Set<String> = []
+    /// 지금 보이는 후보를 고른 단어. 고를 때 캐럿 앞 단어가 이것과 다르면 후보가 낡은 것이다.
+    private var suggestionSourceToken = ""
+    /// 추천으로 넣은 "단어 + 공백". 바로 뒤에 문장부호를 치면 그 공백을 거둔다(iOS 순정과 같음).
+    private var pendingSuggestionSpace: String?
+
+    /// 키보드 위 후보 줄이 차지하는가. 뷰(그리드 배분)와 컨트롤러(컨테이너 높이)가 **같은 조건**을 봐야
+    /// 기능행이 안 잘린다 — 컨트롤러는 두 `@Published` 를 합쳐 같은 식으로 구독한다.
+    var isCandidateBarVisible: Bool { isAbbreviationCandidateVisible || isWordSuggestionBarVisible }
+
     // Forwarding properties for backward compatibility.
     //
     // **동일 값 재대입을 여기서 차단한다.** `@Published` 는 값이 같아도
@@ -749,6 +764,12 @@ class KeyboardViewModel: ObservableObject {
         if previewMode { return }
         let resolved = shiftedSymbolIfNeeded(symbol)
         commitCurrent()
+        // 추천 단어 뒤 자동 공백에 문장부호가 오면 공백을 거둔다 — "감사합니다 ." 방지.
+        if let pending = pendingSuggestionSpace, [".", ",", "!", "?"].contains(resolved),
+           delegate?.textBeforeCursor()?.hasSuffix(pending) == true {
+            delegate?.deleteBackward()
+        }
+        pendingSuggestionSpace = nil
         if !bypassAutoBracket && insertWithAutoBracket(resolved) {
             // Bracket pair inserted with cursor positioned
         } else {
@@ -1018,6 +1039,92 @@ class KeyboardViewModel: ObservableObject {
         commitCurrent()
         abbreviationEngine.resetBuffer()
         scheduleAutoCapitalizationRefresh()
+    }
+
+    // MARK: - 단어 추천
+
+    /// 캐럿 앞 단어의 완성 후보를 다시 고른다. 후보는 iOS 내장 `UITextChecker` — 공식 언어 목록에 한국어가
+    /// 없지만 "ko_KR" 완성어는 자모 단위로 동작한다(안 → 아니·아니면, 감ㅅ → 감사…).
+    /// 실기기 실측(iOS 27.2.1): 언어별 첫 호출 ~100ms, 이후 ~7ms, 메모리 +2MB. 메인 스레드 전용
+    /// API(NS_SWIFT_UI_ACTOR)라 백그라운드로 못 뺀다. 컨트롤러가 우리 입력·호스트 편집 뒤 **다음 런루프 틱**에
+    /// 부른다 — 자동 대문자와 같은 이유(콜백 안에서는 방금 넣은 글자가 문맥에 아직 없다).
+    func refreshWordSuggestions() {
+        // 추천으로 넣은 공백 뒤에 다른 걸 쳤으면 "문장부호 앞 공백 거두기" 대상이 아니다.
+        if let pending = pendingSuggestionSpace, delegate?.textBeforeCursor()?.hasSuffix(pending) != true {
+            pendingSuggestionSpace = nil
+        }
+        guard updateWordSuggestionBarVisibility(), !keyboardMode.isSymbol else { return setWordSuggestions([]) }
+
+        let language = keyboardMode == .english ? "en_US" : "ko_KR"
+        if warmedUpSuggestionLanguages.insert(language).inserted {
+            // 언어별 첫 호출 비용을 키보드가 뜰 때·언어를 바꿀 때 미리 치러 둔다 — 첫 글자에서 멈추지 않게.
+            _ = textChecker.completions(forPartialWordRange: NSRange(location: 0, length: 1),
+                                        in: language == "ko_KR" ? "가" : "a", language: language)
+        }
+        let token = currentSuggestionToken()
+        suggestionSourceToken = token
+        guard !token.isEmpty else { return setWordSuggestions([]) }
+        let range = NSRange(location: 0, length: (token as NSString).length)
+        let capitalize = token.first?.isUppercase == true
+        let words = (textChecker.completions(forPartialWordRange: range, in: token, language: language) ?? [])
+            .map { capitalize ? $0.prefix(1).uppercased() + $0.dropFirst() : $0 }
+            .filter { $0.caseInsensitiveCompare(token) != .orderedSame }
+            .prefix(3)
+        setWordSuggestions(Array(words))
+    }
+
+    /// 추천 바 자리만 판정한다(가벼움 — 사전 조회 없음). 컨트롤러가 `viewWillAppear` 에서 높이를 계산하기
+    /// **전에** 동기로 불러야 키보드가 뜬 뒤 한 번 더 커지지 않는다.
+    /// 이메일·URL·숫자·비밀번호 칸 판정은 자동 대문자와 같은 기준 — 사전 단어가 틀린 입력란이다.
+    @discardableResult
+    func updateWordSuggestionBarVisibility() -> Bool {
+        let enabled = !previewMode
+            && KeyboardSettings.shared.wordSuggestionEnabled
+            && (delegate?.hostAllowsAutoCapitalization() ?? true)
+        if isWordSuggestionBarVisible != enabled { isWordSuggestionBarVisible = enabled }
+        return enabled
+    }
+
+    /// 추천 단어를 고른다: 캐럿 앞 단어를 지우고 추천 + 공백을 넣는다.
+    func acceptWordSuggestion(_ word: String) {
+        typoMarkPending = false
+        guard !previewMode else { return }
+        // 후보를 고른 단어가 아직 캐럿 앞에 있을 때만 바꾼다. 캐럿 탭을 알리지 않는 호스트(SwiftUI TextField 등)
+        // 에서는 낡은 후보가 남아 다른 단어를 지울 수 있다 — 그때는 후보만 새로 고친다.
+        let token = currentSuggestionToken()
+        guard !token.isEmpty, token == suggestionSourceToken else { return refreshWordSuggestions() }
+        // 조합 중 글자는 이미 화면에 있다(delete+insert 시뮬레이션) — 상태만 확정한 뒤 지운다.
+        commitCurrent()
+        abbreviationEngine.resetBuffer()
+        for _ in 0..<token.count { delegate?.deleteBackward() }
+        delegate?.insertText(word + " ")
+        pendingSuggestionSpace = word + " "
+        delegate?.triggerHapticFeedback()
+        setWordSuggestions([])
+        scheduleAutoCapitalizationRefresh()
+    }
+
+    /// 추천 대상 단어. 선택 영역이 있거나 캐럿이 단어 중간이면 없음 — 그때 지우면 선택·뒷부분이 깨진다
+    /// ("hel|lo" → "hello lo").
+    private func currentSuggestionToken() -> String {
+        if delegate?.hostHasSelection() == true { return "" }
+        if let next = delegate?.textAfterCursor()?.first, Self.isWordCharacter(next) { return "" }
+        return Self.wordSuggestionToken(before: delegate?.textBeforeCursor())
+    }
+
+    /// 캐럿 바로 앞 단어 — 끝에서부터 글자(한글 음절·자모·영문)와 아포스트로피(don't)가 이어지는 구간.
+    /// 앞쪽 따옴표('감사)는 단어가 아니므로 뺀다.
+    static func wordSuggestionToken(before: String?) -> String {
+        let run = (before ?? "").reversed().prefix(while: isWordCharacter).reversed()
+        return String(run.drop { $0 == "'" || $0 == "’" })
+    }
+
+    private static func isWordCharacter(_ c: Character) -> Bool {
+        c.isLetter || c == "'" || c == "’"
+    }
+
+    private func setWordSuggestions(_ words: [String]) {
+        if wordSuggestions != words { wordSuggestions = words }
     }
 
     func toggleSpecialCharLayer() {
@@ -1827,9 +1934,14 @@ protocol KeyboardViewModelDelegate: AnyObject {
     /// empty field (no context because there is nothing) from a secure field
     /// (text exists, context withheld).
     func hostHasText() -> Bool
+
+    /// 호스트 입력란에 선택 영역이 있는가. 단어 추천은 이때 동작하지 않는다 — 첫 `deleteBackward` 가 선택을
+    /// 지워 버려 글자 수 계산이 어긋난다. 프로토콜 본문에 둬야 컨트롤러 구현이 동적으로 불린다.
+    func hostHasSelection() -> Bool
 }
 
 extension KeyboardViewModelDelegate {
+    func hostHasSelection() -> Bool { false }
     func hideKeyboard() {}
     func triggerLayerSwitchFeedback() {}
     func triggerLongPressFeedback() {}

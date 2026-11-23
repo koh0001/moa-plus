@@ -21,6 +21,12 @@ struct InputBehaviorSettingsView: View {
             }
 
             Section {
+                Toggle("단어 추천", isOn: $settings.wordSuggestionEnabled)
+            } footer: {
+                Text("입력 중인 단어의 완성 후보를 키보드 위 줄에 보여 줍니다. 후보를 누르면 그 단어와 공백이 들어갑니다. 켜면 키보드가 후보 줄만큼 높아지며, 이메일·주소·숫자 입력란에서는 나타나지 않습니다.")
+            }
+
+            Section {
                 Toggle("영문 문장 첫 글자 대문자", isOn: $settings.englishAutoCapitalizeEnabled)
                 Toggle("영문 키 길게 눌러 대문자", isOn: $settings.englishLongPressUppercaseEnabled)
             } header: {

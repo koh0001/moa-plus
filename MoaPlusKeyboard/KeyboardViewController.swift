@@ -37,6 +37,8 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// 모든 높이 계산 지점에 반영한다.
     private var isCandidateBarVisible = false
     private var candidateBarCancellable: AnyCancellable?
+    private var keyboardModeCancellable: AnyCancellable?
+    private var wordSuggestionRefreshPending = false
     /// 호스트 앱의 백그라운드 ↔ 포그라운드 전환 관찰자.
     ///
     /// 익스텐션에는 `UIApplication` 이 없으므로 `NSExtensionHost*` 알림을 쓴다.
@@ -115,6 +117,9 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // 곧바로 키우므로 결과는 같지만 한 번의 정착 과정을 거친다 — 위 999 우선순위
         // 주석이 설명하는 것과 같은 종류의 수렴이다.
         viewModel.bottomSafeAreaInset = view.safeAreaInsets.bottom
+        // 추천 줄 자리는 높이를 정하기 **전에** 판정한다 — 비동기 갱신(viewDidAppear)에만 맡기면 키보드가
+        // 뜬 뒤 줄만큼 한 번 더 커진다.
+        viewModel.updateWordSuggestionBarVisibility()
         heightConstraint?.constant = computedKeyboardHeight()
         viewModel.canSwitchInputMode = needsInputModeSwitchKey
         // 빈 필드로 새로 열렸을 때는 textDidChange 가 아직 한 번도 불리지 않는다.
@@ -150,6 +155,9 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 
         // Reset any stuck gesture state (e.g., user was mid-drag when backgrounding)
         viewModel.resetGestureState()
+
+        // 입력란이 바뀌었을 수 있다 — 추천 바 표시(입력란 종류) 판정 + 언어별 첫 호출 비용을 지금 치른다.
+        scheduleWordSuggestionRefresh()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -321,13 +329,34 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     /// 후보 바 표시/숨김에 맞춰 키보드 높이를 늘렸다 줄인다.
     /// 이게 없으면 바가 뜨는 순간 기능행(스페이스·엔터)이 화면 밖으로 밀려 잘린다.
     private func observeCandidateBar() {
+        // `KeyboardViewModel.isCandidateBarVisible` 과 같은 식 — 뷰의 그리드 배분과 어긋나면 기능행이 잘린다.
         candidateBarCancellable = viewModel.$isAbbreviationCandidateVisible
+            .combineLatest(viewModel.$isWordSuggestionBarVisible) { $0 || $1 }
             .removeDuplicates()
             .sink { [weak self] visible in
                 guard let self, self.isCandidateBarVisible != visible else { return }
                 self.isCandidateBarVisible = visible
                 self.heightConstraint?.constant = self.computedKeyboardHeight()
             }
+        // 한/영·기호 전환은 글자를 바꾸지 않아 아래 텍스트 훅을 안 지난다 — 후보 언어를 다시 맞춘다.
+        // dropFirst: 구독 즉시 오는 현재 값까지 받으면 첫 화면 전에 사전 첫 호출(~100ms)이 돈다 — 처음은 viewDidAppear 몫.
+        keyboardModeCancellable = viewModel.$keyboardMode
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.scheduleWordSuggestionRefresh() }
+    }
+
+    /// 단어 추천 갱신을 다음 런루프 틱에 한 번만 돌린다. 모든 글자 변경이 이 컨트롤러의 프록시 호출을
+    /// 지나므로 여기가 유일한 길목이다(호스트는 우리 삽입에 `textDidChange` 를 안 보낸다). 조합 중
+    /// delete+insert 가 키 하나에 여러 번 와도 한 번으로 합친다.
+    private func scheduleWordSuggestionRefresh() {
+        guard !wordSuggestionRefreshPending else { return }
+        wordSuggestionRefreshPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.wordSuggestionRefreshPending = false
+            self.viewModel.refreshWordSuggestions()
+        }
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -450,6 +479,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
             // 될 때도 있고 안 될 때도 있는 간헐 증상이 된다.
             self?.viewModel.refreshAutoCapitalization()
         }
+        scheduleWordSuggestionRefresh()
     }
 
     override func selectionWillChange(_ textInput: UITextInput?) {}
@@ -463,6 +493,7 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
         // handleExternalCursorMove is a harmless no-op there.
         if isProgrammaticTextChange { return }
         viewModel.handleExternalCursorMove()
+        scheduleWordSuggestionRefresh()
     }
 }
 
@@ -470,10 +501,12 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
 extension KeyboardViewController: KeyboardViewModelDelegate {
     func insertText(_ text: String) {
         textDocumentProxy.insertText(text)
+        scheduleWordSuggestionRefresh()
     }
 
     func deleteBackward() {
         textDocumentProxy.deleteBackward()
+        scheduleWordSuggestionRefresh()
     }
 
     func updateComposingText(from previous: String, to current: String) {
@@ -490,6 +523,7 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
         if !current.isEmpty {
             textDocumentProxy.insertText(current)
         }
+        scheduleWordSuggestionRefresh()
     }
 
     func switchToNextKeyboard() {
@@ -524,6 +558,7 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
 
     func moveCursor(by offset: Int) {
         textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
+        scheduleWordSuggestionRefresh()
     }
 
     func textBeforeCursor() -> String? {
@@ -536,6 +571,10 @@ extension KeyboardViewController: KeyboardViewModelDelegate {
 
     func hostHasText() -> Bool {
         textDocumentProxy.hasText
+    }
+
+    func hostHasSelection() -> Bool {
+        !(textDocumentProxy.selectedText ?? "").isEmpty
     }
 
     /// 대문자화가 명백히 틀린 필드만 걸러낸다. `autocapitalizationType` 은
