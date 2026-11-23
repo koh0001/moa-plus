@@ -40,4 +40,23 @@ final class OneHandedLayoutTests: XCTestCase {
             XCTAssertGreaterThan(row.spaceWidth, row.letterToggleWidth, "\(mode): 스페이스바가 너무 좁다")
         }
     }
+
+    /// 가운데(좌우 여백)는 띠가 없어 내림 키가 기능행에 남는다 — 가장 좁은 조합에 지구본·내림 키를
+    /// 모두 얹어도 스페이스바가 키 한 칸 이상 남아야 한다 (앱스토어 리뷰 2026-10 "양 옆 여백").
+    func testCenter_narrowestRowWithGlobeAndDismiss_keepsUsableSpaceBar() {
+        XCTAssertEqual(KeyboardPlacement.center.effectiveSide(isPad: false, isLandscape: false), .center)
+        XCTAssertNil(KeyboardPlacement.center.effectiveSide(isPad: true, isLandscape: false), "아이패드")
+        let width = KeyboardPlacement.keyboardWidth(
+            totalWidth: 375, ratio: 0, range: KeyboardPlacement.center.widthRatioBounds)
+        for mode in [KeyboardMode.korean, .english, .symbolFromKorean] {
+            let row = FunctionRowView(
+                totalWidth: width, mode: mode,
+                onToggleSymbolPressed: {}, onToggleLetterPressed: {},
+                onSpacePressed: {}, onPunctuation: { _ in }, onReturnPressed: {},
+                showGlobeKey: true, showDismissKey: true, layoutCustomization: LayoutCustomization())
+            XCTAssertEqual(row.occupiedWidth, row.availableWidth, accuracy: 0.5, "\(mode): ⏎ 잘림")
+            XCTAssertGreaterThanOrEqual(row.spaceWidth, row.letterToggleWidth,
+                                        "\(mode): 스페이스바가 키 한 칸보다 좁다 — 가운데의 하한을 올릴 것")
+        }
+    }
 }

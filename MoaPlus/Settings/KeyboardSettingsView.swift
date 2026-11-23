@@ -62,7 +62,11 @@ struct KeyboardSettingsView: View {
             deviceInset: DeviceSafeArea.bottomInset,
             extra: settings.keyboardExtraBottomInset)
         if inset > 0 { parts.append("여백 \(Int(inset))pt") }
-        if settings.keyboardPlacement != .full { parts.append("한손 \(settings.keyboardPlacement.displayName)") }
+        switch settings.keyboardPlacement {
+        case .full: break
+        case .center: parts.append("좌우 여백")
+        case .left, .right: parts.append("한손 \(settings.keyboardPlacement.displayName)")
+        }
         return parts.joined(separator: " · ")
     }
 

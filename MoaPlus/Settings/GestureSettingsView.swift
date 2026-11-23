@@ -216,7 +216,7 @@ struct GestureSettingsView: View {
             Section {
                 Toggle("제스처 미리보기", isOn: $settings.showGesturePreview)
             } footer: {
-                Text("입력 시 긋기 방향과 예측 모음을 화면에 표시합니다.")
+                Text("입력 시 긋기 방향과 예측 모음, 그 모음으로 조합될 글자(예: 와 ㅘ)를 화면에 표시합니다.")
             }
         }
         .navigationTitle("긋기 입력 설정")

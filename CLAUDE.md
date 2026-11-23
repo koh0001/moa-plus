@@ -413,6 +413,10 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - 배경은 한손 모드일 때 바깥에서 한 번만 그린다(`keyboardContent(drawsBackground:)`). 배경 사진은 띠 폭을
   `keyboardBackground(photoFocusInsets:)` 로 넘겨 본체 기준으로 놓는다(이슈 #39 — 위 "배경 사진 맞춤 · 크기")
 - 폭 하한 0.70 = 375pt + 지구본 표시에서도 기능행이 맞는 선 (`OneHandedLayoutTests`). 하한을 내리면 이 테스트로 확인
+- **가운데(`.center`, 좌우 여백 — 앱스토어 리뷰 2026-10)**: 띠 버튼 없이 양옆을 같게 비운다(사진도 양쪽 절반씩 `photoFocusInsets`).
+  띠가 없어 내림 키는 **기능행에 남으므로** 폭 범위가 따로다(`centerWidthRatioRange` 0.80~0.96, 저장값 `oneHandedWidthRatio` 공유 —
+  슬라이더·실제 폭 모두 `widthRatioBounds`). 0.70 에서는 375pt + 지구본 + 내림 키의 스페이스바가 키 한 칸보다 좁다(실측).
+  키보드에서 빠져나오는 버튼이 없어 설정 화면에서만 바꾼다. 렌더 `KeyboardSnapshotTests.test_snapshot_centerPlacement`
 - 이름을 손이 아니라 **위치**로 붙였다 — 긋기 프리셋 "오른손용/왼손용/양손용" 과 혼동(이슈 #31)
 - 띠 버튼 변경은 전체 접근 OFF 면 App Group 에 못 써 다음 `loadAll()` 에서 원래 값으로 돌아온다.
   그래서 호스트 복귀(`NSExtensionHostDidBecomeActive`)의 `loadAll()` 은 `hasFullAccess` 일 때만 돈다 —
@@ -571,11 +575,14 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── keyboardAutoBottomInsetEnabled: Bool    (홈 인디케이터 구역 자동 회피, 기본 ON)
 ├── keyboardExtraBottomInset: Double        (자동 여백 위에 더할 추가 여백 0~34pt, 기본 0)
 ├── keyboardPlacement: KeyboardPlacement   (한손 모드 .full 기본/.left/.right) + oneHandedWidthRatio (0.70~0.90)
+├── compactReturnKeyEnabled: Bool           (⏎ 를 키 한 칸 폭으로, 기본 OFF. 남는 폭은 스페이스바만 — 펑크 폭은 좁히기 전 ⏎ 기준)
 ├── showGlobeKey: Bool                      (v2.2.6 부터 렌더 미사용 — 지구본은 needsInputModeSwitchKey 로 자동)
 ├── consonantDiagonalDerivationEnabled: Bool (자음 대각선 진입 파생, 기본 OFF=순정 모아키)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)
 ├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
+├── returnToLettersAfterBracket: Bool       (기호 자판에서 괄호 탭 → 글자 자판, 기본 OFF. 탭 처리 중이라 toggleSymbolMode 를
+│                                             부르지 않는다 — supersedeHeldGridKey 가 떼는 키를 한 번 더 확정함)
 ├── wordDeleteEnabled: Bool
 ├── backspaceDeletesWholeSyllable: Bool  (조합 중 받침 없는 글자를 한 번에, 기본 OFF=자소 단위)
 ├── wordDeleteDelay: Double
@@ -751,6 +758,12 @@ v2.2.5 까지 ↗/↘ 를 꺼도 ㅣ/ㅡ 가 들어갔다 — `normalizedDirecti
   입력을 삼키는 셈이다. 이 설정을 끄면 되돌리기 삭제 길이도 `replacement.count` 로 줄어야
   한다 — 안 넣은 구분자를 넣은 것으로 계산하면 앞 글자를 한 자 더 먹는다
   (`testBackspace_afterExpansionWithoutConfirmSpace_restoresTrigger` 가드)
+- **iOS 텍스트 대치 (`systemTextReplacementEnabled`, 기본 OFF — 앱스토어 리뷰 2026-10)**: 키보드가 `requestSupplementaryLexicon` 으로
+  받은 항목을 엔진에 합친다(`viewWillAppear` 마다, 완료는 메인으로 넘김). 앱은 이 목록을 읽을 방법이 없다 — 화면에 안 나온다.
+  연락처 이름(입력 = 결과)·공백 든 단축키·대소문자 중복은 뺀다. **사용자 단축어가 이긴다**(꺼 둔 것 포함, 대소문자 무시) —
+  같은 트리거가 트라이 한 노드에 둘이면 자동 확장이 후보 고르기가 된다. `applyExpansionStore` 의 같음 비교는 **합친 결과**로 —
+  스토어만 비교하면 늦게 온 렉시콘·토글 변경이 트라이에 안 닿는다. 변환 항목은 받을 때 한 번만 만든다(매번 만들면 UUID 가
+  달라 그 비교가 매 키 실패). 단축어 마스터 토글이 꺼지면 같이 꺼진다 (`KeyboardViewModelTextReplacementTests`)
 - 등록 제한(`abbreviationTriggerPolicy`)은 **메인 앱 UI 전용**이다. 엔진에 길이 필터를 넣으면
   이미 등록된 1글자 단축어가 죽는다(소급 적용 없음)
 

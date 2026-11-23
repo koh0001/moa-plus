@@ -15,6 +15,9 @@ enum ShiftState: Equatable {
 class GestureState: ObservableObject {
     @Published var activeKey: (row: Int, column: Int)?
     @Published var previewVowel: Jungseong?
+    /// 누른 자음 + 미리보기 모음으로 조합될 글자 (긋기 미리보기 오버레이용, 앱스토어 리뷰 2026-11).
+    /// `previewVowel` setter 가 같이 갱신한다 — 모음 키(자음 없음)·ㆍ 면 nil.
+    @Published var previewSyllable: Character?
     @Published var directions: [GestureDirection] = []
     @Published var startPoint: CGPoint?
 }
@@ -213,7 +216,13 @@ class KeyboardViewModel: ObservableObject {
         set {
             guard gestureState.previewVowel != newValue else { return }
             gestureState.previewVowel = newValue
+            gestureState.previewSyllable = newValue.flatMap(previewSyllable(for:))
         }
+    }
+
+    private func previewSyllable(for vowel: Jungseong) -> Character? {
+        guard case .consonant(let consonant)? = activeKeyContent, vowel != .ㆍ else { return nil }
+        return HangulConstants.composeSyllable(choseong: consonant, jungseong: vowel)
     }
     var gestureDirections: [GestureDirection] {
         get { gestureState.directions }
@@ -288,9 +297,59 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func applyExpansionStore(_ store: ShortcutExpansionStore) {
-        guard store != lastLoadedExpansionStore else { return }
-        lastLoadedExpansionStore = store
-        abbreviationEngine.loadExpansions(store)
+        // 키를 뗄 때마다 불린다 — 입력(스토어·토글·텍스트 대치 세대)이 그대로면 합치기 전에 끝낸다.
+        // 바뀌었으면 합친 결과로 비교한다 — 텍스트 대치가 늦게 도착하거나 토글만 바뀌어도 트라이를 다시 만든다.
+        let includeSystem = KeyboardSettings.shared.systemTextReplacementEnabled
+        if let last = lastExpansionInputs, last.includeSystem == includeSystem,
+           last.generation == systemTextReplacementsGeneration, last.store == store { return }
+        lastExpansionInputs = (store, includeSystem, systemTextReplacementsGeneration)
+        let merged = Self.mergedExpansionStore(
+            store, systemReplacements: includeSystem ? systemTextReplacements : [])
+        guard merged != lastLoadedExpansionStore else { return }
+        lastLoadedExpansionStore = merged
+        abbreviationEngine.loadExpansions(merged)
+    }
+
+    /// iOS 텍스트 대치 (설정 `systemTextReplacementEnabled`). 컨트롤러가 `requestSupplementaryLexicon` 으로 받아
+    /// 메인 스레드에서 넣는다. 한 번 만들어 둔 값을 계속 쓴다 — 매번 만들면 UUID 가 달라 위 비교가 매 키 실패한다.
+    private var systemTextReplacements: [ShortcutExpansion] = []
+    private var systemTextReplacementsGeneration = 0
+    private var lastExpansionInputs: (store: ShortcutExpansionStore, includeSystem: Bool, generation: Int)?
+
+    func setSystemTextReplacements(_ pairs: [(userInput: String, documentText: String)]) {
+        systemTextReplacements = Self.textReplacementExpansions(from: pairs)
+        systemTextReplacementsGeneration += 1
+        // 실기기 판독용 — 개수만(내용은 남기지 않는다). 같은 입력·결과(연락처 이름)가 대부분이면 텍스트 대치가 안 온 것.
+        let contacts = pairs.filter { $0.userInput == $0.documentText }.count
+        let userTriggers = Set(KeyboardSettings.shared.shortcutExpansionStore.expansions.map { AbbreviationEngine.foldCase($0.trigger) })
+        let collided = systemTextReplacements.filter { userTriggers.contains(AbbreviationEngine.foldCase($0.trigger)) }.count
+        if !previewMode {
+            KeyboardSettings.shared.recordTextReplacementDiagnostic(
+                "받음 \(pairs.count)개 · 연락처 \(contacts) · 사용 \(systemTextReplacements.count) (단축어와 겹쳐 뺌 \(collided)) · 단축어 \(KeyboardSettings.shared.abbreviationEnabled ? "ON" : "OFF")")
+        }
+        applyExpansionStore(KeyboardSettings.shared.shortcutExpansionStore)
+    }
+
+    /// 렉시콘 항목 → 단축어. 연락처 이름(입력 = 결과)·빈 값·공백 든 단축키(엔진 규칙상 트리거에 공백 불가)는 뺀다.
+    static func textReplacementExpansions(from pairs: [(userInput: String, documentText: String)]) -> [ShortcutExpansion] {
+        var seen = Set<String>()
+        return pairs.compactMap { pair in
+            guard !pair.userInput.isEmpty, !pair.documentText.isEmpty, pair.userInput != pair.documentText,
+                  !pair.userInput.contains(where: \.isWhitespace),
+                  seen.insert(AbbreviationEngine.foldCase(pair.userInput)).inserted else { return nil }
+            return ShortcutExpansion(trigger: pair.userInput, replacement: pair.documentText)
+        }
+    }
+
+    /// 사용자 단축어가 이긴다 — 같은 트리거(대소문자 무시)가 둘이면 트라이 한 노드에 두 개가 걸려 자동 확장 대신
+    /// 후보 고르기가 된다. 사용자가 꺼 둔 단축어의 트리거도 텍스트 대치로 되살리지 않는다.
+    static func mergedExpansionStore(_ store: ShortcutExpansionStore,
+                                     systemReplacements: [ShortcutExpansion]) -> ShortcutExpansionStore {
+        guard !systemReplacements.isEmpty else { return store }
+        let userTriggers = Set(store.expansions.map { AbbreviationEngine.foldCase($0.trigger) })
+        var merged = store
+        merged.expansions += systemReplacements.filter { !userTriggers.contains(AbbreviationEngine.foldCase($0.trigger)) }
+        return merged
     }
 
     /// 스토어가 바뀌면 다음 키를 기다리지 않고 바로 트라이를 다시 만든다.
@@ -1119,7 +1178,8 @@ class KeyboardViewModel: ObservableObject {
         return String(run.drop { $0 == "'" || $0 == "’" })
     }
 
-    private static func isWordCharacter(_ c: Character) -> Bool {
+    /// 순수 함수 — `prefix(while:)` 에 넘기므로 메인 액터 격리를 풀어 둔다(기본 격리 MainActor 경고).
+    nonisolated private static func isWordCharacter(_ c: Character) -> Bool {
         c.isLetter || c == "'" || c == "’"
     }
 
@@ -1446,10 +1506,29 @@ class KeyboardViewModel: ObservableObject {
         switch content {
         case .symbol(let symbol):
             inputSymbol(symbol)
+            returnToLettersAfterBracketIfNeeded(symbol)
         case .backspace:
             deleteBackward()
         default:
             break
+        }
+    }
+
+    private static let bracketCharacters = Set(bracketPairs.keys).union(bracketPairs.values)
+
+    /// 괄호를 탭한 뒤 원래 글자 자판으로 (설정 `returnToLettersAfterBracket`). 탭 처리 중이라
+    /// `toggleSymbolMode()` 를 부르지 않는다 — 그 안의 `supersedeHeldGridKey()` 가 지금 떼는 키를 한 번 더 확정한다.
+    private func returnToLettersAfterBracketIfNeeded(_ symbol: String) {
+        guard keyboardMode.isSymbol, Self.bracketCharacters.contains(symbol) else { return }
+        let enabled = KeyboardSettings.shared.returnToLettersAfterBracket
+        let before = keyboardMode
+        if enabled {
+            symbolPage = 0
+            keyboardMode = keyboardMode.toggleSymbol()
+        }
+        if !previewMode {
+            KeyboardSettings.shared.recordBracketReturnDiagnostic(
+                "괄호 \(symbol) · 설정 \(enabled ? "ON" : "OFF") · \(String(describing: before)) → \(String(describing: keyboardMode))")
         }
     }
 

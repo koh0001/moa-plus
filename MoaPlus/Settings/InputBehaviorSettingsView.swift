@@ -15,6 +15,12 @@ struct InputBehaviorSettingsView: View {
             }
 
             Section {
+                Toggle("괄호 입력 후 글자 자판으로", isOn: $settings.returnToLettersAfterBracket)
+            } footer: {
+                Text("기호 자판(!#1)에서 괄호를 누르면 바로 원래 한글·영문 자판으로 돌아갑니다. 괄호 자동 닫기와 함께 켜면 ( ) 안에 바로 글자를 칠 수 있습니다.")
+            }
+
+            Section {
                 Toggle("더블 스페이스로 마침표 입력", isOn: $settings.periodOnDoubleSpaceEnabled)
             } footer: {
                 Text("글자 뒤에서 스페이스를 두 번 누르면 마침표와 공백(. )으로 바꿉니다.")

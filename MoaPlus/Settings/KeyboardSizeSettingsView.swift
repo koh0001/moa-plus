@@ -132,17 +132,17 @@ struct KeyboardSizeSettingsView: View {
                         HStack {
                             Text("키보드 폭")
                             Spacer()
-                            Text("\(Int((settings.oneHandedWidthRatio * 100).rounded()))%")
+                            Text("\(Int((min(max(settings.oneHandedWidthRatio, settings.keyboardPlacement.widthRatioBounds.lowerBound), settings.keyboardPlacement.widthRatioBounds.upperBound) * 100).rounded()))%")
                                 .foregroundColor(.secondary)
                         }
                         Slider(value: $settings.oneHandedWidthRatio,
-                               in: KeyboardPlacement.widthRatioRange, step: 0.02)
+                               in: settings.keyboardPlacement.widthRatioBounds, step: 0.02)
                     }
                 }
             } header: {
                 Text("한손 모드")
             } footer: {
-                Text("키보드를 좁혀 왼쪽이나 오른쪽에 붙입니다. 아이폰 세로 화면에서만 적용됩니다. 키보드의 빈쪽에 있는 화살표로 반대쪽으로 옮기고, 네모 화살표로 전체 폭으로 돌아갈 수 있습니다. 위 미리보기에 바로 반영됩니다.")
+                Text("키보드를 좁혀 왼쪽이나 오른쪽에 붙입니다. 아이폰 세로 화면에서만 적용됩니다. 키보드의 빈쪽에 있는 화살표로 반대쪽으로 옮기고, 네모 화살표로 전체 폭으로 돌아갈 수 있습니다. 가운데는 양옆에 같은 여백을 두며, 이 화면에서만 바꿀 수 있습니다. 위 미리보기에 바로 반영됩니다.")
             }
 
             Section {
@@ -158,6 +158,12 @@ struct KeyboardSizeSettingsView: View {
             } footer: {
                 // 이슈 #51 — 기본값은 기기마다 다르다(KeyboardSettings.defaultShowDismissKeyboardKey).
                 Text("기능 행 맨 오른쪽(⏎ 옆)에 키보드를 내리는 키를 둡니다. 스페이스바는 그만큼 좁아집니다. 한손 모드에서는 키보드 빈쪽의 화살표 버튼 아래에 나타납니다.\n\n아이패드는 처음부터 켜져 있고, 아이폰은 꺼져 있습니다.")
+            }
+
+            Section {
+                Toggle("엔터 키 좁게", isOn: $settings.compactReturnKeyEnabled)
+            } footer: {
+                Text("⏎ 키를 다른 키 한 칸 폭으로 줄이고, 남는 폭만큼 스페이스바를 넓힙니다.")
             }
         }
         .navigationTitle("크기 · 전환 키")

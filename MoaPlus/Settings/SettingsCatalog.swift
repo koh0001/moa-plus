@@ -113,6 +113,13 @@ enum SettingsCatalog {
             keywords: ["민감도", "멀티스트로크", "빨리", "속도", "ㅛ", "ㅠ", "ㅢ", "안나옴", "인식안됨"]
         ),
         SettingsEntry(
+            title: "제스처 미리보기",
+            icon: "text.bubble",
+            destination: .gesture,
+            // 앱스토어 리뷰 "옛 모아키의 글자·모음 팝업" (2026-11) — 조합될 글자도 보여 준다.
+            keywords: ["미리보기", "팝업", "모음", "글자", "표시", "말풍선", "방향"]
+        ),
+        SettingsEntry(
             title: "긋기 테스트",
             icon: "hand.draw",
             destination: .gestureTest,
@@ -136,7 +143,7 @@ enum SettingsCatalog {
             title: "한손 모드 (키보드 위치)",
             icon: "keyboard.onehanded.right",
             destination: .size,
-            keywords: ["한손", "한 손", "한손모드", "왼쪽", "오른쪽", "축소", "작게", "좁게", "큰폰", "프로맥스"]
+            keywords: ["한손", "한 손", "한손모드", "왼쪽", "오른쪽", "가운데", "여백", "좌우 여백", "양옆", "축소", "작게", "좁게", "큰폰", "프로맥스"]
         ),
         SettingsEntry(
             title: "키보드 전환 (지구본) 키",
@@ -151,6 +158,13 @@ enum SettingsCatalog {
             destination: .size,
             // 이슈 #51 — 아이패드 제보 "키보드를 내릴 수가 없어요".
             keywords: ["내림", "내리", "내려", "숨기", "숨김", "닫기", "닫아", "감추", "dismiss", "아이패드"]
+        ),
+        SettingsEntry(
+            title: "엔터 키 좁게",
+            icon: "return",
+            destination: .size,
+            // 앱스토어 리뷰 "엔터키가 너무 커요" (2026-11).
+            keywords: ["엔터", "리턴", "return", "줄바꿈", "스페이스", "스페이스바", "넓게", "좁게"]
         ),
         SettingsEntry(
             title: "좌우 끝 키 폭",
@@ -232,6 +246,13 @@ enum SettingsCatalog {
             keywords: ["괄호", "자동", "마침표", "더블스페이스", "온점"]
         ),
         SettingsEntry(
+            title: "괄호 입력 후 글자 자판으로",
+            icon: "parentheses",
+            destination: .inputBehavior,
+            // 앱스토어 리뷰 "() 입력후 자동으로 한글/영문 자판으로" (2026-11).
+            keywords: ["괄호", "복귀", "돌아가", "기호", "특수문자", "자판", "전환", "한글로", "영문으로"]
+        ),
+        SettingsEntry(
             title: "영문 대문자 · 첫 글자 · 길게 눌러 대문자",
             icon: "textformat",
             destination: .inputBehavior,
@@ -263,6 +284,13 @@ enum SettingsCatalog {
             icon: "text.badge.plus",
             destination: .abbreviation,
             keywords: ["단축어", "약어", "자동완성", "확장", "등록"]
+        ),
+        SettingsEntry(
+            title: "iOS 텍스트 대치도 사용",
+            icon: "text.insert",
+            destination: .abbreviation,
+            // 앱스토어 리뷰 "텍스트 대치를 연동하거나 불러올 수 있으면" (2026-10).
+            keywords: ["텍스트 대치", "텍스트대치", "대치", "단축키", "iOS", "아이폰 설정", "불러오기", "연동"]
         ),
     ]
 

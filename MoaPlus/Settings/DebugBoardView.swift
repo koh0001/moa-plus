@@ -83,6 +83,8 @@ final class DebugBoardStore: ObservableObject {
         조기 터치: \(s.earlyTouchDiagnostic ?? "(기록 없음)")
         조기 터치 (마지막 지연 기록): \(s.earlyTouchDelayedDiagnostic ?? "(없음)")
         자동 대문자: \(s.autoCapitalizeDiagnostic ?? "(아직 판정한 적 없음)")
+        괄호 후 글자 자판: \(s.bracketReturnDiagnostic ?? "(기호 자판에서 괄호를 친 적 없음)")
+        텍스트 대치: \(s.textReplacementDiagnostic ?? "(키보드가 아직 확인하지 않음)")
         전체 접근: \(fullAccessLine)
         레이아웃: slotA \(s.layoutCustomization.slotA.rawValue) / slotB \(s.layoutCustomization.slotB.rawValue) / 모음키 \(s.layoutCustomization.vowelKeyBehavior.rawValue)
         """
