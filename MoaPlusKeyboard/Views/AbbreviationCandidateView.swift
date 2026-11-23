@@ -40,6 +40,7 @@ struct AbbreviationCandidateView: View {
                     }
                 }
             }
+            .hidingScrollEdgeEffect()
 
             // Dismiss button
             Button(action: onDismiss) {
@@ -58,5 +59,12 @@ struct AbbreviationCandidateView: View {
                 .foregroundColor(Color(.separator)),
             alignment: .bottom
         )
+    }
+}
+
+private extension View {
+    /// iOS 26+ 스크롤 가장자리 효과가 30pt 남짓한 후보 줄 전체를 흐리게 덮었다(실기기 iOS 27, 후보 글자만 모자이크).
+    @ViewBuilder func hidingScrollEdgeEffect() -> some View {
+        if #available(iOS 26.0, *) { scrollEdgeEffectHidden() } else { self }
     }
 }
