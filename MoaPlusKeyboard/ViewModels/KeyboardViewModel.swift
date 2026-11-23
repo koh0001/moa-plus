@@ -1446,11 +1446,23 @@ class KeyboardViewModel: ObservableObject {
         switch content {
         case .symbol(let symbol):
             inputSymbol(symbol)
+            returnToLettersAfterBracketIfNeeded(symbol)
         case .backspace:
             deleteBackward()
         default:
             break
         }
+    }
+
+    private static let bracketCharacters = Set(bracketPairs.keys).union(bracketPairs.values)
+
+    /// 괄호를 탭한 뒤 원래 글자 자판으로 (설정 `returnToLettersAfterBracket`). 탭 처리 중이라
+    /// `toggleSymbolMode()` 를 부르지 않는다 — 그 안의 `supersedeHeldGridKey()` 가 지금 떼는 키를 한 번 더 확정한다.
+    private func returnToLettersAfterBracketIfNeeded(_ symbol: String) {
+        guard KeyboardSettings.shared.returnToLettersAfterBracket, keyboardMode.isSymbol,
+              Self.bracketCharacters.contains(symbol) else { return }
+        symbolPage = 0
+        keyboardMode = keyboardMode.toggleSymbol()
     }
 
     private func handleEnglishModeTap(row: Int, column: Int) {

@@ -40,6 +40,7 @@ final class KeyboardSettings: ObservableObject {
         static let clickSoundEnabled = "clickSoundEnabled"
         static let showDetailedHints = "showDetailedHints"
         static let autoBracketEnabled = "autoBracketEnabled"
+        static let returnToLettersAfterBracket = "returnToLettersAfterBracket"
         static let englishAutoCapitalize = "englishAutoCapitalize"
         static let englishLongPressUppercase = "englishLongPressUppercase"
         static let wordDeleteEnabled = "wordDeleteEnabled"
@@ -224,6 +225,11 @@ final class KeyboardSettings: ObservableObject {
     /// Auto-close brackets: (), {}, []
     @Published var autoBracketEnabled: Bool = true {
         didSet { guard !isLoading else { return }; writePrimitive(autoBracketEnabled, forKey: Keys.autoBracketEnabled) }
+    }
+
+    /// 기호 자판에서 괄호를 탭하면 원래 한글/영문 자판으로 (앱스토어 리뷰 2026-11). 기본 OFF.
+    @Published var returnToLettersAfterBracket: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(returnToLettersAfterBracket, forKey: Keys.returnToLettersAfterBracket) }
     }
 
     /// Show all popup candidates on key (detailed hint mode)
@@ -592,6 +598,7 @@ final class KeyboardSettings: ObservableObject {
         assign(\.clickSoundEnabled, defaults.object(forKey: Keys.clickSoundEnabled) as? Bool ?? false)
         assign(\.showDetailedHints, defaults.object(forKey: Keys.showDetailedHints) as? Bool ?? false)
         assign(\.autoBracketEnabled, defaults.object(forKey: Keys.autoBracketEnabled) as? Bool ?? true)
+        assign(\.returnToLettersAfterBracket, defaults.bool(forKey: Keys.returnToLettersAfterBracket))
         assign(\.wordDeleteEnabled, defaults.object(forKey: Keys.wordDeleteEnabled) as? Bool ?? true)
         assign(\.backspaceDeletesWholeSyllable, defaults.object(forKey: Keys.backspaceDeletesWholeSyllable) as? Bool ?? false)
         assign(\.gestureDebugLogEnabled, defaults.object(forKey: Keys.gestureDebugLogEnabled) as? Bool ?? true)
@@ -739,6 +746,7 @@ final class KeyboardSettings: ObservableObject {
         showSecondaryHints = true
         hintSize = 1
         autoBracketEnabled = true
+        returnToLettersAfterBracket = false
         showDetailedHints = false
         clickSoundEnabled = false
         sideKeyWidthRatio = 0.7

@@ -577,6 +577,8 @@ KeyboardSettings (싱글톤, App Group UserDefaults, ObservableObject)
 ├── cursorMoveBySpaceDragEnabled: Bool      (Space 드래그 커서 이동, 기본 ON)
 ├── cursorRepeatSpeed: Int                  (Space 드래그 양끝 연속 이동 속도, 0/1/2 기본 1)
 ├── autoBracketEnabled: Bool
+├── returnToLettersAfterBracket: Bool       (기호 자판에서 괄호 탭 → 글자 자판, 기본 OFF. 탭 처리 중이라 toggleSymbolMode 를
+│                                             부르지 않는다 — supersedeHeldGridKey 가 떼는 키를 한 번 더 확정함)
 ├── wordDeleteEnabled: Bool
 ├── backspaceDeletesWholeSyllable: Bool  (조합 중 받침 없는 글자를 한 번에, 기본 OFF=자소 단위)
 ├── wordDeleteDelay: Double

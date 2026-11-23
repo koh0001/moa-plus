@@ -239,6 +239,13 @@ enum SettingsCatalog {
             keywords: ["괄호", "자동", "마침표", "더블스페이스", "온점"]
         ),
         SettingsEntry(
+            title: "괄호 입력 후 글자 자판으로",
+            icon: "parentheses",
+            destination: .inputBehavior,
+            // 앱스토어 리뷰 "() 입력후 자동으로 한글/영문 자판으로" (2026-11).
+            keywords: ["괄호", "복귀", "돌아가", "기호", "특수문자", "자판", "전환", "한글로", "영문으로"]
+        ),
+        SettingsEntry(
             title: "영문 대문자 · 첫 글자 · 길게 눌러 대문자",
             icon: "textformat",
             destination: .inputBehavior,
