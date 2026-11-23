@@ -4,6 +4,8 @@ struct GestureOverlayView: View {
     let directions: [GestureDirection]
     let startPoint: CGPoint?
     let currentVowel: Jungseong?
+    /// 누른 자음과 조합될 글자(와). 있으면 모음 앞에 같은 줄로 — 줄을 늘리면 위치 계산(~80pt)을 넘는다.
+    var currentSyllable: Character? = nil
 
     var body: some View {
         GeometryReader { geometry in
@@ -20,9 +22,16 @@ struct GestureOverlayView: View {
                             .minimumScaleFactor(0.5)
 
                         if let vowel = currentVowel {
-                            Text(String(vowel.compatibilityCharacter))
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundColor(.blue)
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                if let syllable = currentSyllable {
+                                    Text(String(syllable))
+                                        .font(.system(size: 32, weight: .bold))
+                                }
+                                Text(String(vowel.compatibilityCharacter))
+                                    .font(.system(size: currentSyllable == nil ? 32 : 22, weight: .bold))
+                                    .opacity(currentSyllable == nil ? 1 : 0.7)
+                            }
+                            .foregroundColor(.blue)
                         }
                     }
                     .padding(8)
@@ -70,7 +79,8 @@ struct GestureOverlayView: View {
         GestureOverlayView(
             directions: [.up, .right],
             startPoint: CGPoint(x: 150, y: 200),
-            currentVowel: .ㅘ
+            currentVowel: .ㅘ,
+            currentSyllable: "와"
         )
     }
     .frame(width: 300, height: 300)

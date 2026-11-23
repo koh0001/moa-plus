@@ -113,6 +113,13 @@ enum SettingsCatalog {
             keywords: ["민감도", "멀티스트로크", "빨리", "속도", "ㅛ", "ㅠ", "ㅢ", "안나옴", "인식안됨"]
         ),
         SettingsEntry(
+            title: "제스처 미리보기",
+            icon: "text.bubble",
+            destination: .gesture,
+            // 앱스토어 리뷰 "옛 모아키의 글자·모음 팝업" (2026-11) — 조합될 글자도 보여 준다.
+            keywords: ["미리보기", "팝업", "모음", "글자", "표시", "말풍선", "방향"]
+        ),
+        SettingsEntry(
             title: "긋기 테스트",
             icon: "hand.draw",
             destination: .gestureTest,

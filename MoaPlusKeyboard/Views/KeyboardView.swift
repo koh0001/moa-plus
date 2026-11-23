@@ -321,7 +321,8 @@ struct KeyboardView: View {
                         GestureOverlayView(
                             directions: gestureState.directions,
                             startPoint: gestureState.startPoint,
-                            currentVowel: gestureState.previewVowel
+                            currentVowel: gestureState.previewVowel,
+                            currentSyllable: gestureState.previewSyllable
                         )
                     }
 

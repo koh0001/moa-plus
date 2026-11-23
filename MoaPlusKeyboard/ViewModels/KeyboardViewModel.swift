@@ -15,6 +15,9 @@ enum ShiftState: Equatable {
 class GestureState: ObservableObject {
     @Published var activeKey: (row: Int, column: Int)?
     @Published var previewVowel: Jungseong?
+    /// 누른 자음 + 미리보기 모음으로 조합될 글자 (긋기 미리보기 오버레이용, 앱스토어 리뷰 2026-11).
+    /// `previewVowel` setter 가 같이 갱신한다 — 모음 키(자음 없음)·ㆍ 면 nil.
+    @Published var previewSyllable: Character?
     @Published var directions: [GestureDirection] = []
     @Published var startPoint: CGPoint?
 }
@@ -213,7 +216,13 @@ class KeyboardViewModel: ObservableObject {
         set {
             guard gestureState.previewVowel != newValue else { return }
             gestureState.previewVowel = newValue
+            gestureState.previewSyllable = newValue.flatMap(previewSyllable(for:))
         }
+    }
+
+    private func previewSyllable(for vowel: Jungseong) -> Character? {
+        guard case .consonant(let consonant)? = activeKeyContent, vowel != .ㆍ else { return nil }
+        return HangulConstants.composeSyllable(choseong: consonant, jungseong: vowel)
     }
     var gestureDirections: [GestureDirection] {
         get { gestureState.directions }
