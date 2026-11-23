@@ -23,6 +23,8 @@ struct FunctionRowView: View {
     var showGlobeKey: Bool = false
     /// 행 맨 오른쪽(⏎ 옆)의 키보드 내림 키 (이슈 #51). 지구본과 같이 폭은 스페이스바에서만 뺀다.
     var showDismissKey: Bool = false
+    /// ⏎ 를 키 한 칸 폭으로 (설정 `compactReturnKeyEnabled`). 남는 폭은 스페이스바가 가져간다.
+    var compactReturnKey: Bool = false
     var onDismissKeyboardPressed: (() -> Void)? = nil
     var useBimanualLayout: Bool = false
     var layoutCustomization: LayoutCustomization = LayoutCustomization()
@@ -452,6 +454,13 @@ struct FunctionRowView: View {
     }
 
     var returnWidth: CGFloat {
+        compactReturnKey
+            ? min(standardReturnWidth, KeyboardMetrics.centerKeyWidth(for: totalWidth))
+            : standardReturnWidth
+    }
+
+    /// 좁히지 않은 ⏎ 폭. 긋기 펑크 폭은 이 값으로 정한다 — 좁힌 폭으로 정하면 펑크 키까지 커진다.
+    private var standardReturnWidth: CGFloat {
         let centerKeyWidth = KeyboardMetrics.centerKeyWidth(for: totalWidth)
         let usesWideBackspace = layoutCustomization.slotA == .fullPackage
             || (mode.isSymbol && layoutCustomization.slotA != .vowel)
@@ -469,7 +478,7 @@ struct FunctionRowView: View {
 
     var availableWidthWithoutReturn: CGFloat {
         // Default layout: 5 children (toggles + space + punct + return) → 4 internal gaps.
-        max(0, effectiveTotalWidth - returnWidth - spacing * 4)
+        max(0, effectiveTotalWidth - standardReturnWidth - spacing * 4)
     }
 
     var symbolToggleWidth: CGFloat {

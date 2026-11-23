@@ -32,6 +32,7 @@ final class KeyboardSettings: ObservableObject {
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
         static let showGlobeKey = "showGlobeKey"
         static let showDismissKeyboardKey = "showDismissKeyboardKey"
+        static let compactReturnKeyEnabled = "compactReturnKeyEnabled"
         static let keyboardPlacement = "keyboardPlacement"
         static let oneHandedWidthRatio = "oneHandedWidthRatio"
         static let consonantDiagonalDerivation = "consonantDiagonalDerivation"
@@ -281,6 +282,11 @@ final class KeyboardSettings: ObservableObject {
     /// 아이폰은 꺼짐(기능행이 좁다). 전체 접근이 꺼진 사용자는 App Group 을 못 읽어 이 기본값을 쓴다.
     @Published var showDismissKeyboardKey: Bool = KeyboardSettings.defaultShowDismissKeyboardKey {
         didSet { guard !isLoading else { return }; writePrimitive(showDismissKeyboardKey, forKey: Keys.showDismissKeyboardKey) }
+    }
+
+    /// ⏎ 를 키 한 칸 폭으로 (앱스토어 리뷰 "엔터키가 너무 커요"). 남는 폭은 스페이스바가 가져간다. 기본 OFF.
+    @Published var compactReturnKeyEnabled: Bool = false {
+        didSet { guard !isLoading else { return }; writePrimitive(compactReturnKeyEnabled, forKey: Keys.compactReturnKeyEnabled) }
     }
 
     static var defaultShowDismissKeyboardKey: Bool {
@@ -576,6 +582,7 @@ final class KeyboardSettings: ObservableObject {
         assign(\.showGlobeKey, defaults.object(forKey: Keys.showGlobeKey) as? Bool ?? false)
         assign(\.showDismissKeyboardKey, defaults.object(forKey: Keys.showDismissKeyboardKey) as? Bool
                ?? Self.defaultShowDismissKeyboardKey)
+        assign(\.compactReturnKeyEnabled, defaults.bool(forKey: Keys.compactReturnKeyEnabled))
         assign(\.keyboardPlacement,
                (defaults.object(forKey: Keys.keyboardPlacement) as? String)
                    .flatMap(KeyboardPlacement.init(rawValue:)) ?? .full)
@@ -740,6 +747,7 @@ final class KeyboardSettings: ObservableObject {
         keyboardExtraBottomInset = KeyboardMetrics.defaultExtraBottomInset
         showGlobeKey = false
         showDismissKeyboardKey = Self.defaultShowDismissKeyboardKey
+        compactReturnKeyEnabled = false
         keyboardPlacement = .full
         oneHandedWidthRatio = KeyboardPlacement.defaultWidthRatio
         consonantDiagonalDerivationEnabled = false

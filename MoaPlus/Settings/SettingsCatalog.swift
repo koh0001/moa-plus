@@ -153,6 +153,13 @@ enum SettingsCatalog {
             keywords: ["내림", "내리", "내려", "숨기", "숨김", "닫기", "닫아", "감추", "dismiss", "아이패드"]
         ),
         SettingsEntry(
+            title: "엔터 키 좁게",
+            icon: "return",
+            destination: .size,
+            // 앱스토어 리뷰 "엔터키가 너무 커요" (2026-11).
+            keywords: ["엔터", "리턴", "return", "줄바꿈", "스페이스", "스페이스바", "넓게", "좁게"]
+        ),
+        SettingsEntry(
             title: "좌우 끝 키 폭",
             icon: "arrow.left.and.right",
             destination: .layout,

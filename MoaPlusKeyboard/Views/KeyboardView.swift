@@ -112,6 +112,7 @@ struct KeyboardView: View {
             onLanguageSwitchPressed: { viewModel.switchKeyboard() },
             showGlobeKey: viewModel.canSwitchInputMode,
             showDismissKey: showsDismissKey,
+            compactReturnKey: settings.compactReturnKeyEnabled,
             onDismissKeyboardPressed: { viewModel.dismissKeyboard() },
             layoutCustomization: settings.layoutCustomization,
             onSlotBVowelGestureStart: { viewModel.slotBVowelGestureStarted(at: $0) },

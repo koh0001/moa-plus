@@ -17,6 +17,7 @@ final class FunctionRowWidthTests: XCTestCase {
                      koreanPunctuationEnabled: Bool = true,
                      englishPunctuationEnabled: Bool = true,
                      bimanual: Bool = false,
+                     compactReturn: Bool = false,
                      totalWidth: CGFloat = 393) -> FunctionRowView {
         var customization = LayoutCustomization()
         customization.slotA = slotA
@@ -32,6 +33,7 @@ final class FunctionRowWidthTests: XCTestCase {
             onReturnPressed: {},
             showGlobeKey: showGlobeKey,
             showDismissKey: showDismissKey,
+            compactReturnKey: compactReturn,
             useBimanualLayout: bimanual,
             layoutCustomization: customization
         )
@@ -116,5 +118,32 @@ final class FunctionRowWidthTests: XCTestCase {
         XCTAssertLessThan(on.spaceWidth, off.spaceWidth)
         XCTAssertEqual(off.spaceWidth - on.spaceWidth,
                        on.globeWidth + KeyboardMetrics.keySpacing, accuracy: 0.01)
+    }
+
+    /// 엔터 키 좁게 (앱스토어 리뷰 "엔터키가 너무 커요"): 모든 바디에서 폭 합이 맞아야 한다.
+    func test_compactReturn_fitsEveryBody() {
+        for (globe, dismiss) in Self.globeDismissCombos {
+            let tag = "compact globe=\(globe) dismiss=\(dismiss)"
+            assertFits(row(mode: .korean, showGlobeKey: globe, showDismissKey: dismiss, compactReturn: true),
+                       "default \(tag)", kind: .default)
+            assertFits(row(mode: .symbolFromKorean, showGlobeKey: globe, showDismissKey: dismiss, compactReturn: true),
+                       "symbol \(tag)", kind: .symbol)
+            assertFits(row(mode: .korean, showGlobeKey: globe, showDismissKey: dismiss, slotA: .fullPackage, compactReturn: true),
+                       "longSpace(확장형) \(tag)", kind: .longSpace)
+            assertFits(row(mode: .korean, showGlobeKey: globe, showDismissKey: dismiss, bimanual: true,
+                           compactReturn: true, totalWidth: 1366),
+                       "bimanual \(tag)", kind: .bimanual)
+        }
+    }
+
+    /// 줄인 만큼은 스페이스바로만 간다 — 펑크 키까지 커지면 그 키의 타격 지점이 바뀐다.
+    func test_compactReturn_givesWidthOnlyToSpaceBar() {
+        let off = row(mode: .korean, showGlobeKey: false)
+        let on = row(mode: .korean, showGlobeKey: false, compactReturn: true)
+        XCTAssertEqual(on.returnWidth, on.letterToggleWidth, accuracy: 0.01, "좁힌 ⏎ = 키 한 칸")
+        XCTAssertLessThan(on.returnWidth, off.returnWidth)
+        XCTAssertEqual(on.punctuationWidth, off.punctuationWidth, accuracy: 0.01)
+        XCTAssertEqual(on.symbolToggleWidth, off.symbolToggleWidth, accuracy: 0.01)
+        XCTAssertEqual(on.spaceWidth - off.spaceWidth, off.returnWidth - on.returnWidth, accuracy: 0.01)
     }
 }
