@@ -132,8 +132,11 @@ class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
     private func loadSystemTextReplacementsIfEnabled() {
         guard KeyboardSettings.shared.systemTextReplacementEnabled else { return }
         requestSupplementaryLexicon { [weak self] lexicon in
-            let pairs = lexicon.entries.map { (userInput: $0.userInput, documentText: $0.documentText) }
-            DispatchQueue.main.async { self?.viewModel.setSystemTextReplacements(pairs) }
+            // UILexicon 은 메인 전용(NS_SWIFT_UI_ACTOR) — 항목도 메인에서 읽는다.
+            DispatchQueue.main.async {
+                let pairs = lexicon.entries.map { (userInput: $0.userInput, documentText: $0.documentText) }
+                self?.viewModel.setSystemTextReplacements(pairs)
+            }
         }
     }
 

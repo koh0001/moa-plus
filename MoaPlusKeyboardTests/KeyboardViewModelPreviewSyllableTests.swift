@@ -33,4 +33,20 @@ final class KeyboardViewModelPreviewSyllableTests: XCTestCase {
         XCTAssertNil(vm.gestureState.previewVowel)
         XCTAssertNil(vm.gestureState.previewSyllable)
     }
+
+    /// 모음 키(슬롯 B)는 자음이 없으니 글자 없이 모음만 — 그리드 자음을 누른 채 모음 키로 넘어가도(롤오버) 앞 자음이 남지 않는다.
+    func test_slotBVowelKey_neverShowsSyllable_evenAfterHeldConsonant() {
+        vm.slotBVowelGestureStarted(at: Self.origin)
+        vm.slotBVowelGestureMoved(to: CGPoint(x: Self.origin.x + 200, y: Self.origin.y))
+        XCTAssertNotNil(vm.gestureState.previewVowel)
+        XCTAssertNil(vm.gestureState.previewSyllable)
+        vm.slotBVowelGestureEnded()
+
+        vm.gestureStarted(row: 1, column: 4, at: Self.origin)
+        vm.slotBVowelGestureStarted(at: Self.origin)
+        vm.slotBVowelGestureMoved(to: CGPoint(x: Self.origin.x + 200, y: Self.origin.y))
+        XCTAssertNotNil(vm.gestureState.previewVowel)
+        XCTAssertNil(vm.gestureState.previewSyllable, "ㄱ 을 누른 채 모음 키 — '가' 가 남으면 안 된다")
+        vm.slotBVowelGestureEnded()
+    }
 }

@@ -297,10 +297,14 @@ class KeyboardViewModel: ObservableObject {
     }
 
     private func applyExpansionStore(_ store: ShortcutExpansionStore) {
-        // 비교는 합친 결과로 — 텍스트 대치가 늦게 도착하거나 토글만 바뀌어도 트라이를 다시 만든다.
+        // 키를 뗄 때마다 불린다 — 입력(스토어·토글·텍스트 대치 세대)이 그대로면 합치기 전에 끝낸다.
+        // 바뀌었으면 합친 결과로 비교한다 — 텍스트 대치가 늦게 도착하거나 토글만 바뀌어도 트라이를 다시 만든다.
+        let includeSystem = KeyboardSettings.shared.systemTextReplacementEnabled
+        if let last = lastExpansionInputs, last.includeSystem == includeSystem,
+           last.generation == systemTextReplacementsGeneration, last.store == store { return }
+        lastExpansionInputs = (store, includeSystem, systemTextReplacementsGeneration)
         let merged = Self.mergedExpansionStore(
-            store,
-            systemReplacements: KeyboardSettings.shared.systemTextReplacementEnabled ? systemTextReplacements : [])
+            store, systemReplacements: includeSystem ? systemTextReplacements : [])
         guard merged != lastLoadedExpansionStore else { return }
         lastLoadedExpansionStore = merged
         abbreviationEngine.loadExpansions(merged)
@@ -309,9 +313,12 @@ class KeyboardViewModel: ObservableObject {
     /// iOS 텍스트 대치 (설정 `systemTextReplacementEnabled`). 컨트롤러가 `requestSupplementaryLexicon` 으로 받아
     /// 메인 스레드에서 넣는다. 한 번 만들어 둔 값을 계속 쓴다 — 매번 만들면 UUID 가 달라 위 비교가 매 키 실패한다.
     private var systemTextReplacements: [ShortcutExpansion] = []
+    private var systemTextReplacementsGeneration = 0
+    private var lastExpansionInputs: (store: ShortcutExpansionStore, includeSystem: Bool, generation: Int)?
 
     func setSystemTextReplacements(_ pairs: [(userInput: String, documentText: String)]) {
         systemTextReplacements = Self.textReplacementExpansions(from: pairs)
+        systemTextReplacementsGeneration += 1
         applyExpansionStore(KeyboardSettings.shared.shortcutExpansionStore)
     }
 
@@ -1163,7 +1170,8 @@ class KeyboardViewModel: ObservableObject {
         return String(run.drop { $0 == "'" || $0 == "’" })
     }
 
-    private static func isWordCharacter(_ c: Character) -> Bool {
+    /// 순수 함수 — `prefix(while:)` 에 넘기므로 메인 액터 격리를 풀어 둔다(기본 격리 MainActor 경고).
+    nonisolated private static func isWordCharacter(_ c: Character) -> Bool {
         c.isLetter || c == "'" || c == "’"
     }
 

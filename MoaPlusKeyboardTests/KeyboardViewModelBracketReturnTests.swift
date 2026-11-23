@@ -58,6 +58,31 @@ final class KeyboardViewModelBracketReturnTests: XCTestCase {
         XCTAssertEqual(viewModel.keyboardMode, .symbolFromKorean)
     }
 
+    /// 괄호를 누른 채 다음 키를 누르면(롤오버) 괄호가 먼저 확정되며 글자 자판으로 바뀌고, 다음 키는 **글자 자판**의
+    /// 같은 칸으로 읽힌다 — 자동 복귀를 켠 사용자는 괄호 뒤에 글자를 치려는 것이므로 의도한 결과다.
+    func test_rolloverFromBracket_nextKeyResolvesOnLetterLayer() {
+        KeyboardSettings.shared.autoBracketEnabled = false
+        viewModel.keyboardMode = .symbolFromKorean
+        let (row, column) = cell(of: "(")
+        viewModel.gestureStarted(row: row, column: column, at: .zero)
+        viewModel.gestureStarted(row: 1, column: 4, at: .zero)   // ㄱ 자리(기호 자판에서는 5)
+        viewModel.gestureEnded(row: 1, column: 4)
+        viewModel.gestureEnded(row: row, column: column)          // 롤오버로 이미 확정 — 무시
+        XCTAssertEqual(viewModel.keyboardMode, .korean)
+        XCTAssertEqual(delegate.inserted.first, "(")
+        XCTAssertFalse(delegate.inserted.contains("5"), "\(delegate.inserted)")
+        XCTAssertEqual(viewModel.composingText, "ㄱ")
+    }
+
+    private func cell(of symbol: String) -> (Int, Int) {
+        let grid = KeyboardMetrics.symbolLayout(KeyboardSettings.shared.layoutCustomization, page: 0)
+        for (row, keys) in grid.enumerated() {
+            if let column = keys.firstIndex(of: .symbol(symbol)) { return (row, column) }
+        }
+        XCTFail("기호 자판 page 0 에 \(symbol) 가 없다")
+        return (0, 0)
+    }
+
     /// 기호 자판 page 0 에서 그 글자가 있는 칸을 찾아 누른다 — 칸 위치는 레이아웃 설정에 따라 다르다.
     private func tapSymbol(_ symbol: String, file: StaticString = #filePath, line: UInt = #line) {
         let grid = KeyboardMetrics.symbolLayout(KeyboardSettings.shared.layoutCustomization, page: 0)
