@@ -413,6 +413,10 @@ Row 3: ⇧ z x c v b n m ⌫        (9키, shift+letter+backspace)
 - 배경은 한손 모드일 때 바깥에서 한 번만 그린다(`keyboardContent(drawsBackground:)`). 배경 사진은 띠 폭을
   `keyboardBackground(photoFocusInsets:)` 로 넘겨 본체 기준으로 놓는다(이슈 #39 — 위 "배경 사진 맞춤 · 크기")
 - 폭 하한 0.70 = 375pt + 지구본 표시에서도 기능행이 맞는 선 (`OneHandedLayoutTests`). 하한을 내리면 이 테스트로 확인
+- **가운데(`.center`, 좌우 여백 — 앱스토어 리뷰 2026-10)**: 띠 버튼 없이 양옆을 같게 비운다(사진도 양쪽 절반씩 `photoFocusInsets`).
+  띠가 없어 내림 키는 **기능행에 남으므로** 폭 범위가 따로다(`centerWidthRatioRange` 0.80~0.96, 저장값 `oneHandedWidthRatio` 공유 —
+  슬라이더·실제 폭 모두 `widthRatioBounds`). 0.70 에서는 375pt + 지구본 + 내림 키의 스페이스바가 키 한 칸보다 좁다(실측).
+  키보드에서 빠져나오는 버튼이 없어 설정 화면에서만 바꾼다. 렌더 `KeyboardSnapshotTests.test_snapshot_centerPlacement`
 - 이름을 손이 아니라 **위치**로 붙였다 — 긋기 프리셋 "오른손용/왼손용/양손용" 과 혼동(이슈 #31)
 - 띠 버튼 변경은 전체 접근 OFF 면 App Group 에 못 써 다음 `loadAll()` 에서 원래 값으로 돌아온다.
   그래서 호스트 복귀(`NSExtensionHostDidBecomeActive`)의 `loadAll()` 은 `hasFullAccess` 일 때만 돈다 —

@@ -123,7 +123,18 @@ struct KeyboardView: View {
 
     var body: some View {
         GeometryReader { outer in
-            if let side = oneHandedSide(fullWidth: outer.size.width) {
+            if oneHandedSide(fullWidth: outer.size.width) == .center {
+                // 가운데: 양옆을 비우기만 한다(띠 버튼 없음 — 내림 키는 기능행에). 사진은 본체 기준.
+                let width = KeyboardPlacement.keyboardWidth(
+                    totalWidth: outer.size.width, ratio: settings.oneHandedWidthRatio,
+                    range: KeyboardPlacement.centerWidthRatioRange)
+                let margin = max(0, outer.size.width - width) / 2
+                keyboardContent(drawsBackground: false, dismissKeyInRow: true)
+                    .frame(width: width)
+                    .frame(maxWidth: .infinity)
+                    .background(keyboardBackground(photoFocusInsets: EdgeInsets(
+                        top: 0, leading: margin, bottom: 0, trailing: margin)))
+            } else if let side = oneHandedSide(fullWidth: outer.size.width) {
                 // 한손 모드: 본체는 좁힌 폭으로 그대로 그리고(그리드·기능행·팝업·오버레이가 모두
                 // 주어진 폭을 따른다), 빈쪽에 위치 전환 띠를 붙인다. 배경은 바깥에서 한 번만.
                 let width = KeyboardPlacement.keyboardWidth(

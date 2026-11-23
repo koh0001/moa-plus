@@ -817,6 +817,9 @@ struct SpaceKeyView: View {
     var body: some View {
         Text("space")
             .font(.system(size: 16))
+            // 좁은 배치(가운데 하한 + 지구본·내림 키)에서 "spac/e" 로 접히지 않게 — 맞으면 그대로.
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
             .foregroundColor(themeTextColor.opacity(0.6))
             .frame(width: width, height: height)
             .background(

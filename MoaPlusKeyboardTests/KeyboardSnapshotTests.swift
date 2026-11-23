@@ -103,6 +103,22 @@ final class KeyboardSnapshotTests: XCTestCase {
         try oneHandedSnapshot(.right, name: "iphone_onehanded_right.png")
     }
 
+    /// 가운데(좌우 여백) — 띠 없이 양옆이 비고 내림 키는 기능행에 (최소 비율은 비율 0 을 넣어 하한으로 잘림).
+    @MainActor
+    func test_snapshot_centerPlacement() throws {
+        let settings = KeyboardSettings.shared
+        let prev = (settings.keyboardPlacement, settings.oneHandedWidthRatio, settings.showDismissKeyboardKey)
+        defer { settings.keyboardPlacement = prev.0; settings.oneHandedWidthRatio = prev.1; settings.showDismissKeyboardKey = prev.2 }
+        settings.keyboardPlacement = .center
+        settings.oneHandedWidthRatio = 0
+        settings.showDismissKeyboardKey = true
+        let height = KeyboardMetrics.keyboardHeight(
+            isPad: false, isLandscape: false, screenShort: 375, screenLong: 667, scale: 1.0)
+        try snapshot(width: 375, height: height,
+                     override: (isPad: false, isLandscape: false),
+                     name: "iphone_center.png", showGlobe: true)
+    }
+
     /// 높이 배율 하한/상한에서의 실제 렌더. 키가 찌그러지거나 겹치지 않아야 한다.
     @MainActor
     func test_snapshot_iPhoneHeightScaleMin() throws {
