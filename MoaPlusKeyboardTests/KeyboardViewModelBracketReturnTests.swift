@@ -38,6 +38,22 @@ final class KeyboardViewModelBracketReturnTests: XCTestCase {
         }
     }
 
+    /// 확장형(A3)·클래식(A2) — 괄호가 col 6 위쪽(슬롯 B 임베드 자리)에 있다. 레이아웃마다 실제 탭 경로로 확인.
+    func test_openBracket_returnsToKorean_everyLayout() {
+        let savedLayout = KeyboardSettings.shared.layoutCustomization
+        defer { KeyboardSettings.shared.layoutCustomization = savedLayout }
+        for preset in [SlotAPreset.vowel, .classic11, .fullPackage] {
+            var layout = LayoutCustomization()
+            layout.slotA = preset
+            KeyboardSettings.shared.layoutCustomization = layout
+            delegate.inserted = []
+            viewModel.keyboardMode = .symbolFromKorean
+            tapSymbol("(")
+            XCTAssertEqual(viewModel.keyboardMode, .korean, "\(preset)")
+            XCTAssertEqual(delegate.inserted.count, 1, "\(preset): \(delegate.inserted)")
+        }
+    }
+
     func test_closeBracket_returnsToEnglish() {
         viewModel.keyboardMode = .symbolFromEnglish
         tapSymbol(")")

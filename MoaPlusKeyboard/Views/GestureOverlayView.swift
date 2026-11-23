@@ -16,7 +16,7 @@ struct GestureOverlayView: View {
                         // 화살표가 많아도 한 줄·고정 폭으로 — 길어져서 미리보기
                         // 박스가 화면을 침범하지 않게 최근 8개만, 축소 허용.
                         Text(directions.suffix(8).map { $0.symbol }.joined())
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.blue)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
@@ -25,17 +25,20 @@ struct GestureOverlayView: View {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 if let syllable = currentSyllable {
                                     Text(String(syllable))
-                                        .font(.system(size: 32, weight: .bold))
+                                        .font(.system(size: 26, weight: .bold))
                                 }
                                 Text(String(vowel.compatibilityCharacter))
-                                    .font(.system(size: currentSyllable == nil ? 32 : 22, weight: .bold))
+                                    .font(.system(size: currentSyllable == nil ? 26 : 18, weight: .bold))
                                     .opacity(currentSyllable == nil ? 1 : 0.7)
                             }
                             .foregroundColor(.blue)
                         }
                     }
-                    .padding(8)
-                    .frame(maxWidth: 240)
+                    // 내용만큼만 — 예전 `.frame(maxWidth: 240)` 은 짧은 내용에도 박스를 240pt 로 늘렸다
+                    // (실기기 "좌우 여백이 불필요하게 큼"). 화살표는 최근 8개라 폭 상한이 따로 필요 없다.
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .fixedSize()
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.white.opacity(0.9))

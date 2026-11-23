@@ -319,6 +319,14 @@ class KeyboardViewModel: ObservableObject {
     func setSystemTextReplacements(_ pairs: [(userInput: String, documentText: String)]) {
         systemTextReplacements = Self.textReplacementExpansions(from: pairs)
         systemTextReplacementsGeneration += 1
+        // 실기기 판독용 — 개수만(내용은 남기지 않는다). 같은 입력·결과(연락처 이름)가 대부분이면 텍스트 대치가 안 온 것.
+        let contacts = pairs.filter { $0.userInput == $0.documentText }.count
+        let userTriggers = Set(KeyboardSettings.shared.shortcutExpansionStore.expansions.map { AbbreviationEngine.foldCase($0.trigger) })
+        let collided = systemTextReplacements.filter { userTriggers.contains(AbbreviationEngine.foldCase($0.trigger)) }.count
+        if !previewMode {
+            KeyboardSettings.shared.recordTextReplacementDiagnostic(
+                "받음 \(pairs.count)개 · 연락처 \(contacts) · 사용 \(systemTextReplacements.count) (단축어와 겹쳐 뺌 \(collided)) · 단축어 \(KeyboardSettings.shared.abbreviationEnabled ? "ON" : "OFF")")
+        }
         applyExpansionStore(KeyboardSettings.shared.shortcutExpansionStore)
     }
 
@@ -1511,10 +1519,17 @@ class KeyboardViewModel: ObservableObject {
     /// 괄호를 탭한 뒤 원래 글자 자판으로 (설정 `returnToLettersAfterBracket`). 탭 처리 중이라
     /// `toggleSymbolMode()` 를 부르지 않는다 — 그 안의 `supersedeHeldGridKey()` 가 지금 떼는 키를 한 번 더 확정한다.
     private func returnToLettersAfterBracketIfNeeded(_ symbol: String) {
-        guard KeyboardSettings.shared.returnToLettersAfterBracket, keyboardMode.isSymbol,
-              Self.bracketCharacters.contains(symbol) else { return }
-        symbolPage = 0
-        keyboardMode = keyboardMode.toggleSymbol()
+        guard keyboardMode.isSymbol, Self.bracketCharacters.contains(symbol) else { return }
+        let enabled = KeyboardSettings.shared.returnToLettersAfterBracket
+        let before = keyboardMode
+        if enabled {
+            symbolPage = 0
+            keyboardMode = keyboardMode.toggleSymbol()
+        }
+        if !previewMode {
+            KeyboardSettings.shared.recordBracketReturnDiagnostic(
+                "괄호 \(symbol) · 설정 \(enabled ? "ON" : "OFF") · \(String(describing: before)) → \(String(describing: keyboardMode))")
+        }
     }
 
     private func handleEnglishModeTap(row: Int, column: Int) {

@@ -27,6 +27,8 @@ final class KeyboardSettings: ObservableObject {
         static let earlyTouchDiagnostic = "earlyTouchDiagnostic"
         static let earlyTouchDelayedDiagnostic = "earlyTouchDelayedDiagnostic"
         static let autoCapitalizeDiagnostic = "autoCapitalizeDiagnostic"
+        static let bracketReturnDiagnostic = "bracketReturnDiagnostic"
+        static let textReplacementDiagnostic = "textReplacementDiagnostic"
         static let wordSuggestionEnabled = "wordSuggestionEnabled"
         static let fullAccessDiagnostic = "fullAccessDiagnostic"
         static let keyboardMeasuredBottomInset = "keyboardMeasuredBottomInset"
@@ -706,6 +708,26 @@ final class KeyboardSettings: ObservableObject {
 
     var autoCapitalizeDiagnostic: String? {
         defaults.string(forKey: Keys.autoCapitalizeDiagnostic)
+    }
+
+    /// 괄호 입력 후 글자 자판 · iOS 텍스트 대치의 실기기 판독용 (2026-11 실기기에서 둘 다 "안 됨" 제보 —
+    /// 유닛 테스트는 통과). 키보드가 읽은 설정과 실제 결과를 시각과 함께 남긴다. 내용(단축키·문구)은 남기지 않는다.
+    func recordBracketReturnDiagnostic(_ text: String) {
+        defaults.set("\(Self.diagnosticStamp()) \(text)", forKey: Keys.bracketReturnDiagnostic)
+    }
+
+    var bracketReturnDiagnostic: String? { defaults.string(forKey: Keys.bracketReturnDiagnostic) }
+
+    func recordTextReplacementDiagnostic(_ text: String) {
+        defaults.set("\(Self.diagnosticStamp()) \(text)", forKey: Keys.textReplacementDiagnostic)
+    }
+
+    var textReplacementDiagnostic: String? { defaults.string(forKey: Keys.textReplacementDiagnostic) }
+
+    private static func diagnosticStamp() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm:ss"
+        return f.string(from: Date())
     }
 
     /// 익스텐션이 마지막으로 실측한 하단 안전영역(pt). 아직 키보드를 한 번도
