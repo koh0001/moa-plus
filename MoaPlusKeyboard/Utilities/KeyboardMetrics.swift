@@ -179,6 +179,15 @@ enum KeyboardMetrics {
         }
     }
 
+    /// 아이패드 플로팅 키보드(폭 ~320pt)는 아이폰처럼 다룬다 (앱스토어 리뷰 2026-11 "플로팅 키보드 버튼이 홀쭉").
+    /// 아이패드 기본 높이를 쓰면 좁은 폭에 키가 길쭉해지고, 세로 분할을 켜 뒀으면 320pt 를 둘로 쪼갠다.
+    /// 가장 좁은 아이패드 세로 폭이 744pt 라 500 아래는 플로팅뿐이다. 폭을 아직 모르면(0) 아이패드 그대로.
+    static let compactPadKeyboardWidth: CGFloat = 500
+
+    static func usesPadMetrics(isPad: Bool, keyboardWidth: CGFloat) -> Bool {
+        isPad && (keyboardWidth <= 0 || keyboardWidth >= compactPadKeyboardWidth)
+    }
+
     /// 키보드는 항상 화면 폭을 꽉 채우므로, 키보드 폭이 기기 장축이면 가로.
     /// (단축+장축 중점을 임계로 둬서 인셋/안전영역 오차에 강건.)
     static func isLandscapeKeyboard(keyboardWidth: CGFloat,
